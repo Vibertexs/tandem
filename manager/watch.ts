@@ -53,11 +53,11 @@ if (!brain.isOperator()) {
   log('approved.');
 }
 
-// Tell the page which repo the team works on, so it can show a teammate what to clone.
-// Only with --push: without it, task branches made on other computers never reach this one.
+// Tell the page which repo the team works on (its origin), so it can show a teammate what to
+// clone. Workers elsewhere push their task branches there, and merging fetches them.
 {
   let url = '';
-  if (opt.push) { try { url = execFileSync('git', ['-C', REPO, 'remote', 'get-url', 'origin'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch { /* no origin */ } }
+  try { url = execFileSync('git', ['-C', REPO, 'remote', 'get-url', 'origin'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch { /* no origin */ }
   await brain.setContext('repo_url', url).catch(() => {});
 }
 

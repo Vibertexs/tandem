@@ -31,7 +31,7 @@ await owner.reducers.postGoal({ sessionId: 'live', id: 'g1', text: 'Build the ca
 const repo = mkdtempSync(join(tmpdir(), 'tandem-watch-repo-'));
 execSync('git init -q && git remote add origin https://github.com/acme/shop.git', { cwd: repo, stdio: 'pipe' });
 const here = fileURLToPath(new URL('..', import.meta.url));
-const watcher = spawn(process.execPath, ['--import', 'tsx', join(here, 'watch.ts'), '--poll', '1', '--repo', repo, '--push'], {
+const watcher = spawn(process.execPath, ['--import', 'tsx', join(here, 'watch.ts'), '--poll', '1', '--repo', repo], {
   cwd: here,
   env: { ...process.env, STDB_URI: URI, STDB_DB: DB, TANDEM_SESSION: 'live', TANDEM_TOKEN_FILE: join(tmpdir(), `tandem-watch-${Date.now()}`), TANDEM_CLAUDE: join(here, 'test', 'fake-claude.mjs') },
 });
@@ -41,7 +41,7 @@ watcher.stderr.on('data', d => { out += d; });
 try {
   check('the watcher asks to manage the team', await until(() => [...owner.db.operatorRequests.iter()].length === 1, 15_000));
   await owner.reducers.approveOperator({ identity: [...owner.db.operatorRequests.iter()][0].identity });
-  check('with --push, it tells the page which repo a teammate should clone', await until(() =>
+  check('it tells the page which repo a teammate should clone (its origin)', await until(() =>
     [...owner.db.context.iter()].some(c => c.sessionId === 'live' && c.key === 'repo_url' && c.value === 'https://github.com/acme/shop.git'), 10_000));
   const goal = () => [...owner.db.goals.iter()].find(g => g.id === 'g1')!;
   check('after two failed planning runs the goal is failed, with the reason', await until(() => goal().status === 'failed', 30_000) &&

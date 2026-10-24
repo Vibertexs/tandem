@@ -1,10 +1,8 @@
-// Goals, Team, Shared memory, Activity and Settings.
+// Team, Shared memory, Activity and Settings. (Goals and their tasks are on the Board.)
 import { useState } from 'react';
 import type { Api, Snapshot } from './brain';
 import { shareable, type Team } from './config';
-import { GoalChip } from './Board';
-import { stageOf } from './ui';
-import { Avatar, Bar, CodeLine, EV_ICON, WorkerStatus, ago, copy, isManager, money, online, sh, took, liveInfo } from './ui';
+import { Avatar, Bar, CodeLine, EV_ICON, WorkerStatus, ago, copy, isManager, money, online, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
 
@@ -22,71 +20,12 @@ function useAct(say: (m: string) => void) {
 }
 const list = (text: string) => text.split(/[,\n]/).map(x => x.trim()).filter(Boolean);
 
-// ---------- Goals ----------
-const STAGE_ICON = { waiting: '○', todo: '○', doing: '▶', done: '✓' } as const;
-export function GoalsPage({ snap, now, say, api, isOp }: Common) {
-  const { busy, act } = useAct(say);
-  const [confirm, setConfirm] = useState<string | null>(null);
-  return (
-    <div className="page">
-      <p className="muted lead">Everything you asked for, newest first. The manager turns each goal into tasks; when they are all done, their work is merged into one branch.</p>
-      {snap.goals.length === 0 && <div className="card empty-board"><p className="muted">No goals yet. Send one from the Board.</p></div>}
-      <div className="goal-cards">
-        {snap.goals.map(g => {
-          const mine = snap.tasks.filter(t => t.goalId === g.id);
-          const done = mine.filter(t => t.status === 'done').length;
-          const cost = g.costUsd + mine.reduce((sum, t) => sum + t.costUsd, 0);
-          // when it was finished, from the brain's "Goal done" log line
-          const short = g.text.length > 60 ? g.text.slice(0, 57) + '...' : g.text;
-          const doneAt = g.status === 'done' ? snap.events.find(e => e.type === 'merge_unblocked' && e.message.startsWith(`Goal done: ${short}`))?.time : undefined;
-          return (
-            <article key={g.id} className="card goal-card">
-              <header><h2 className="grow">{g.text}</h2><GoalChip status={g.status} /></header>
-              <p className="small muted">Sent {ago(g.createdAt, now)}{doneAt ? ` · done in ${took(g.createdAt, doneAt.getTime())}` : ''}{mine.length ? ` · ${done} of ${mine.length} tasks done` : ''}{cost > 0 ? ` · ${money(cost)} of Claude usage` : ''}</p>
-              {mine.length > 0 && <div className="bar"><div className="bar-fill job-fill" style={{ width: `${Math.round((100 * done) / mine.length)}%` }} /></div>}
-              {mine.length > 0 && (
-                <ul className="plain goal-tasks">
-                  {mine.map(t => {
-                    const who = snap.workers.find(w => w.id === t.assignee);
-                    const st = stageOf(t);
-                    if (t.status === 'failed') return <li key={t.id} className="warn"><span aria-hidden="true">✕</span> {t.title}<span className="small"> · needs you: {t.resultSummary ?? 'no reason given'}</span></li>;
-                    return <li key={t.id} className={`stage-${st}`}><span aria-hidden="true">{STAGE_ICON[st]}</span> {t.title}{who ? <span className="small muted"> · {who.name}</span> : null}</li>;
-                  })}
-                </ul>
-              )}
-              {g.status === 'new' && <p className="small muted">The manager has not picked this up yet.</p>}
-              {(g.status === 'done' || g.status === 'failed') && g.note && <p className={`small goal-note ${g.status === 'failed' || /fail|could not|not on this/i.test(g.note) ? 'warn' : 'ok-note'}`}>{g.note}</p>}
-              {isOp && api && !['done', 'cancelled'].includes(g.status) && (
-                confirm === g.id
-                  ? <p className="small row-actions">Cancel it? Tasks not started yet are removed.
-                      <button type="button" className="btn danger" disabled={busy} onClick={() => act(() => api.cancelGoal(g.id), 'Goal cancelled.').then(() => setConfirm(null))}>Yes, cancel it</button>
-                      <button type="button" className="btn" onClick={() => setConfirm(null)}>Keep it</button></p>
-                  : <button type="button" className="link small cancel-goal" onClick={() => setConfirm(g.id)}>Cancel goal</button>
-              )}
-              {g.branch && (
-                <div className="branch-box">
-                  <span className="small">All of its work is on <code className="mono">{g.branch}</code></span>
-                  <button type="button" className="link" onClick={() => copy(`git checkout ${g.branch}`, say, 'Command copied')}>copy git checkout</button>
-                </div>
-              )}
-            </article>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ---------- Team ----------
 export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
   const share = shareable(team);
   const uri = share?.uri ?? team.uri;
-  // The manager says which repo the team works on (only when branches are pushed, so work from
-  // other computers can reach it). Real workers elsewhere need a clone of it.
+  // The manager says which repo the team works on (its origin). Real workers elsewhere need a clone.
   const repoUrl = snap.context.repo_url ?? '';
-  const folder = repoUrl.replace(/\/+$/, '').split(/[/:]/).pop()?.replace(/\.git$/, '') || 'project';
-  const join = repoUrl ? `.\\start.ps1 -Join ${uri} -Db ${team.db} -Repo ..\\${folder} -Push` : `.\\start.ps1 -Join ${uri} -Db ${team.db} -Simulate`;
-  const joinUnix = repoUrl ? `./start.sh --join ${uri} --db ${team.db} --repo ../${folder} --push` : `./start.sh --join ${uri} --db ${team.db} --simulate`;
   const mcp = `claude mcp add tandem -e STDB_URI=${uri} -e STDB_DB=${team.db} -e TANDEM_SESSION=live -- node --import tsx <tandem-folder>/mcp/src/server.ts`;
   const sorted = [...snap.workers].sort((a, b) => Number(online(b, now)) - Number(online(a, now)) || a.name.localeCompare(b.name));
   return (
@@ -116,24 +55,29 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
         <h2 id="connect-h">Connect a computer</h2>
         {share ? (
           <>
-            <p className="muted small">On the other computer, in the Tandem folder:</p>
-            {repoUrl && <>
-              <p className="muted small">1. Get the team's repo next to it:</p>
-              <CodeLine code={`git clone ${repoUrl} ../${folder}`} say={say} />
-              <p className="muted small">2. Start workers there that join this team:</p>
-            </>}
-            <CodeLine code={join} say={say} />
-            <p className="small muted">On macOS or Linux: <code className="mono">{joinUnix}</code></p>
-            {!repoUrl && <p className="small muted">Those workers fake the coding: this team has no shared repo. For real work from other computers, host with a repo that has a GitHub remote: <code className="mono">{sh('.\\start.ps1 -Lan -Push -Repo <your clone>', './start.sh --lan --push --repo <your clone>')}</code></p>}
-            <p className="small muted">They can watch the board at <a href={share.page}>{share.page}</a></p>
+            <p className="muted small">Send them the invite: <a href={share.page}>{share.page}</a>. In a browser it shows this board. To add their computer's workers:</p>
+            {repoUrl ? (
+              <>
+                <p className="muted small">1. Get the project:</p>
+                <CodeLine code={`git clone ${repoUrl}`} say={say} />
+                <p className="muted small">2. In that folder:</p>
+                <CodeLine code={`tandem join ${share.page}`} say={say} />
+              </>
+            ) : (
+              <>
+                <CodeLine code={`tandem join ${share.page} --simulate`} say={say} />
+                <p className="small muted">This project has no GitHub remote (origin), so workers on other computers can only fake the coding. Add a remote to the repo and run <code className="mono">tandem start</code> again, and they can do real work.</p>
+              </>
+            )}
+            <p className="small muted">Their Claude Code runs under their own login and quota.</p>
           </>
         ) : (
           <>
-            <p className="small warn">Right now only this computer can reach this team.</p>
-            <p className="muted small">To let other computers join, restart it open to your network. This page then shows the command to run on them.</p>
-            <CodeLine code={sh('.\\stop.ps1 -All; .\\start.ps1 -Lan', './stop.sh --all; ./start.sh --lan')} say={say} />
+            <p className="small warn">Right now only this computer can join.</p>
+            <p className="muted small">To invite others, start it open to your network, in the project's folder:</p>
+            <CodeLine code="tandem stop --all; tandem start" say={say} />
             <p className="muted small">Or add more workers on this computer:</p>
-            <CodeLine code={sh('.\\start.ps1 -Workers 4', './start.sh --workers 4')} say={say} />
+            <CodeLine code="tandem start --workers 4" say={say} />
           </>
         )}
         <details>
@@ -295,7 +239,7 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
           <dt>Address</dt><dd className="mono">{team.uri}</dd>
           {share && share.uri !== team.uri && <><dt>Others use</dt><dd className="mono">{share.uri}</dd></>}
         </dl>
-        {!share && <p className="small muted">Only this computer can open this team. Start it with <code className="mono">{sh('.\\start.ps1 -Lan', './start.sh --lan')}</code> to share the link.</p>}
+        {!share && <p className="small muted">Only this computer can open this team. To share the link: <code className="mono">tandem stop --all; tandem start</code> in the project's folder.</p>}
         <div className="row-actions">
           <button type="button" className="btn" onClick={async () => { try { const QRCode = (await import('qrcode')).default; setQr(await QRCode.toDataURL(pageUrl, { margin: 1, width: 220 })); } catch { setQr(''); } }}>Show QR code</button>
           <button type="button" className="btn" onClick={() => copy(pageUrl, say, 'Link copied')}>Copy link</button>

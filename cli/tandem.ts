@@ -337,7 +337,7 @@ async function joinTeam(argv: string[]) {
     }
     if (!git(repo!, 'remote', 'get-url', 'origin').ok) fail(`${repo} has no origin remote. The workers push their branches there for the host to merge.`);
     if (!which('claude')) fail('Claude Code (claude) is not installed or not on PATH. Or add --simulate.');
-    if (!repoUrl) say('  note: the host did not start with --push, so it cannot fetch the branches your workers push. Ask them to.');
+    if (!repoUrl) say('  note: the host\'s repo has no origin remote, so it cannot fetch the branches your workers push. Ask them to add one.');
   }
   repo ??= process.cwd();
   installPackages(['brain', 'mcp', 'launcher', 'manager']);

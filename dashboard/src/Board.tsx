@@ -1,7 +1,7 @@
 // The main page: tell the team what to build, then watch the tasks move across the board.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Api, Snapshot, Task } from './brain';
-import { Avatar, EV_ICON, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, money, online, sh, stageOf, took, why, type Stage } from './ui';
+import type { Api, Goal, Snapshot, Task } from './brain';
+import { Avatar, EV_ICON, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, money, online, stageOf, took, why, type Stage } from './ui';
 
 type Props = { snap: Snapshot; api: Api | null; isOp: boolean; now: number; say: (m: string) => void; present: boolean; go: (page: string) => void };
 
@@ -62,7 +62,7 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
       <div className="next card subtle">
         <span className="next-icon" aria-hidden="true">💤</span>
         <div><strong>The manager is offline, so new goals are waiting.</strong>
-          <p className="small muted">On the host, run <code className="mono">{sh('.\\start.ps1', './start.sh')}</code> again. It picks up where it left off.</p></div>
+          <p className="small muted">On the host, run <code className="mono">tandem start</code> again in the project's folder. It picks up where it left off.</p></div>
       </div>
     );
   }
@@ -71,7 +71,7 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
       <div className="next card subtle">
         <span className="next-icon" aria-hidden="true">🧭</span>
         <div><strong>The manager is not connected yet.</strong>
-          <p className="small muted">It turns your goals into tasks. On the host, run <code className="mono">{sh('.\\start.ps1', './start.sh')}</code>; then approve "Manager Claude" here. You can still add tasks by hand in Settings.</p></div>
+          <p className="small muted">It turns your goals into tasks. On the host, run <code className="mono">tandem start</code> in the project's folder; then approve "Manager Claude" here. You can still add tasks by hand in Settings.</p></div>
       </div>
     );
   }
@@ -80,7 +80,7 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
       <div className="next card subtle">
         <span className="next-icon" aria-hidden="true">💻</span>
         <div><strong>No workers are online.</strong>
-          <p className="small muted">Tasks wait until a worker picks them up. Start workers with <code className="mono">{sh('.\\start.ps1', './start.sh')}</code>, or connect another computer.</p></div>
+          <p className="small muted">Tasks wait until a worker picks them up. Start workers with <code className="mono">tandem start</code>, or invite another computer.</p></div>
         <button type="button" className="btn" onClick={() => go('team')}>Connect a computer</button>
       </div>
     );
@@ -130,12 +130,6 @@ function Prompt({ snap, api, isOp, say }: Props) {
           {EXAMPLES.map(x => <button key={x} type="button" className="chip example" onClick={() => { setText(x); input.current?.focus(); }}>{x}</button>)}
         </p>
       )}
-      {latest && (
-        <p className="small latest">
-          <span className="muted">Latest goal:</span> <span className="goal-text">{latest.text}</span>
-          <GoalChip status={latest.status} />
-        </p>
-      )}
     </section>
   );
 }
@@ -146,30 +140,88 @@ export function GoalChip({ status }: { status: string }) {
   return <span className={`chip goal-${status}`}>{text}</span>;
 }
 
-// How far along each goal is. Clicking one shows only its tasks on the board.
-export function GoalProgress({ snap, filter, setFilter, say }: { snap: Snapshot; filter: string | null; setFilter?: (g: string | null) => void; say: (m: string) => void }) {
-  const rows = snap.goals.filter(g => snap.tasks.some(t => t.goalId === g.id)).slice(0, 6);
-  if (rows.length === 0) return null;
+// One goal and its tasks: a swimlane. The header says what was asked and how it is going; the
+// body is the goal's tasks in the four stages. A goal that was already finished starts folded.
+type Lane = { key: string; goal: Goal | null; tasks: Task[] };
+const FINISHED = ['done', 'cancelled'];
+const EMPTY_LANE: Record<string, string> = {
+  new: 'Waiting for the manager to plan it.', planning: 'The manager is splitting it into tasks…',
+  planned: 'No tasks.', cancelled: 'Cancelled before any work started.', done: 'Done.', failed: '',
+};
+
+function GoalLane({ lane, p, open, setOpen, flash }: { lane: Lane; p: Props; open: string | null; setOpen: (id: string) => void; flash: Set<string> }) {
+  const { snap, now, isOp, api, say } = p;
+  const g = lane.goal;
+  const [expanded, setExpanded] = useState(!(g && FINISHED.includes(g.status)));
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const act = async (fn: () => Promise<unknown>, done: string) => {
+    setBusy(true);
+    try { await fn(); say(done); } catch (e) { say('Could not do that: ' + (e as Error).message); } finally { setBusy(false); setConfirm(false); }
+  };
+  const done = lane.tasks.filter(t => t.status === 'done').length;
+  const cost = (g?.costUsd ?? 0) + lane.tasks.reduce((sum, t) => sum + t.costUsd, 0);
+  // when it was finished, from the brain's "Goal done" log line
+  const short = g && (g.text.length > 60 ? g.text.slice(0, 57) + '...' : g.text);
+  const doneAt = g?.status === 'done' ? snap.events.find(e => e.type === 'merge_unblocked' && e.message.startsWith(`Goal done: ${short}`))?.time : undefined;
+  const meta = g ? [
+    `sent ${ago(g.createdAt, now)}`,
+    doneAt ? `done in ${took(g.createdAt, doneAt.getTime())}` : '',
+    cost > 0 ? `${money(cost)} of Claude usage` : '',
+  ].filter(Boolean).join(' · ') : 'Added by hand, not part of a goal';
+  const warn = g && (g.status === 'failed' || /fail|could not|not on this|by hand/i.test(g.note));
   return (
-    <ul className="plain goal-rows" aria-label="Goals in progress">
-      {rows.map(g => {
-        const mine = snap.tasks.filter(t => t.goalId === g.id);
-        const done = mine.filter(t => t.status === 'done').length;
-        const pct = Math.round((100 * done) / mine.length);
-        const on = filter === g.id;
-        return (
-          <li key={g.id} className={`goal-row ${on ? 'on' : ''}`}>
-            {setFilter
-              ? <button type="button" className="goal-pick" onClick={() => setFilter(on ? null : g.id)} aria-pressed={on} title={on ? 'Show all tasks' : 'Show only this goal'}>{g.text}</button>
-              : <span className="goal-pick">{g.text}</span>}
-            <div className="bar"><div className="bar-fill job-fill" style={{ width: `${pct}%` }} /></div>
-            <span className="small muted nowrap">{done}/{mine.length}</span>
-            <GoalChip status={g.status} />
-            {g.branch && <button type="button" className="link mono" onClick={() => copy(`git checkout ${g.branch}`, say, `Copied: git checkout ${g.branch}`)} title={g.note ? `${g.note} Click to copy the git command.` : 'Copy the git command'}>{g.branch}</button>}
-          </li>
-        );
-      })}
-    </ul>
+    <section className={`goal-lane goal-${g?.status ?? 'other'} ${expanded ? '' : 'folded'}`} aria-label={g ? `Goal: ${g.text}` : 'Other tasks'}>
+      <header className="lane-head">
+        <button type="button" className="lane-toggle" aria-expanded={expanded} aria-label={expanded ? 'Fold' : 'Unfold'} onClick={() => setExpanded(!expanded)}>{expanded ? '▾' : '▸'}</button>
+        <div className="lane-title">
+          <strong className="goal-text">{g ? g.text : 'Other tasks'}</strong>
+          <span className="small muted">{meta}</span>
+        </div>
+        {lane.tasks.length > 0 && (
+          <span className="lane-progress">
+            <span className="bar"><span className="bar-fill job-fill" style={{ width: `${Math.round((100 * done) / lane.tasks.length)}%` }} /></span>
+            <span className="small muted nowrap">{done}/{lane.tasks.length}</span>
+          </span>
+        )}
+        {g && <GoalChip status={g.status} />}
+        {g && isOp && api && !FINISHED.includes(g.status) && !confirm && (
+          <button type="button" className="link small cancel-goal" onClick={() => setConfirm(true)}>Cancel goal</button>
+        )}
+      </header>
+      {g && confirm && (
+        <p className="small row-actions lane-foot">Cancel this goal? Tasks not started yet are removed.
+          <button type="button" className="btn danger small-btn" disabled={busy} onClick={() => act(() => api!.cancelGoal(g.id), 'Goal cancelled.')}>Yes, cancel it</button>
+          <button type="button" className="btn small-btn" onClick={() => setConfirm(false)}>Keep it</button>
+        </p>
+      )}
+      {(g?.note || g?.branch || (isOp && api && g?.status === 'failed')) && (
+        <div className="lane-foot">
+          {g?.note && <span className={`small goal-note ${warn ? 'warn' : 'ok-note'}`}>{g.note}</span>}
+          {g?.branch && (
+            <span className="small branch">
+              Work is on <code className="mono">{g.branch}</code>{' '}
+              <button type="button" className="link" onClick={() => copy(`git checkout ${g.branch}`, say, `Copied: git checkout ${g.branch}`)}>copy git checkout</button>
+            </span>
+          )}
+          {g && isOp && api && g.status === 'failed' && <button type="button" className="btn small-btn" disabled={busy} onClick={() => act(() => api.retryGoal(g.id), 'Sent to the manager again.')}>Try again</button>}
+        </div>
+      )}
+      {expanded && (lane.tasks.length === 0
+        ? (g && EMPTY_LANE[g.status] ? <p className="small muted lane-empty">{EMPTY_LANE[g.status]}</p> : null)
+        : (
+          <div className="lane-body">
+            {STAGES.map(s => {
+              const items = lane.tasks.filter(t => stageOf(t) === s.key);
+              return (
+                <div className="column" key={s.key} aria-label={s.title}>
+                  {items.map(t => <Card key={t.id} t={t} snap={snap} now={now} selected={open === t.id} flash={flash.has(t.id)} onOpen={() => setOpen(t.id)} />)}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+    </section>
   );
 }
 
@@ -293,13 +345,9 @@ function Drawer({ t, snap, now, onClose, api, isOp, say }: { t: Task; snap: Snap
 }
 
 export function BoardPage(p: Props) {
-  const { now, present, say } = p;
+  const { now, present, say, snap } = p;
   const [open, setOpen] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string | null>(null);
-  const activeFilter = filter && p.snap.goals.some(g => g.id === filter) ? filter : null;
-  // With a goal picked, the whole board (summary, columns) shows only that goal's tasks.
-  const snap = useMemo(() => activeFilter ? { ...p.snap, tasks: p.snap.tasks.filter(t => t.goalId === activeFilter) } : p.snap, [p.snap, activeFilter]);
-  const task = p.snap.tasks.find(t => t.id === open);
+  const task = snap.tasks.find(t => t.id === open);
 
   // Highlight cards that just moved.
   const prev = useRef(new Map<string, string>());
@@ -316,33 +364,37 @@ export function BoardPage(p: Props) {
     }
   }, [snap.tasks]);
 
-  const cols = useMemo(() => STAGES.map(s => ({ ...s, items: snap.tasks.filter(t => stageOf(t) === s.key) })), [snap.tasks]);
+  // Goals still going come first (newest first), then tasks that belong to no goal, then
+  // finished goals. A cancelled goal with nothing left on it is not shown.
+  const lanes = useMemo((): Lane[] => {
+    const goalLanes = snap.goals
+      .map(g => ({ key: g.id, goal: g, tasks: snap.tasks.filter(t => t.goalId === g.id) }))
+      .filter(l => l.goal.status !== 'cancelled' || l.tasks.length > 0);
+    const loose = snap.tasks.filter(t => !snap.goals.some(g => g.id === t.goalId));
+    return [
+      ...goalLanes.filter(l => !FINISHED.includes(l.goal.status)),
+      ...(loose.length ? [{ key: 'other', goal: null, tasks: loose }] : []),
+      ...goalLanes.filter(l => FINISHED.includes(l.goal.status)),
+    ];
+  }, [snap.goals, snap.tasks]);
+
   return (
     <div className="page board-page">
       {!present && <NextStep {...p} openTask={setOpen} />}
       {!present && <Prompt {...p} />}
-      <GoalProgress snap={p.snap} filter={activeFilter} setFilter={setFilter} say={say} />
-      {activeFilter && <p className="small filter-note">Showing one goal. <button type="button" className="link" onClick={() => setFilter(null)}>Show all tasks</button></p>}
       {snap.tasks.length > 0 && <Summary snap={snap} />}
-      {snap.tasks.length === 0 ? (
+      {lanes.length === 0 ? (
         <div className="empty-board card">
-          <p><strong>No tasks yet.</strong></p>
-          <p className="muted">{p.isOp ? 'Describe what you want built above. The manager splits it into tasks, and workers pick them up.' : 'When the owner sends a goal, its tasks show up here.'}</p>
+          <p><strong>Nothing yet.</strong></p>
+          <p className="muted">{p.isOp ? 'Describe what you want built above. The manager splits it into tasks, and workers pick them up.' : 'When the owner sends a goal, it shows up here with its tasks.'}</p>
         </div>
       ) : (
-        <div className="columns" style={{ '--cols': cols.map(c => (c.items.length === 0 ? '0.6fr' : c.items.length > 6 ? '2fr' : '1fr')).join(' ') } as React.CSSProperties}>
-          {cols.map(c => (
-            <div className="column" key={c.key} aria-label={c.title}>
-              <h3 title={c.hint}>{c.title} <span className="count">{c.items.length}</span></h3>
-              <div className={`list ${c.items.length > 6 ? 'wrap' : ''}`}>
-                {c.items.map(t => <Card key={t.id} t={t} snap={snap} now={now} selected={open === t.id} flash={flash.has(t.id)} onOpen={() => setOpen(t.id)} />)}
-              </div>
-              {c.items.length === 0 && <p className="small muted empty">Nothing here</p>}
-            </div>
-          ))}
+        <div className="lanes">
+          <div className="lane-cols" aria-hidden="true">{STAGES.map(s => <span key={s.key} title={s.hint}>{s.title}</span>)}</div>
+          {lanes.map(l => <GoalLane key={l.key} lane={l} p={p} open={open} setOpen={setOpen} flash={flash} />)}
         </div>
       )}
-      {task && <><div className="scrim" onClick={() => setOpen(null)} /><Drawer t={task} snap={p.snap} now={now} onClose={() => setOpen(null)} api={p.api} isOp={p.isOp} say={say} /></>}
+      {task && <><div className="scrim" onClick={() => setOpen(null)} /><Drawer t={task} snap={snap} now={now} onClose={() => setOpen(null)} api={p.api} isOp={p.isOp} say={say} /></>}
     </div>
   );
 }

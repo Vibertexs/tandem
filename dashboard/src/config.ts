@@ -1,5 +1,5 @@
 // Which team this page shows, and how. A "team" is a brain address plus a team name (the database).
-//   ?db=<team>&uri=<ws://host:3001>   open a team (start.ps1 opens the page this way); remembered
+//   ?db=<team>&uri=<ws://host:3001>   open a team (tandem start opens the page this way); remembered
 //   &lan=<ip>                           the host's network address, for links others can use
 //   ?view=present                       big type, no controls
 //   ?mock=1                             a still picture from contract/seed.json, no brain

@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { config, forgetTeam, rememberTeam, type Team } from './config';
+import { config, forgetTeam, rememberTeam, shareable, type Team } from './config';
 import { useBrain } from './useBrain';
 import { Landing, Unreachable } from './Landing';
 import { BoardPage } from './Board';
-import { ActivityPage, GoalsPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
-import { isManager, managerOnline, online, useNow } from './ui';
+import { ActivityPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
+import { CodeLine, isManager, managerOnline, online, useNow } from './ui';
 
 const PAGES = [
   { key: 'board', label: 'Board', icon: '▦' },
-  { key: 'goals', label: 'Goals', icon: '◎' },
   { key: 'team', label: 'Team', icon: '◉' },
   { key: 'memory', label: 'Shared memory', icon: '✎' },
   { key: 'activity', label: 'Activity', icon: '≡' },
@@ -84,7 +83,7 @@ export function App() {
   const asked = !!me && snap.requests.some(r => r.identity === me);
 
   if (unowned && !justWatch && !config.present) {
-    // If the manager started by start.ps1 is already asking, approve it in the same click.
+    // If the manager started by tandem start is already asking, approve it in the same click.
     const mgr = snap.requests.find(r => isManager(r.name));
     const claim = async () => {
       try {
@@ -111,10 +110,7 @@ export function App() {
   }
 
   const workersOnline = snap.workers.filter(w => online(w, now)).length;
-  const badge: Partial<Record<PageKey, number>> = {
-    goals: snap.goals.filter(g => g.status === 'new').length,
-    settings: isOp ? snap.requests.length : 0,
-  };
+  const badge: Partial<Record<PageKey, number>> = { settings: isOp ? snap.requests.length : 0 };
   const title = PAGES.find(p => p.key === page)!.label;
   const common = { snap, api, isOp, me, now, say };
 
@@ -150,6 +146,7 @@ export function App() {
         <header className="topbar">
           <h1>{config.present ? `${team?.db ?? 'Tandem'}` : title}</h1>
           <span className="spacer" />
+          {!config.mock && !config.present && team && <Invite team={team} say={say} />}
           {!config.mock && !isOp && !config.present && status === 'connected' && (
             asked
               ? <span className="chip goal-new">⏳ Waiting for the owner to approve you</span>
@@ -160,7 +157,6 @@ export function App() {
         {status === 'connecting' && api && <div className="banner">Connection lost. Reconnecting…</div>}
         <main>
           {page === 'board' && <BoardPage {...common} isOp={isOp} present={config.present} go={go} />}
-          {page === 'goals' && <GoalsPage {...common} />}
           {page === 'team' && <TeamPage {...common} team={team ?? { uri: '', db: 'sample' }} />}
           {page === 'memory' && <MemoryPage {...common} />}
           {page === 'activity' && <ActivityPage {...common} />}
@@ -168,6 +164,35 @@ export function App() {
         </main>
       </div>
       {toast}
+    </div>
+  );
+}
+
+// The team's invite, on every page: a link others open in a browser, and the same link for
+// `tandem join` on their computer.
+function Invite({ team, say }: { team: Team; say: (m: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const share = shareable(team);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+  if (!share) {
+    return <span className="chip invite-local" title="To invite others: tandem stop --all, then tandem start, in the project's folder">This computer only</span>;
+  }
+  return (
+    <div className="invite">
+      <button type="button" className="btn" aria-expanded={open} onClick={() => setOpen(!open)}>Invite</button>
+      {open && (
+        <div className="invite-pop card" role="dialog" aria-label="Invite">
+          <p className="small"><strong>Send this link.</strong> <span className="muted">In a browser it shows this board.</span></p>
+          <CodeLine code={share.page} say={say} />
+          <p className="small muted">To add their computer's workers, in their clone of the project:</p>
+          <CodeLine code={`tandem join ${share.page}`} say={say} />
+        </div>
+      )}
     </div>
   );
 }

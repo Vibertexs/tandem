@@ -30,7 +30,9 @@ const until = async (fn: () => Promise<boolean>, ms = 8000) => {
 const shot = async (page: Page, name: string, full = false) => { if (SHOTS) await page.screenshot({ path: join(SHOTS, name + '.png'), fullPage: full }); };
 const seen = (page: Page, text: string | RegExp, ms = 8000) =>
   page.getByText(text).first().waitFor({ state: 'visible', timeout: ms }).then(() => true, () => false);
-const col = (page: Page, name: string) => page.locator('.column', { has: page.locator('h3', { hasText: name }) });
+// a stage's cards, in every goal's lane
+const col = (page: Page, name: string) => page.locator(`.lane-body .column[aria-label="${name}"]`);
+const lane = (page: Page, text: string) => page.locator('.goal-lane', { hasText: text }).first();
 const prompt = (page: Page) => page.getByLabel('Describe what you want built');
 const nav = (page: Page, label: string) => page.locator('.nav a', { hasText: label }).click();
 const desktop = { width: 1440, height: 960 };
@@ -49,31 +51,28 @@ try {
 
   // ---- 1. nothing connected: host or join ----
   await A.goto(URL_);
-  check('start: with nothing connected, the page offers Host a team and Join a team',
-    await seen(A, 'Host a team') && await seen(A, 'Join a team', 1000) && await A.getByText('.\\start.ps1').first().isVisible());
+  check('start: with nothing connected, the page offers Host a team (tandem start in your project) and Join a team',
+    await seen(A, 'Host a team') && await seen(A, 'Join a team', 1000) && await A.getByText('tandem start', { exact: true }).first().isVisible() && await seen(A, "In your project's folder", 1000));
   await shot(A, '01-start');
-  {
-    const mac = await (await browser.newContext({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 Chrome/130 Safari/537.36' })).newPage();
-    await mac.goto(URL_);
-    check('start: on a Mac it shows ./start.sh', await seen(mac, './start.sh', 5000));
-    await mac.context().close();
-  }
-  await A.getByLabel('Host address').fill('127.0.0.1:9');
-  await A.getByLabel('Team name', { exact: true }).last().fill(DB);
+  await A.getByLabel('Invite link').fill('not an invite');
   await A.getByRole('button', { name: 'Join' }).click();
-  check('start: a wrong address says it cannot reach the team, with Try again', await seen(A, `Can't reach "${DB}"`, 12_000) && await A.getByRole('button', { name: 'Try again' }).isVisible());
+  check('start: something that is not an invite says what one looks like', await seen(A, "That doesn't look like an invite", 3000));
+  await A.getByLabel('Invite link').fill(`127.0.0.1:9/${DB}`);
+  await A.getByRole('button', { name: 'Join' }).click();
+  check('start: an invite nobody answers says it cannot reach the team, with Try again', await seen(A, `Can't reach "${DB}"`, 12_000) && await A.getByRole('button', { name: 'Try again' }).isVisible());
   await A.getByRole('button', { name: 'Choose another team' }).click();
   check('start: "Choose another team" goes back to the start', await seen(A, 'Host a team', 4000));
-  await A.getByLabel('Team name', { exact: true }).last().fill(DB);
-  await A.getByRole('button', { name: 'Join' }).click();
+  await A.getByLabel('Team name', { exact: true }).fill(DB);
+  await A.getByRole('button', { name: 'Open' }).click();
 
   // ---- 2. first visitor becomes the owner ----
   check('owner: a team with no owner asks "Make me the owner" (or just watch)', await seen(A, 'has no owner yet') && await A.getByRole('button', { name: 'Just watch' }).isVisible());
   await shot(A, '02-owner');
   await A.getByRole('button', { name: 'Make me the owner' }).click();
   check('owner: then the board opens, with the prompt on', await until(() => prompt(A).isEnabled()));
-  check('owner: the sidebar has Board, Goals, Team, Shared memory, Activity, Settings',
-    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Board|Goals|Team|Shared memory|Activity|Settings');
+  check('owner: the sidebar has Board, Team, Shared memory, Activity, Settings (goals live on the Board)',
+    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Board|Team|Shared memory|Activity|Settings');
+  check('owner: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
   check('owner: it shows one next step: the manager is not connected yet', await seen(A, 'The manager is not connected yet', 3000));
   check('owner: the sidebar says you manage the team', await seen(A, 'You manage this team', 2000));
 
@@ -97,8 +96,8 @@ try {
   check('goal: "/" jumps to the prompt', await prompt(A).evaluate(el => el === document.activeElement));
   await prompt(A).fill('Build a tiny calculator with tests');
   await A.getByRole('button', { name: /^Send/ }).click();
-  check('goal: the latest goal shows "Waiting for the manager"', await seen(A, 'Waiting for the manager', 4000) && await seen(A, 'Build a tiny calculator with tests', 1000));
-  check('goal: the Goals tab shows a count of 1 waiting', await A.locator('.nav a', { hasText: 'Goals' }).locator('.badge-count').innerText().then(t => t === '1'));
+  check('goal: the goal gets its own lane on the board, waiting for the manager',
+    await until(async () => /Waiting for the manager/.test(await lane(A, 'Build a tiny calculator with tests').innerText().catch(() => '')), 4000));
   check('manager: approved but not running, with a goal waiting, the next step says the manager is offline', await seen(A, 'The manager is offline, so new goals are waiting.', 4000) && await seen(A, 'Manager offline', 1000));
   await manager.reducers.ping({ sessionId: 'live', name: 'Manager Claude', kind: 'manager' });
   check('manager: once it pings, the sidebar says Manager online and the offline step goes away',
@@ -110,11 +109,11 @@ try {
     await manager.reducers.createTask({ sessionId: 'live', kind: 'normal', task: { id, title, description: '', files: [file], difficulty: 'easy', model: '', effort: 'default', dependsOn: id === 't-test' ? ['t-calc'] : [] } });
   }
   await manager.reducers.setGoalStatus({ sessionId: 'live', id: goalId, status: 'planned' });
-  check('goal: the board shows the goal with its own progress (0/2, Planned)',
-    await until(async () => (await A.locator('.goal-row').first().innerText()).includes('0/2') && (await A.locator('.goal-row').first().innerText()).includes('Planned'), 6000), await A.locator('.goal-row').first().innerText().catch(() => ''));
-  await nav(A, 'Goals');
-  check('goal: the Goals page shows it as one card with its 2 planned tasks', await seen(A, 'Everything you asked for') && await A.locator('.goal-card').count() === 1 && await seen(A, '0 of 2 tasks done', 2000));
-  await nav(A, 'Board');
+  const calc = lane(A, 'Build a tiny calculator with tests');
+  check('goal: its lane shows its progress (0/2, Planned) and its 2 tasks in their stages',
+    await until(async () => { const t = await calc.innerText(); return t.includes('0/2') && t.includes('Planned'); }, 6000) &&
+    await calc.locator('.column[aria-label="To do"] .task', { hasText: 'Write calc.py' }).count() === 1 &&
+    await calc.locator('.column[aria-label="Waiting"] .task', { hasText: 'Test calc.py' }).count() === 1, await calc.innerText().catch(() => ''));
 
   // ---- 5. add work by hand, then simulated workers pick it up ----
   await nav(A, 'Settings');
@@ -128,10 +127,12 @@ try {
   await seen(A, 'Big job created', 4000);
   await nav(A, 'Board');
   check('board: tasks land in To do, the merge task and the dependent test in Waiting', await until(async () => await col(A, 'To do').locator('.task').count() === 5 && await col(A, 'Waiting').locator('.task').count() === 2));
-  await A.locator('.goal-pick').first().click();
-  check('goal filter: picking a goal shows only its tasks', await until(async () => await A.locator('.columns .task').count() === 2) && await seen(A, 'Showing one goal.', 1000));
-  await A.getByRole('button', { name: 'Show all tasks' }).click();
-  check('goal filter: Show all tasks brings every task back', await until(async () => await A.locator('.columns .task').count() === 7));
+  check('board: work added by hand gets an "Other tasks" lane, after the goal still going', await until(async () =>
+    (await A.locator('.goal-lane .goal-text').allInnerTexts()).join('|') === 'Build a tiny calculator with tests|Other tasks') &&
+    await lane(A, 'Other tasks').locator('.task').count() === 5);
+  await calc.getByRole('button', { name: 'Fold' }).click();
+  check('board: a lane folds to one line and unfolds again', await calc.locator('.task').count() === 0 &&
+    await calc.getByRole('button', { name: 'Unfold' }).click().then(() => calc.locator('.task').count()) === 2);
   for (const name of ['Alex', 'Sam']) {
     launchers.push(spawn(process.execPath, ['--import', launcherTsx, launcherTs, '--name', name, '--simulate', '--sim-ms', '2500', '--poll', '1'], {
       env: { ...process.env, STDB_URI: 'ws://127.0.0.1:3001', STDB_DB: DB, TANDEM_SESSION: 'live' }, stdio: 'ignore',
@@ -152,37 +153,39 @@ try {
   // what the runs cost (a real launcher and the manager report this)
   await manager.reducers.addGoalCost({ sessionId: 'live', id: goalId, usd: 0.01 });
   await manager.reducers.finishGoal({ sessionId: 'live', id: goalId, branch: `tandem/${goalId}`, note: 'Tests pass (python -m unittest).' });
-  check('goal done: the goal row says Done and shows its branch', await until(async () => {
-    const row = await A.locator('.goal-row').first().innerText();
+  check('goal done: its lane says Done, 2/2, and where the work is', await until(async () => {
+    const row = await calc.innerText();
     return row.includes('2/2') && row.includes('Done') && row.includes(`tandem/${goalId}`);
-  }, 5000), await A.locator('.goal-row').first().innerText().catch(() => ''));
+  }, 5000), await calc.innerText().catch(() => ''));
+  const doneLane = await calc.innerText();
+  check('goal done: the lane says how it went, how long it took and what it cost', doneLane.includes('Tests pass') && /done in \d/.test(doneLane) && doneLane.includes('$0.01 of Claude usage'), doneLane);
+  check('goal done: a finished goal moves below the work still going', (await A.locator('.goal-lane .goal-text').allInnerTexts()).join('|') === 'Other tasks|Build a tiny calculator with tests');
   await shot(A, '06-board-done', true);
 
   // ---- 6. team, shared memory, activity ----
-  await nav(A, 'Goals');
-  const card = await A.locator('.goal-card').first().innerText();
-  check('goals page: the finished goal lists its tasks and where its work is', card.includes('Write calc.py') && card.includes('Test calc.py') && card.includes(`tandem/${goalId}`) && card.includes('2 of 2 tasks done'), card);
-  check('goals page: it shows how it went, how long it took and what it cost', card.includes('Tests pass') && /done in \d/.test(card) && card.includes('$0.01 of Claude usage'), card);
-  await shot(A, '06b-goals');
   await nav(A, 'Team');
   check('team: each worker card says how many tasks it finished', await until(async () => /\d+ tasks? done/.test(await A.locator('.worker').first().innerText())));
   check('team: both workers are listed as online cards', await until(async () => await A.locator('.worker').count() === 2) && await seen(A, 'Alex', 2000) && await seen(A, 'Sam', 1000));
   const connect = await A.locator('.connect').innerText();
   check('team: a team only this computer can reach says so, with the one command to open it up (no join command that cannot work)',
-    connect.includes('Right now only this computer can reach this team') && connect.includes('.\\stop.ps1 -All; .\\start.ps1 -Lan') && !connect.includes('-Join'), connect.slice(0, 300));
+    connect.includes('Right now only this computer can join') && connect.includes('tandem stop --all; tandem start') && !connect.includes('tandem join'), connect.slice(0, 300));
   {
-    // start.ps1 -Lan opens the page with &lan=<ip>: the join command and the link use that address.
+    // tandem start opens the page with &lan=<ip> when the brain is open to the network
     const L = await (await browser.newContext({ viewport: desktop })).newPage();
     await L.goto(`${URL_}/?db=${DB}&lan=10.1.2.3`);
+    const invite = `http://10.1.2.3:${new URL(URL_).port}/?db=${DB}`;
+    await L.getByRole('button', { name: 'Invite' }).click();
+    const pop = await L.getByRole('dialog', { name: 'Invite' }).innerText().catch(() => '');
+    check('invite: on the network, every page has an Invite button with the link and the tandem join command', pop.includes(invite) && pop.includes(`tandem join ${invite}`), pop);
+    await L.keyboard.press('Escape');
     await nav(L, 'Team');
     const lan = await L.locator('.connect').innerText().catch(() => '');
-    check('team: opened with the network address, it gives that address to share', lan.includes(`-Join ws://10.1.2.3:3001 -Db ${DB}`) && lan.includes(`http://10.1.2.3:`) && !lan.includes('Right now only'), lan.slice(0, 300));
-    check('team: with no shared repo, the joiners\' workers are simulated and it says how to host for real work', lan.includes('-Simulate') && lan.includes('has no shared repo'), lan.slice(0, 400));
-    // the manager publishes the repo's remote when branches are pushed: then the steps are clone + join
+    check('team: with no shared repo, a joiner\'s workers are simulated, and it says how to get real work', lan.includes(`tandem join ${invite} --simulate`) && lan.includes('no GitHub remote'), lan.slice(0, 400));
+    // the manager publishes the repo's origin: then the steps are clone + join
     await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: 'https://github.com/acme/shop.git' });
-    const withRepo = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/acme/shop.git ../shop'), 4000);
+    const withRepo = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/acme/shop.git'), 4000);
     const lan2 = await L.locator('.connect').innerText();
-    check('team: with a shared repo, a joiner clones it and starts real workers that push', withRepo && lan2.includes(`-Join ws://10.1.2.3:3001 -Db ${DB} -Repo ..\\shop -Push`), lan2.slice(0, 400));
+    check('team: with a shared repo, a joiner clones it, then tandem join in that folder', withRepo && lan2.includes(`tandem join ${invite}`) && !lan2.includes('--simulate'), lan2.slice(0, 400));
     await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: '' });
     await L.context().close();
   }
@@ -222,7 +225,7 @@ try {
   await A.getByRole('button', { name: 'Clear the board…' }).click();
   await A.getByRole('button', { name: 'Yes, clear everything' }).click();
   await nav(A, 'Board');
-  check('start over: the board is empty again, the team stays', await seen(A, 'No tasks yet.', 5000) && !(await A.getByText('No workers are online.').isVisible()));
+  check('start over: the board is empty again, the team stays', await seen(A, 'Nothing yet.', 5000) && !(await A.getByText('No workers are online.').isVisible()));
 
   // ---- 8b. a task two workers cannot finish ----
   for (const l of launchers) l.kill(); // so only the two test workers below can take it
@@ -258,14 +261,13 @@ try {
   await A.locator('.next').getByRole('button', { name: 'Try again' }).click();
   check('could not plan: Try again sends it to the manager again', await seen(A, 'Sent to the manager again.', 4000) &&
     await until(async () => [...manager.db.goals.iter()].find(g => g.id === 'g-bad')?.status === 'new', 4000));
-  // cancelling that goal
-  await nav(A, 'Goals');
-  const bad = A.locator('.goal-card', { hasText: 'Something the manager cannot plan' });
+  // cancelling that goal (it never got tasks, so its lane goes away)
+  const bad = lane(A, 'Something the manager cannot plan');
+  check('could not plan: back to waiting, its lane says so', await until(async () => /Waiting for the manager/.test(await bad.innerText()), 4000));
   await bad.getByRole('button', { name: 'Cancel goal' }).click();
   await bad.getByRole('button', { name: 'Yes, cancel it' }).click();
-  check('cancel: the owner can cancel a goal (with a confirm), and it says Cancelled', await seen(A, 'Goal cancelled.', 4000) &&
-    await until(async () => (await bad.innerText()).includes('Cancelled'), 4000) && await bad.getByRole('button', { name: 'Cancel goal' }).count() === 0);
-  await nav(A, 'Board');
+  check('cancel: the owner can cancel a goal (with a confirm); with no work done, it leaves the board', await seen(A, 'Goal cancelled.', 4000) &&
+    await until(() => A.locator('.goal-lane', { hasText: 'Something the manager cannot plan' }).count().then(n => n === 0), 4000));
   // a worker that hit its usage limit says until when
   await x1.reducers.updateCapacity({ sessionId: 'live', workerId: 'w-kim', usage5H: 100, usageWeek: undefined, resetAt: Timestamp.fromDate(new Date(Date.now() + 3600_000)), status: undefined });
   await nav(A, 'Team');
@@ -282,7 +284,7 @@ try {
   await P.goto(`${URL_}/?db=${DB}`);
   await until(() => prompt(P).isVisible(), 10_000);
   const bar = await P.locator('.sidebar').boundingBox();
-  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 840 && await P.locator('.nav a').count() === 6, bar);
+  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 840 && await P.locator('.nav a').count() === 5, bar);
   const small = await P.locator('.nav a, .btn').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent && (e as HTMLElement).offsetHeight < 44).length);
   check('phone: tap targets are at least 44px tall', small === 0, small);
   check('phone: no sideways scrolling', await P.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
@@ -295,7 +297,7 @@ try {
   await M.goto(`${URL_}/?mock=1`);
   check('sample: ?mock=1 shows sample data, clearly labeled, read only', await seen(M, 'Sample data, not connected to a team.', 5000) && await prompt(M).isDisabled());
   await M.goto(`${URL_}/?db=${DB}&view=present`);
-  check('present: ?view=present shows the board with no sidebar and no prompt', await until(() => M.locator('.columns, .empty-board').first().isVisible(), 10_000) && await M.locator('.sidebar').count() === 0 && await M.locator('.prompt').count() === 0);
+  check('present: ?view=present shows the board with no sidebar and no prompt', await until(() => M.locator('.lanes, .empty-board').first().isVisible(), 10_000) && await M.locator('.sidebar').count() === 0 && await M.locator('.prompt').count() === 0);
   await ctxM.close();
 } finally {
   for (const l of launchers) l.kill();

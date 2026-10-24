@@ -122,10 +122,6 @@ export function why(task: Task, snap: Snapshot): string {
   return `Ready. The next free worker takes it. It is ${kind}.`;
 }
 
-// Commands are shown for the computer you are on: start.ps1 on Windows, start.sh elsewhere.
-export const WINDOWS = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent);
-export const sh = (windows: string, unix: string) => (WINDOWS ? windows : unix);
-
 export const copy = (text: string, say: (m: string) => void, what = 'Copied') => {
   void navigator.clipboard?.writeText(text).then(() => say(`${what}.`), () => say('Could not copy. Select the text instead.'));
 };

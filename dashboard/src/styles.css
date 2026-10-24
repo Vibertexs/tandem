@@ -185,22 +185,41 @@ textarea { resize: vertical; }
 .done-line { color: var(--accent-strong); font-weight: 600; }
 .empty-board { text-align: center; padding: 36px 20px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
 
-.goal-rows { display: flex; flex-direction: column; gap: 6px; }
-.goal-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(80px, 1fr) auto auto auto; gap: 10px; align-items: center; padding: 8px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
-.goal-row.on { border-color: var(--accent-strong); box-shadow: 0 0 0 2px var(--accent-soft); }
-.goal-pick { background: none; border: 0; padding: 0; font: inherit; font-weight: 500; color: var(--ink); text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 32px; }
-span.goal-pick { cursor: default; }
+/* ---- the invite, top right of every page ---- */
+.invite { position: relative; }
+.invite-pop { position: absolute; right: 0; top: calc(100% + 8px); width: min(460px, calc(100vw - 32px)); z-index: 30; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12); }
+.chip.invite-local { cursor: help; }
+
+/* ---- the board: one swimlane per goal, its tasks in the four stages ---- */
+.lanes { display: flex; flex-direction: column; gap: 12px; }
+.lane-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 0 12px; position: sticky; top: 0; z-index: 2; background: var(--bg); font: 600 0.72rem/2.2 var(--mono, ui-monospace, monospace); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.goal-lane { background: var(--panel); border-radius: var(--radius); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; border: 1px solid transparent; }
+.goal-lane.goal-failed { border-color: var(--danger); }
+.goal-lane.folded { padding-bottom: 10px; }
+.lane-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lane-toggle { background: none; border: 0; color: var(--muted); font-size: 0.95rem; width: 28px; min-height: 32px; cursor: pointer; border-radius: 8px; flex: none; }
+.lane-toggle:hover { background: var(--card); color: var(--ink); }
+.lane-title { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.lane-title .goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-progress { display: flex; align-items: center; gap: 8px; width: min(220px, 30%); flex: none; }
+.lane-progress .bar { flex: 1; display: block; }
+.lane-progress .bar-fill { display: block; }
+.lane-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-left: 38px; }
+.lane-foot .branch code { background: var(--card); padding: 1px 6px; border-radius: 6px; }
+.lane-body { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.lane-body .column { background: none; padding: 0; min-height: 0; gap: 8px; }
+.lane-empty { padding-left: 38px; margin: 0; }
+.cancel-goal { color: var(--muted); flex: none; }
+.cancel-goal:hover { color: var(--danger); }
+/* finished work takes one line: title and who did it */
+.lane-body .task.stage-done { flex-direction: row; align-items: center; gap: 8px; padding: 8px 12px; min-height: 40px; }
+.lane-body .task.stage-done .task-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9rem; color: var(--muted); }
+.lane-body .task.stage-done .card-foot { flex-wrap: nowrap; }
+.lane-body .task.stage-done .card-foot .files { display: none; }
+.btn.small-btn { min-height: 32px; padding: 0 12px; font-size: 0.85rem; }
 .nowrap { white-space: nowrap; }
-.filter-note { padding: 0 4px; }
-.goal-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
-.goal-card { display: flex; flex-direction: column; gap: 8px; }
-.goal-card header { display: flex; gap: 10px; align-items: flex-start; }
-.goal-tasks li { padding: 3px 0; font-size: 0.88rem; }
-.goal-tasks li.stage-done { color: var(--muted); }
-.goal-tasks li.stage-doing span[aria-hidden] { color: var(--accent-strong); }
-.goal-note { padding: 6px 10px; border-radius: 8px; background: var(--panel); }
+.goal-note { padding: 4px 10px; border-radius: 8px; background: var(--card); }
 .goal-note.ok-note { color: var(--accent-strong); }
-.branch-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; background: var(--accent-soft); border-radius: 10px; }
 .chip.goal-done { background: var(--accent-strong); color: var(--bg); border-color: transparent; }
 
 /* ---- task details drawer ---- */
@@ -269,8 +288,13 @@ ol.log.card { padding: 6px 18px; }
   .column .empty { margin: 0 4px 4px; }
   .row2 { grid-template-columns: 1fr; }
   .job { grid-template-columns: 1fr; }
-  .goal-row { grid-template-columns: 1fr auto; }
-  .goal-row .bar { grid-column: 1 / -1; }
+  .lane-cols { display: none; }
+  .lane-head { flex-wrap: wrap; }
+  .lane-progress { order: 3; width: 100%; padding-left: 38px; }
+  .lane-foot, .lane-empty { padding-left: 0; }
+  .lane-body { grid-template-columns: 1fr; }
+  /* stacked: each stage says which it is */
+  .lane-body .column:not(:empty)::before { content: attr(aria-label); font: 600 0.7rem/1.6 var(--mono, ui-monospace, monospace); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
   .toast { bottom: 84px; }
 }
 

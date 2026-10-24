@@ -1,18 +1,35 @@
 // What you see before you are connected to a team: host one, or join one.
 import { useState } from 'react';
 import { defaultUri, type Team } from './config';
-import { CodeLine, WINDOWS, sh } from './ui';
+import { CodeLine } from './ui';
+
+// The invite the host's page and `tandem start` show: http://192.168.1.20:5173/?db=shop.
+// Also accepts host/team or host:3001/team. Returns null if it cannot tell the team.
+export function parseInvite(text: string): { page: string | null; team: Team } | null {
+  const x = text.trim();
+  if (!x) return null;
+  try {
+    const u = new URL(/^[a-z]+:\/\//i.test(x) ? x : `http://${x}`);
+    const db = u.searchParams.get('db') ?? u.pathname.replace(/^\/+|\/+$/g, '');
+    if (!db) return null;
+    const page = /^https?:$/.test(u.protocol) && u.port !== '3001' && u.searchParams.has('db') ? u.href : null;
+    // a page link's port is the page's; otherwise a port given is the brain's
+    const port = !page && u.port ? u.port : '3001';
+    return { page, team: { db, uri: `ws://${u.hostname}:${port}` } };
+  } catch { return null; }
+}
 
 export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: string) => void }) {
-  const [hostTeam, setHostTeam] = useState('tandem-local');
-  const [address, setAddress] = useState('');
-  const [joinTeam, setJoinTeam] = useState('tandem-local');
-  const toUri = (a: string) => {
-    const x = a.trim();
-    if (!x) return defaultUri();
-    if (/^wss?:\/\//.test(x)) return x;
-    if (/^https?:\/\//.test(x)) return x.replace(/^http/, 'ws');
-    return `ws://${x.includes(':') ? x : `${x}:3001`}`;
+  const [hostTeam, setHostTeam] = useState('');
+  const [invite, setInvite] = useState('');
+  const [bad, setBad] = useState(false);
+  const join = (e: React.FormEvent) => {
+    e.preventDefault();
+    const r = parseInvite(invite);
+    if (!r) { setBad(true); return; }
+    // the invite is a page on the host's computer: go there, so its links work too
+    if (r.page && new URL(r.page).host !== location.host) { location.href = r.page; return; }
+    onOpen(r.team);
   };
   return (
     <main className="landing">
@@ -24,30 +41,30 @@ export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: s
       <div className="landing-cards">
         <section className="card choice" aria-labelledby="host-h">
           <h2 id="host-h">Host a team</h2>
-          <p className="muted">Run the team on this computer. Do this once.</p>
+          <p className="muted">For the project on your computer.</p>
           <ol className="steps">
-            <li>In the Tandem folder, run:
-              <CodeLine code={WINDOWS ? '.\\start.ps1' : './start.sh'} say={say} />
-              <span className="small muted">It starts the brain, the manager and two workers, then opens this page. Add <code className="mono">{WINDOWS ? '-Simulate' : '--simulate'}</code> for workers that fake the coding (no Claude usage).{WINDOWS ? '' : ' On Windows: .\\start.ps1'}</span>
+            <li>In your project's folder, run:
+              <CodeLine code="tandem start" say={say} />
+              <span className="small muted">It starts everything, opens this page and prints the link to invite others. Just trying it out? <code className="mono">tandem start --demo --simulate</code> uses a sample project and no Claude usage.</span>
             </li>
             <li>Already running? Open it:
-              <form className="inline-form" onSubmit={e => { e.preventDefault(); onOpen({ uri: defaultUri(), db: hostTeam.trim() || 'tandem-local' }); }}>
+              <form className="inline-form" onSubmit={e => { e.preventDefault(); if (hostTeam.trim()) onOpen({ uri: defaultUri(), db: hostTeam.trim() }); }}>
                 <label className="sr-only" htmlFor="host-team">Team name</label>
-                <input id="host-team" value={hostTeam} onChange={e => setHostTeam(e.target.value)} aria-label="Team name" />
-                <button type="submit" className="btn primary">Open my team</button>
+                <input id="host-team" value={hostTeam} onChange={e => setHostTeam(e.target.value)} aria-label="Team name" placeholder="team name (your project folder's name)" />
+                <button type="submit" className="btn primary" disabled={!hostTeam.trim()}>Open</button>
               </form>
             </li>
           </ol>
         </section>
         <section className="card choice" aria-labelledby="join-h">
           <h2 id="join-h">Join a team</h2>
-          <p className="muted">Someone else hosts it. Ask them for the address and the team name.</p>
-          <form className="form" onSubmit={e => { e.preventDefault(); onOpen({ uri: toUri(address), db: joinTeam.trim() || 'tandem-local' }); }}>
-            <label>Host address<input value={address} onChange={e => setAddress(e.target.value)} placeholder="192.168.1.20  (blank = this computer)" /></label>
-            <label>Team name<input value={joinTeam} onChange={e => setJoinTeam(e.target.value)} /></label>
-            <button type="submit" className="btn primary">Join</button>
+          <p className="muted">Someone else hosts it. Paste the invite link they sent you.</p>
+          <form className="form" onSubmit={join}>
+            <label>Invite link<input value={invite} onChange={e => { setInvite(e.target.value); setBad(false); }} placeholder="http://192.168.1.20:5173/?db=shop" aria-invalid={bad} /></label>
+            {bad && <p className="small warn">That doesn't look like an invite. It looks like http://192.168.1.20:5173/?db=shop</p>}
+            <button type="submit" className="btn primary" disabled={!invite.trim()}>Join</button>
           </form>
-          <p className="small muted">You can watch right away. To send work, ask to make changes and the owner approves you.</p>
+          <p className="small muted">You can watch right away. To add your computer's workers, run <code className="mono">tandem join &lt;invite link&gt;</code> in your clone of the project.</p>
         </section>
       </div>
       <p className="small muted center"><a href="?mock=1">See a sample board</a> without connecting.</p>
@@ -63,7 +80,7 @@ export function Unreachable({ team, problem, onRetry, onLeave }: { team: Team; p
         <section className="card choice narrow" role="alert">
           <h2>"{team.db}" needs an update</h2>
           <p className="muted">Its brain runs an older version of Tandem than this page.</p>
-          <p>On the host, run <code className="mono">{sh(`.\\start.ps1 -Db ${team.db}`, `./start.sh --db ${team.db}`)}</code>. It updates the team and keeps its data.</p>
+          <p>On the host, run <code className="mono">tandem start</code> again in the project's folder. It updates the team and keeps its data.</p>
           <div className="row-actions">
             <button type="button" className="btn primary" onClick={onRetry}>Try again</button>
             <button type="button" className="btn" onClick={onLeave}>Choose another team</button>
@@ -78,8 +95,8 @@ export function Unreachable({ team, problem, onRetry, onLeave }: { team: Team; p
         <h2>Can't reach "{team.db}"</h2>
         <p className="muted">Nothing answered at <code className="mono">{team.uri}</code>.</p>
         {local
-          ? <p>If this computer hosts the team, start it with <code className="mono">{sh('.\\start.ps1', './start.sh')}</code> in the Tandem folder.</p>
-          : <p>Check that the host is running Tandem and that the address is right.</p>}
+          ? <p>If this computer hosts the team, run <code className="mono">tandem start</code> in the project's folder.</p>
+          : <p>Check that the host is running Tandem and that the invite link is right.</p>}
         <div className="row-actions">
           <button type="button" className="btn primary" onClick={onRetry}>Try again</button>
           <button type="button" className="btn" onClick={onLeave}>Choose another team</button>
