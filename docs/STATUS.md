@@ -39,7 +39,7 @@ For real work, go to your own project's folder and run `tandem start`. `tandem s
 Everything from the night before still holds: failure handling (giving back, conflicts as tasks, usage limits, goals that could not be planned), costs, worker ownership, `--review`, `--notify`, dependent tasks starting from their dependencies' work.
 
 ## Tested
-`.\test.ps1` on the final code: **11 suites, 362 checks, all pass** (no Claude calls).
+`.\test.ps1` on the final code: **11 suites, 361 checks, all pass** (no Claude calls).
 
 | Suite | Checks |
 |---|---|
