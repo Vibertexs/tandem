@@ -50,6 +50,10 @@ export class BrainClient {
 
   disconnect() { this.conn.disconnect(); }
 
+  async heartbeat(workerId: string) {
+    await this.conn.reducers.heartbeat({ workerId });
+  }
+
   async registerWorker(id: string, name: string, plan: string) {
     await this.conn.reducers.registerWorker({ id, name, plan });
   }

@@ -1,6 +1,7 @@
 // Tandem MCP server (stdio). Env:
 //   STDB_URI  default ws://127.0.0.1:3001   STDB_DB  default bilal-dev
 //   TANDEM_WORKER_ID  optional; otherwise call register_worker first
+//   HEARTBEAT_MS      default 30000
 // stdout is the protocol channel. Log to stderr only.
 import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
@@ -13,6 +14,14 @@ let workerId: string | undefined = process.env.TANDEM_WORKER_ID;
 
 const brainReady = BrainClient.connect(URI, DB);
 brainReady.catch(e => console.error('cannot connect to brain:', e));
+
+// While this process is alive the worker is alive. If Claude crashes, the
+// heartbeat stops and the brain frees this worker's locks after a while.
+const HEARTBEAT_MS = Number(process.env.HEARTBEAT_MS ?? 30_000);
+setInterval(() => {
+  if (!workerId) return;
+  brainReady.then(b => b.heartbeat(workerId!)).catch(e => console.error('heartbeat failed:', e));
+}, HEARTBEAT_MS);
 
 const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
 const fail = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });

@@ -27,10 +27,11 @@ Hello world published, and two clients claiming one task gives exactly one winne
 ## Progress (POC, local only)
 Built and tested on a local server (`bilal-dev`). Not published to `tandem` yet.
 - Tables: workers, tasks, locks, events. Still missing: `context`, `session_id`.
-- Reducers: register_worker, create_task, claim_task, complete_task. Still missing: take_locks, release_locks, update_capacity, create_job, add_event, set_context, reset_session, seed loader.
+- Reducers: register_worker, create_task, claim_task, take_locks, release_locks, complete_task, heartbeat, reap_stale. Still missing: update_capacity, create_job, add_event, set_context, reset_session, seed loader.
+- Stale workers: the MCP server sends a heartbeat every 30s. A worker silent for 2 minutes loses its locks and its task goes back to `open`. Cleanup runs whenever any live worker claims, locks or sends a heartbeat. `reap_stale(ttl_seconds)` is callable by anyone (TODO: restrict before the database is shared).
 - `claim_task` picks a task, takes its file locks and marks it claimed in one transaction. A task whose files are locked stays `open`.
 - `complete_task` releases locks and opens blocked tasks whose `depends_on` are all done.
-- Tests (`brain/test/brain.test.ts`): 10 clients race for one task (one winner), overlapping files wait, merge task opens exactly once.
+- Tests (`brain/test/brain.test.ts`): 10 clients race for one task (one winner), overlapping files wait, merge task opens exactly once, lock conflicts leave no partial locks, silent workers are reaped.
 - Column names are snake_case in the database (as in the contract). Generated client rows are camelCase.
 - Bindings are generated into `bindings/`. Regenerate with `spacetime generate --lang typescript --out-dir ./bindings --module-path ./spacetimedb --yes`.
 

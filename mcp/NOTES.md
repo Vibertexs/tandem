@@ -12,6 +12,9 @@
 - Tool errors come back as `isError: true` with a plain message.
 - Tool results are JSON text in `content`.
 
+## Crashed workers
+The server sends a heartbeat every 30s (`HEARTBEAT_MS`) once a worker is registered. If Claude dies, the heartbeat stops. After 2 minutes the brain frees that worker's locks and reopens its task. Tested with a killed server process. If a worker was only slow and comes back, its `complete_task` is rejected because the task was reopened.
+
 ## Known limits
 - `src/brain-client.ts` imports `../../brain/bindings`, so `brain/` needs `npm install` too. A shared package would fix this.
 - Default database is `bilal-dev` on `ws://127.0.0.1:3001`. Set `STDB_URI` and `STDB_DB` for anything else.

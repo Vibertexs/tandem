@@ -5,7 +5,7 @@
 // Env: STDB_URI (default ws://127.0.0.1:3001), STDB_DB (default bilal-dev)
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { DbConnection } from '../../brain/bindings/index.js';
+import { DbConnection, tables } from '../../brain/bindings/index.js';
 
 const URI = process.env.STDB_URI ?? 'ws://127.0.0.1:3001';
 const DB = process.env.STDB_DB ?? 'bilal-dev';
@@ -21,7 +21,7 @@ async function session(name: string) {
   await client.connect(new StdioClientTransport({
     command: process.execPath,
     args: ['--import', 'tsx', 'src/server.ts'],
-    env: { ...(process.env as Record<string, string>), STDB_URI: URI, STDB_DB: DB },
+    env: { ...(process.env as Record<string, string>), STDB_URI: URI, STDB_DB: DB, HEARTBEAT_MS: '300' },
   }));
   const call = async (tool: string, args: Record<string, unknown> = {}) => {
     const r = await client.callTool({ name: tool, arguments: args });
@@ -34,7 +34,15 @@ async function session(name: string) {
 // Test-only seeding. The 6 POC tools cannot create tasks (assign_task is a manager tool).
 const seed = await new Promise<DbConnection>((resolve, reject) => {
   DbConnection.builder().withUri(URI).withDatabaseName(DB)
-    .onConnect(c => resolve(c)).onConnectError((_c, e) => reject(e)).build();
+    .onConnect(c => {
+      c.subscriptionBuilder().onApplied(() => resolve(c)).subscribe([tables.workers, tables.tasks, tables.locks]);
+    })
+    .onConnectError((_c, e) => reject(e)).build();
+});
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+const newTask = (id: string, files: string[]) => ({
+  id, jobId: undefined, kind: 'normal', title: id, description: '', files,
+  difficulty: 'normal', model: 'sonnet', effort: 'default', dependsOn: [],
 });
 for (const [id, files] of [['t1', ['a.txt']], ['t2', ['a.txt']], ['t3', ['c.txt']]] as const) {
   await seed.reducers.createTask({
@@ -94,6 +102,30 @@ check('complete_task: cannot complete another worker\'s task', wrong.isError, wr
 
 const c2 = await A.call('claim_task');
 check('claim_task: t2 is claimable once a.txt is free', c2.data?.task?.id === 't2', c2.text);
+
+// Heartbeat: the server keeps its worker's last_seen fresh without any tool call.
+const seen = (id: string) => [...seed.db.workers.iter()].find(w => w.id === id)!.lastSeen.microsSinceUnixEpoch;
+const before = seen('w-bob');
+await sleep(1000);
+check('heartbeat: last_seen advances while the session is idle', seen('w-bob') > before, [before, seen('w-bob')]);
+
+// Crash: Dan claims a task, then his server process is killed without releasing anything.
+const D = await session('dan');
+await D.call('register_worker', { name: 'Dan', plan: 'pro' });
+await seed.reducers.createTask(newTask('t4', ['d.txt']));
+await sleep(300);
+const cd = await D.call('claim_task');
+check('crash: setup, Dan holds t4 and d.txt', cd.data?.task?.id === 't4', cd.text);
+await D.client.close();
+await sleep(2500); // Dan is gone and silent; Alice and Bob keep heartbeating
+await seed.reducers.reapStale({ ttlSeconds: 2 });
+await sleep(500);
+st = await A.call('get_status');
+const t4 = st.data.tasks.find((t: { id: string }) => t.id === 't4');
+const t2now = st.data.tasks.find((t: { id: string }) => t.id === 't2');
+check('crash: Dan\'s task is open again and d.txt is free',
+  t4.status === 'open' && t4.assignee === null && !st.data.locks.some((l: { path: string }) => l.path === 'd.txt'), t4);
+check('crash: Alice (alive) keeps her task', t2now.status === 'claimed' && t2now.assignee === 'w-alice', t2now);
 
 for (const s of [A, B, C]) await s.client.close();
 seed.disconnect();
