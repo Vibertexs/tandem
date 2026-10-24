@@ -8,7 +8,7 @@ MCP server that exposes the brain to every Claude as tools. TypeScript, stdio, M
 - [x] Thin brain client module (all database access goes through it): `src/brain-client.ts`
 - [x] **Mock mode** (`BRAIN_MODE=mock`): in-memory brain loaded from `contract/seed.json`, no database needed (`src/mock-brain.ts`)
 - [ ] Register the server with Claude Code (`claude mcp add`, check the docs for the exact syntax). The real-Claude test uses `--mcp-config` instead; `claude mcp add` itself is not tested yet
-- [ ] Team-rules skill: `skill/SKILL.md` (Omar, about hour 10)
+- [x] Team-rules skill: `skill/SKILL.md` (written by Bilal while solo). Copy it to `.claude/skills/tandem-worker/SKILL.md` in the repo a worker works on; headless runs get it in their prompt. Used by the real full-loop test
 - [ ] Lock-check hook: `hook/` (Omar, about hour 10)
 
 ## Checkpoint (about hour 6)
@@ -41,6 +41,8 @@ Env for `npm start`:
 | `HEARTBEAT_MS` | `30000` | |
 | `TANDEM_TOKEN_FILE` | `mcp/.tandem/token-<db>` | where the server saves its login, so its identity stays the same |
 
-Real-Claude test: `powershell -File mcp/test/e2e/run.ps1` (two headless `claude -p` haiku runs, uses a little quota, edits only a throwaway repo). Passed 3 times: two workers, three tasks, two sharing a file, no overlap.
+**Full loop** (the headline test): `powershell -File mcp/test/e2e/loop.ps1`. Posts a goal, runs the real manager, runs two real workers, checks nothing collided and their tests pass, then checks the dashboard (needs `npm run dev` in `dashboard/`). 3 haiku runs. Passed on the first try.
+
+Two-worker test: `powershell -File mcp/test/e2e/run.ps1` (two headless `claude -p` haiku runs, uses a little quota, edits only a throwaway repo). Passed 3 times: two workers, three tasks, two sharing a file, no overlap.
 
 Register with Claude Code for interactive use (not tested): `claude mcp add tandem -- node --import tsx <repo>/mcp/src/server.ts` (check `claude mcp add --help` for scope and env flags).

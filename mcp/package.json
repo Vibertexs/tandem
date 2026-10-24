@@ -8,7 +8,8 @@
     "test": "tsx test/mcp.test.ts",
     "test:mock": "tsx test/mock.test.ts",
     "whoami": "tsx src/whoami.ts",
-    "test:operator": "tsx test/operator.test.ts"
+    "test:operator": "tsx test/operator.test.ts",
+    "test:hook": "tsx test/hook.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "^2.4.0",
