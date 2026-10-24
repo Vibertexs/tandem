@@ -45,7 +45,7 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 - **Two workers claim at once:** the brain handles one first. The other gets a different task or nothing.
 - **A file is already locked:** the task waits (stays `open`) until the lock is freed. A Claude that tries to edit it anyway is blocked by the hook.
 - **A worker crashes:** no heartbeat for 2 minutes, so the brain frees its locks and reopens its task.
-- **A worker hits its limit (usage 100):** it is capped and its running task goes back to the queue.
+- **A worker hits its limit (usage 100):** it is capped and its running task goes back to the queue for someone with headroom. The launcher reads when the limit resets from Claude's message (or waits 30 minutes), stays online, then reports usage 0 and takes work again. The page shows "Out of quota until 3:00 PM".
 - **A worker cannot finish a task:** it calls `give_back_task` with a reason (the launcher does this after two failed runs). The locks are freed and a different worker gets it. If a second worker gives it back too, it is marked failed: the page says "needs you" with the reason, and an operator presses **Try again**.
 - **Two task branches conflict:** the manager adds a "Resolve the merge conflict with task/X" task for the files that conflict. The launcher starts that merge in the worker's worktree, Claude edits out the conflict markers, and the launcher commits the merge. The goal is finished once it is merged. A conflict that is still there after its fix task is left for a person ("merge by hand").
 - **The tests fail on the goal branch:** the manager adds one "Fix the failing tests" task to the goal and checks again when it is done.

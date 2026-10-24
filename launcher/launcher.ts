@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { BrainClient, type Task } from '../mcp/src/brain-client.js';
 import { loadRouting, route } from './routing.js';
+import { isRateLimit, resetTime } from './limits.js';
 import { filesWithMarkers, mergeInProgress, pushIfRemote, startConflictMerge } from '../manager/merge.js';
 import { conflictBranch } from '../manager/finish.js';
 
@@ -30,6 +31,7 @@ const { values: opt } = parseArgs({
     poll: { type: 'string', default: '3' },
     'sim-ms': { type: 'string', default: '1500' },
     push: { type: 'boolean', default: false },
+    'sim-limit': { type: 'string', default: '0' }, // simulate: hit a usage limit on the first task, lasting N seconds
   },
 });
 if (!opt.name) { console.error('usage: tsx launcher.ts --name <name> [--simulate] ...'); process.exit(2); }
@@ -56,13 +58,29 @@ const cannedResult = (t: Task) => ({
 
 // ---------- one task ----------
 
+// After a usage limit: when it resets.
+let cappedUntil = 0;
+async function hitLimit(until: Date) {
+  log(`hit a usage limit; waiting until ${until.toLocaleTimeString()}`);
+  // usage 100 caps this worker: the brain puts the task back in the queue for someone with headroom
+  await brain.reportCapacity(workerId, 100, null, until.toISOString());
+  cappedUntil = until.getTime();
+  return 'capped' as const;
+}
+
+let simLimitUsed = false;
 async function simulate(t: Task) {
   const ms = Number(opt['sim-ms']);
   await brain.reportProgress(workerId, t.id, 'started');
   await sleep(ms);
+  if (Number(opt['sim-limit']) > 0 && !simLimitUsed) {
+    simLimitUsed = true;
+    return hitLimit(new Date(Date.now() + Number(opt['sim-limit']) * 1000));
+  }
   await brain.reportProgress(workerId, t.id, 'halfway');
   await sleep(ms);
   await brain.completeTask(workerId, t.id, `sim/${t.id}`, `Simulated: ${t.title}`, t.kind === 'map' ? cannedResult(t) : undefined);
+  return 'done' as const;
 }
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
@@ -141,12 +159,7 @@ async function realRun(t: Task) {
     // Claude may have given the task back itself (give_back_task): then it is no longer ours.
     if (brain.getStatus().tasks.find(x => x.id === t.id)?.assignee !== workerId) return 'given back';
     if (cost > 0) await brain.recordCost(workerId, t.id, cost).catch(() => {});
-    if (/rate.?limit|usage limit|limit reached|try again later/i.test(out) && (code !== 0 || isError)) {
-      // cap this worker: the brain puts the task back in the queue for someone with headroom
-      log('hit a rate limit; reporting capped');
-      await brain.reportCapacity(workerId, 100, null, null);
-      return 'capped';
-    }
+    if (isRateLimit(out) && (code !== 0 || isError)) return hitLimit(resetTime(out));
     const leftover = resolving && code === 0 && !isError ? filesWithMarkers(tree, conflicted) : [];
     if (leftover.length > 0) {
       lastError = `conflict markers are still in ${leftover.join(', ')}`;
@@ -189,10 +202,16 @@ for (;;) {
     continue;
   }
   log(`claimed ${task.id}: ${task.title}`);
-  const outcome = opt.simulate ? (await simulate(task), 'done') : await realRun(task);
+  const outcome = opt.simulate ? await simulate(task) : await realRun(task);
   log(`${task.id}: ${outcome}`);
   if (outcome === 'done') done++;
-  if (outcome === 'capped') break;
+  if (outcome === 'capped') {
+    // stay online (the heartbeat keeps going) until the limit resets, then take work again
+    while (Date.now() < cappedUntil) await sleep(Math.min(60_000, cappedUntil - Date.now()));
+    await brain.reportCapacity(workerId, 0, null, null);
+    log('the limit has reset; back to work');
+    continue;
+  }
   if (max > 0 && done >= max) break;
 }
 clearInterval(beat);

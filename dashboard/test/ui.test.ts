@@ -7,6 +7,7 @@ import { mkdirSync } from 'node:fs';
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Timestamp } from 'spacetimedb';
 import { DbConnection, tables } from '../../brain/bindings/index.js';
 
 const URL_ = process.env.UI_URL ?? 'http://localhost:4173';
@@ -227,6 +228,11 @@ try {
   check('retry: Try again puts it back for any worker', await seen(A, 'Back on the board for any worker.', 4000) &&
     await until(() => A.getByText('needs you').count().then(n => n === 0), 4000));
   await A.keyboard.press('Escape');
+  // a worker that hit its usage limit says until when
+  await x1.reducers.updateCapacity({ sessionId: 'live', workerId: 'w-kim', usage5H: 100, usageWeek: undefined, resetAt: Timestamp.fromDate(new Date(Date.now() + 3600_000)), status: undefined });
+  await nav(A, 'Team');
+  check('limit: a worker out of quota says until when', await seen(A, /Out of quota until \d/, 4000));
+  await nav(A, 'Board');
   x1.disconnect(); x2.disconnect();
   check('no page errors', errs.length === 0, errs);
   manager.disconnect();

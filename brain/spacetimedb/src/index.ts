@@ -524,7 +524,10 @@ export const updateCapacity = spacetimedb.reducer(
     if (status !== undefined && !['idle', 'busy', 'capped'].includes(status)) throw new SenderError('bad status');
 
     let next = status ?? worker.status;
-    if (status === undefined && usage_5h !== undefined && usage_5h >= 100) next = 'capped';
+    if (status === undefined && usage_5h !== undefined) {
+      if (usage_5h >= 100) next = 'capped';
+      else if (worker.status === 'capped') next = 'idle'; // room again (for example, after the limit reset)
+    }
     const running = [...ctx.db.tasks.session_id.filter(session_id)]
       .some(x => x.status === 'claimed' && x.assignee === worker_id);
     if (next === 'capped') {

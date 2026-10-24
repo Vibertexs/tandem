@@ -41,7 +41,9 @@ const STATUS_TEXT: Record<string, string> = { idle: 'Free', busy: 'Working', cap
 export function WorkerStatus({ w, now }: { w: Worker; now: number }) {
   const offline = now - w.lastSeen.getTime() > 120_000;
   if (offline) return <span className="chip st-offline"><span aria-hidden="true">◌</span> Offline</span>;
-  return <span className={`chip st-${w.status}`}><span aria-hidden="true">{STATUS_ICON[w.status] ?? '○'}</span> {STATUS_TEXT[w.status] ?? w.status}</span>;
+  const until = w.status === 'capped' && w.resetAt && w.resetAt.getTime() > now
+    ? ` until ${w.resetAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '';
+  return <span className={`chip st-${w.status}`}><span aria-hidden="true">{STATUS_ICON[w.status] ?? '○'}</span> {STATUS_TEXT[w.status] ?? w.status}{until}</span>;
 }
 export const online = (w: Worker, now: number) => now - w.lastSeen.getTime() <= 120_000;
 

@@ -56,6 +56,30 @@ check('a.py was never worked on twice at once (c waited for a)', (() => {
   return doneA >= 0 && claimC > doneA;
 })());
 
+// A usage limit: the worker is capped, its task goes back to the queue, it waits, then resumes.
+{
+  const L = `ll-${Date.now().toString(36)}`;
+  await conn.reducers.createTask({ sessionId: L, kind: 'normal', task: input('z', ['z.py']) });
+  const child = spawn(process.execPath, ['--import', 'tsx', launcher, '--name', 'Lim', '--simulate', '--exit-when-idle', '--poll', '1', '--sim-ms', '300', '--sim-limit', '4'], {
+    env: { ...process.env, STDB_URI: URI, STDB_DB: DB, TANDEM_SESSION: L },
+  });
+  let out = '';
+  child.stdout.on('data', d => { out += d; });
+  const exited = new Promise<number>(res => child.on('close', c => res(c ?? 1)));
+  const lim = () => [...conn.db.workers.iter()].find(w => w.sessionId === L && w.id === 'w-lim');
+  const z = () => [...conn.db.tasks.iter()].find(t => t.sessionId === L && t.id === 'z');
+  let sawCapped = false;
+  for (let i = 0; i < 40 && !sawCapped; i++) {
+    await new Promise(r => setTimeout(r, 200));
+    sawCapped = lim()?.status === 'capped' && z()?.status === 'open';
+  }
+  check('limit: the worker is capped and its task goes back to To do', sawCapped, [lim()?.status, z()?.status]);
+  check('limit: it says when the limit resets', !!lim()?.resetAt && lim()!.resetAt!.toDate().getTime() > Date.now());
+  const code = await exited;
+  check('limit: after the reset it takes the task again and finishes it', code === 0 && z()?.status === 'done' && z()?.assignee === 'w-lim' && /back to work/.test(out), [code, z()?.status, out.slice(-200)]);
+  check('limit: it ends uncapped', lim()?.status === 'idle', lim()?.status);
+}
+
 conn.disconnect();
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
 setTimeout(() => process.exit(failures === 0 ? 0 : 1), 300);

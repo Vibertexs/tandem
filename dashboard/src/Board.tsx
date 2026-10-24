@@ -214,8 +214,14 @@ function Drawer({ t, snap, now, onClose, api, isOp, say }: { t: Task; snap: Snap
   try { result = t.result ? JSON.parse(t.result) : null; } catch { result = null; }
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => { ref.current?.focus(); }, [t.id]);
+  // Escape closes it wherever focus is (a button inside may have just disappeared).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return (
-    <aside className="drawer" role="dialog" aria-label={`Task: ${t.title}`} onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
+    <aside className="drawer" role="dialog" aria-label={`Task: ${t.title}`}>
       <header>
         <span className={`stage-chip stage-${stage.key} ${t.status === 'failed' ? 'is-failed' : ''}`}>{t.status === 'failed' ? 'Needs you' : stage.title}</span>
         <button ref={ref} type="button" className="icon-btn" onClick={onClose} aria-label="Close">✕</button>

@@ -195,6 +195,10 @@ check('capacity: bad usage is rejected', await rejects(clients[6].reducers.updat
 await clients[6].reducers.updateCapacity({ sessionId: S, workerId: ids[6], usage5H: 10, usageWeek: undefined, resetAt: undefined, status: 'idle' });
 await sleep(300);
 check('capacity: status idle with low usage un-caps the worker', main.workers().get(ids[6])!.status === 'idle');
+await clients[6].reducers.updateCapacity({ sessionId: S, workerId: ids[6], usage5H: 100, usageWeek: undefined, resetAt: undefined, status: undefined });
+await clients[6].reducers.updateCapacity({ sessionId: S, workerId: ids[6], usage5H: 0, usageWeek: undefined, resetAt: undefined, status: undefined });
+await sleep(300);
+check('capacity: reporting usage under 100 again un-caps it too (the limit reset)', main.workers().get(ids[6])!.status === 'idle');
 
 // 10. progress and context.
 await clients[0].reducers.reportProgress({ sessionId: S, workerId: ids[0], taskId: 't-lk1', message: 'halfway' });
