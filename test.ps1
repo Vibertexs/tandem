@@ -38,8 +38,8 @@ $suites = @(
   @('mcp: 17 tools, real brain', 'mcp', 'npm.cmd run test'),
   @('mcp: manager identity', 'mcp', 'npm.cmd run test:operator'),
   @('mcp: lock-check hook', 'mcp', 'npm.cmd run test:hook'),
-  @('launcher', 'launcher', 'npm.cmd run test'),
-  @('manager: merge, test, finish', 'manager', 'npm.cmd run test'),
+  @('launcher: routing, limits, simulate', 'launcher', 'npm.cmd run test'),
+  @('manager: merge, conflicts, test, finish, notify', 'manager', 'npm.cmd run test'),
   @('page in Chrome', 'dashboard', 'npx.cmd tsx test/ui.test.ts')
 )
 if ($Restart) { $suites += , @('page + worker survive a brain restart', 'dashboard', 'npx.cmd tsx test/reconnect.test.ts') }

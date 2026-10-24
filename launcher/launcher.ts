@@ -190,11 +190,28 @@ async function realRun(t: Task) {
 
 // ---------- main loop ----------
 
+// Stays online (the heartbeat keeps going) until the limit resets, then takes work again.
+async function waitForReset() {
+  while (Date.now() < cappedUntil) await sleep(Math.min(60_000, cappedUntil - Date.now()));
+  await brain.reportCapacity(workerId, 0, null, null);
+  log('the limit has reset; back to work');
+}
+
 let done = 0;
 const max = Number(opt['max-tasks']);
 for (;;) {
   let task: Task | null = null;
-  try { task = await brain.claimTask(workerId); } catch (e) { log(`claim refused: ${(e as Error).message}`); }
+  try { task = await brain.claimTask(workerId); } catch (e) {
+    const msg = (e as Error).message;
+    if (/capped/.test(msg)) {
+      // still capped from before this launcher started: wait for the reset the brain has
+      cappedUntil = Date.parse(brain.getCapacity().find(w => w.id === workerId)?.reset_at ?? '') || 0;
+      if (cappedUntil > Date.now()) log(`out of quota until ${new Date(cappedUntil).toLocaleTimeString()}`);
+      await waitForReset();
+      continue;
+    }
+    log(`claim refused: ${msg}`);
+  }
   if (!task) {
     const left = brain.getStatus().tasks.filter(t => t.status !== 'done' && t.status !== 'failed');
     if (opt['exit-when-idle'] && left.length === 0) break;
@@ -205,13 +222,7 @@ for (;;) {
   const outcome = opt.simulate ? await simulate(task) : await realRun(task);
   log(`${task.id}: ${outcome}`);
   if (outcome === 'done') done++;
-  if (outcome === 'capped') {
-    // stay online (the heartbeat keeps going) until the limit resets, then take work again
-    while (Date.now() < cappedUntil) await sleep(Math.min(60_000, cappedUntil - Date.now()));
-    await brain.reportCapacity(workerId, 0, null, null);
-    log('the limit has reset; back to work');
-    continue;
-  }
+  if (outcome === 'capped') { await waitForReset(); continue; }
   if (max > 0 && done >= max) break;
 }
 clearInterval(beat);

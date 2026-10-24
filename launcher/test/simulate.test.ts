@@ -78,6 +78,22 @@ check('a.py was never worked on twice at once (c waited for a)', (() => {
   const code = await exited;
   check('limit: after the reset it takes the task again and finishes it', code === 0 && z()?.status === 'done' && z()?.assignee === 'w-lim' && /back to work/.test(out), [code, z()?.status, out.slice(-200)]);
   check('limit: it ends uncapped', lim()?.status === 'idle', lim()?.status);
+
+  // stopped while out of quota, then started again: it waits for the reset the brain has, then works
+  await conn.reducers.createTask({ sessionId: L, kind: 'normal', task: input('y', ['y.py']) });
+  const first = spawn(process.execPath, ['--import', 'tsx', launcher, '--name', 'Lim', '--simulate', '--poll', '1', '--sim-ms', '300', '--sim-limit', '5'], {
+    env: { ...process.env, STDB_URI: URI, STDB_DB: DB, TANDEM_SESSION: L }, stdio: 'ignore',
+  });
+  for (let i = 0; i < 40 && lim()?.status !== 'capped'; i++) await new Promise(r => setTimeout(r, 200));
+  first.kill();
+  const again = spawn(process.execPath, ['--import', 'tsx', launcher, '--name', 'Lim', '--simulate', '--exit-when-idle', '--poll', '1', '--sim-ms', '300'], {
+    env: { ...process.env, STDB_URI: URI, STDB_DB: DB, TANDEM_SESSION: L },
+  });
+  let out2 = '';
+  again.stdout.on('data', d => { out2 += d; });
+  const code2 = await new Promise<number>(res => again.on('close', c => res(c ?? 1)));
+  const y = [...conn.db.tasks.iter()].find(t => t.sessionId === L && t.id === 'y');
+  check('limit: restarted while capped, it waits for the reset, then does the task', code2 === 0 && /out of quota until/.test(out2) && y?.status === 'done', [code2, y?.status, out2.slice(-300)]);
 }
 
 conn.disconnect();
