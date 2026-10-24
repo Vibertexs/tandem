@@ -84,6 +84,12 @@ if ! up 5173; then
   echo '  started'
 else echo '  already running'; fi
 URL="http://localhost:5173/?db=$DB"; [ $HOSTING = 0 ] && URL="$URL&uri=$(node -e 'console.log(encodeURIComponent(process.argv[1]))' "$URI")"
+# the network address others use (macOS, then Linux)
+IP=""
+if [ $HOSTING = 1 ] && [ $LAN = 1 ]; then
+  IP="$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  [ -n "$IP" ] && URL="$URL&lan=$IP"
+fi
 
 [ -n "$REPO" ] || REPO="$(dirname "$ROOT")/tandem-playground"
 if [ ! -d "$REPO/.git" ]; then
@@ -124,6 +130,7 @@ fi
 step 'Ready'
 echo "  Open $URL"
 [ $HOSTING = 1 ] && echo '  First time: click "Make me the owner" (it also approves the manager). Then describe what you want built.'
+[ -n "$IP" ] && echo "  Others can open http://$IP:5173/?db=$DB and join workers with: ./start.sh --join ws://$IP:3001 --db $DB"
 echo '  Logs: .tandem/logs   Stop: ./stop.sh'
 if [ $NOBROWSER = 0 ]; then
   { command -v open >/dev/null && open "$URL"; } || { command -v xdg-open >/dev/null && xdg-open "$URL"; } || { command -v cmd.exe >/dev/null && cmd.exe /c start "" "$URL"; } || true

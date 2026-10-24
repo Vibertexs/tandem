@@ -157,6 +157,16 @@ try {
   check('team: both workers are listed as online cards', await until(async () => await A.locator('.worker').count() === 2) && await seen(A, 'Alex', 2000) && await seen(A, 'Sam', 1000));
   const connect = await A.locator('.connect').innerText();
   check('team: "Connect a computer" gives the exact join command for this team', connect.includes(`-Join ws://127.0.0.1:3001 -Db ${DB}`), connect.slice(0, 160));
+  check('team: a team only this computer can reach says how to open it to the network', connect.includes('Right now only this computer can reach this team') && connect.includes('.\\start.ps1 -Lan'), connect.slice(0, 200));
+  {
+    // start.ps1 -Lan opens the page with &lan=<ip>: the join command and the link use that address.
+    const L = await (await browser.newContext({ viewport: desktop })).newPage();
+    await L.goto(`${URL_}/?db=${DB}&lan=10.1.2.3`);
+    await nav(L, 'Team');
+    const lan = await L.locator('.connect').innerText().catch(() => '');
+    check('team: opened with the network address, it gives that address to share', lan.includes(`-Join ws://10.1.2.3:3001 -Db ${DB}`) && lan.includes(`http://10.1.2.3:`) && !lan.includes('Right now only'), lan.slice(0, 300));
+    await L.context().close();
+  }
   await shot(A, '07-team');
   await nav(A, 'Shared memory');
   await A.getByLabel('Project summary').fill('A tiny calculator. Python 3, unittest.');

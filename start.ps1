@@ -117,7 +117,13 @@ if (-not (Up 5173)) {
   for ($i = 0; $i -lt 40 -and -not (Up 5173); $i++) { Start-Sleep -Milliseconds 500 }
   Write-Host '  started'
 } else { Write-Host '  already running' }
-$url = "http://localhost:5173/?db=$Db" + $(if ($hosting) { '' } else { "&uri=$([uri]::EscapeDataString($uri))" })
+# The network address others use, only if the brain really listens beyond this computer.
+$ip = $null
+if ($hosting -and $Lan -and (Get-NetTCPConnection -LocalPort 3001 -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalAddress -in '0.0.0.0', '::' })) {
+  # the adapter with a default gateway is the real network (not a VirtualBox or WSL one)
+  $ip = @(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' } | ForEach-Object { $_.IPv4Address.IPAddress })[0]
+}
+$url = "http://localhost:5173/?db=$Db" + $(if ($hosting) { '' } else { "&uri=$([uri]::EscapeDataString($uri))" }) + $(if ($ip) { "&lan=$ip" } else { '' })
 
 if (-not $Repo) { $Repo = Join-Path (Split-Path $root -Parent) 'tandem-playground' }
 if ($Workers -gt 0 -or ($hosting -and -not $NoManager)) {
@@ -169,9 +175,9 @@ Step 'Ready'
 Write-Host "  Open $url"
 if ($hosting) {
   Write-Host '  First time: click "Make me the owner" (it also approves the manager). Then describe what you want built.'
-  if ($Lan) {
-    $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254*' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
+  if ($ip) {
     Write-Host "  Others can open http://${ip}:5173/?db=$Db and join workers with: .\start.ps1 -Join ws://${ip}:3001 -Db $Db"
+    Write-Host '  (If Windows asks whether node and spacetime may use the network, allow private networks.)'
   }
 }
 Write-Host '  Logs: .tandem\logs   Stop: .\stop.ps1'

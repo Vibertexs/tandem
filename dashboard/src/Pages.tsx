@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import QRCode from 'qrcode';
 import type { Api, Snapshot } from './brain';
-import type { Team } from './config';
+import { shareable, type Team } from './config';
 import { GoalChip } from './Board';
 import { stageOf } from './ui';
 import { Avatar, Bar, CodeLine, EV_ICON, WorkerStatus, ago, copy, isManager, money, online, took, liveInfo } from './ui';
@@ -67,8 +67,10 @@ export function GoalsPage({ snap, now, say }: Common) {
 
 // ---------- Team ----------
 export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
-  const join = `.\\start.ps1 -Join ${team.uri} -Db ${team.db}`;
-  const mcp = `claude mcp add tandem -e STDB_URI=${team.uri} -e STDB_DB=${team.db} -e TANDEM_SESSION=live -- node --import tsx <tandem-folder>/mcp/src/server.ts`;
+  const share = shareable(team);
+  const uri = share?.uri ?? team.uri;
+  const join = `.\\start.ps1 -Join ${uri} -Db ${team.db}`;
+  const mcp = `claude mcp add tandem -e STDB_URI=${uri} -e STDB_DB=${team.db} -e TANDEM_SESSION=live -- node --import tsx <tandem-folder>/mcp/src/server.ts`;
   const sorted = [...snap.workers].sort((a, b) => Number(online(b, now)) - Number(online(a, now)) || a.name.localeCompare(b.name));
   return (
     <div className="page">
@@ -95,9 +97,11 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
       </div>
       <section className="card connect" aria-labelledby="connect-h">
         <h2 id="connect-h">Connect a computer</h2>
+        {!share && <p className="small warn">Right now only this computer can reach this team. To let others join, restart it open to your network: <code className="mono">.\stop.ps1 -All</code>, then <code className="mono">.\start.ps1 -Lan</code>. This page then shows the address to share.</p>}
         <p className="muted small">On the other computer, get the Tandem folder (clone the repo), then run:</p>
         <CodeLine code={join} say={say} />
-        <p className="small muted">It starts workers there that join this team. Use <code className="mono">-Simulate</code> instead for workers that fake the coding.</p>
+        <p className="small muted">It starts workers there that join this team. Add <code className="mono">-Simulate</code> for workers that fake the coding. On macOS or Linux: <code className="mono">./start.sh --join {uri} --db {team.db}</code></p>
+        {share && <p className="small muted">They can watch the board at <a href={share.page}>{share.page}</a></p>}
         <details>
           <summary className="small">Or use your own Claude Code session as a worker</summary>
           <ol className="steps small">
@@ -106,7 +110,6 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
             <li>Tell it: <em>Register with the tandem tools using my name, then claim a task, do it, and complete it. Repeat until no tasks are left.</em></li>
           </ol>
         </details>
-        {/127\.0\.0\.1|localhost/.test(team.uri) && <p className="small warn">This team's address is only reachable from this computer. To let others join, the host runs <code className="mono">.\start.ps1 -Lan</code> and shares its network address.</p>}
       </section>
     </div>
   );
@@ -170,7 +173,8 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
   const [title, setTitle] = useState(''); const [files, setFiles] = useState(''); const [desc, setDesc] = useState('');
   const [diff, setDiff] = useState('normal'); const [who, setWho] = useState('');
   const [goal, setGoal] = useState(''); const [pieces, setPieces] = useState('');
-  const pageUrl = `${location.origin}${location.pathname}?db=${encodeURIComponent(team.db)}${/127\.0\.0\.1/.test(team.uri) ? '' : `&uri=${encodeURIComponent(team.uri)}`}`;
+  const share = shareable(team);
+  const pageUrl = share?.page ?? `${location.origin}${location.pathname}?db=${encodeURIComponent(team.db)}`;
   return (
     <div className="page settings">
       {isOp && snap.requests.length > 0 && (
@@ -237,7 +241,9 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
         <dl className="facts">
           <dt>Team name</dt><dd className="mono">{team.db}</dd>
           <dt>Address</dt><dd className="mono">{team.uri}</dd>
+          {share && share.uri !== team.uri && <><dt>Others use</dt><dd className="mono">{share.uri}</dd></>}
         </dl>
+        {!share && <p className="small muted">Only this computer can open this team. Start it with <code className="mono">.\start.ps1 -Lan</code> to share the link.</p>}
         <div className="row-actions">
           <button type="button" className="btn" onClick={async () => { try { setQr(await QRCode.toDataURL(pageUrl, { margin: 1, width: 220 })); } catch { setQr(''); } }}>Show QR code</button>
           <button type="button" className="btn" onClick={() => copy(pageUrl, say, 'Link copied')}>Copy link</button>

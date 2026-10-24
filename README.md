@@ -48,7 +48,7 @@ For real work, drop `-Simulate`. Each task becomes a real headless Claude Code r
 |---|---|
 | `.\start.ps1` | Host a team on this computer (brain, page, manager, 2 real workers) |
 | `.\start.ps1 -Simulate` | Same, with workers that fake the coding |
-| `.\start.ps1 -Lan` | Let other computers on your network join; prints the address |
+| `.\start.ps1 -Lan` | Let other computers on your network join. The Team page then shows the exact command and link to share |
 | `.\start.ps1 -Join ws://<host>:3001 -Db <team>` | Add this computer's workers to someone else's team |
 | `.\start.ps1 -Workers 4 -Repo C:\path\to\repo` | More workers, working on your own repo |
 | `.\start.ps1 -Model auto` | Real workers pick the model by task difficulty (`launcher/routing.json`) instead of always using haiku |
