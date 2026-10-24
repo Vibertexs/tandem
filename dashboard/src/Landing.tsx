@@ -64,7 +64,7 @@ export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: s
             {bad && <p className="small warn">That doesn't look like an invite. It looks like http://192.168.1.20:5173/?db=shop</p>}
             <button type="submit" className="btn primary" disabled={!invite.trim()}>Join</button>
           </form>
-          <p className="small muted">You can watch right away. To add your computer's workers, run <code className="mono">tandem join &lt;invite link&gt;</code> in your clone of the project.</p>
+          <p className="small muted">You can watch right away. To add your computer's workers, get Tandem, then run <code className="mono">tandem join &lt;invite link&gt;</code>. It copies the project from the host.</p>
         </section>
       </div>
       <p className="small muted center"><a href="?mock=1">See a sample board</a> without connecting.</p>

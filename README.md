@@ -11,7 +11,7 @@ Describe what you want built. A manager plans it, every teammate's coding agent 
 ![SpacetimeDB](https://img.shields.io/badge/shared%20brain-SpacetimeDB-7c3aed)
 ![MCP](https://img.shields.io/badge/tools-MCP-1f2937)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex-d97757)
-![Tests](https://img.shields.io/badge/tests-343%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-361%20passing-2ea44f)
 
 ![The board while two workers are on it](docs/img/board.png)
 
@@ -73,15 +73,12 @@ On the **Board**, describe what you want built and send it. The manager splits i
 Run the same command in each project's folder. Every project is its own **team** with its own board and workers (`?db=<project folder name>`), all sharing one brain and one page. `tandem status` lists them, and `tandem stop` stops all of them.
 
 ### 3. Add a teammate's computer
-Their work reaches yours through **GitHub**, so the project needs a GitHub remote first:
-```
-git remote add origin https://github.com/<you>/<repo>.git
-git push -u origin main
-```
-Add your teammate as a collaborator on the repo, then restart (`tandem stop`, `tandem start`). Then:
+GitHub is not needed. Tandem shares the host's project directly with the teammate, and their workers push their task branches back to the host. Then:
 1. Send them the **invite link** (top right of the board, **Invite**, or the `Invite` line in your terminal).
-2. They need Node 22.18+, Git, Claude Code signed in, and the invite. The **Invite** box shows the exact commands to copy: `git clone` Tandem and the project side by side, then in the *project's* folder `..\tandem\tandem.cmd join "<invite>"` (macOS and Linux: `../tandem/tandem join "<invite>"`).
-3. Their Claude runs under their own login and quota. Their workers push each task branch to GitHub, and your manager fetches and merges them into the goal branch and runs the tests.
+2. They need Node 22.18+, Git, Claude Code signed in, and the invite. The **Invite** box shows the exact commands: clone Tandem once, then from its new `tandem` folder run `.\tandem.cmd join "<invite>"` on Windows (macOS and Linux: `./tandem join "<invite>"`). That one command copies the project into Tandem's private work folder and starts their workers.
+3. Their Claude runs under their own login and quota. Their workers push each task branch straight back to the host, and the host manager merges them into the goal branch and runs the tests.
+
+The host's project server has no separate login. Share only with people you trust, ideally through Tailscale; do not expose it on a public or shared network. `tandem start --local` keeps everything on one computer and does not share the project.
 
 If Node is older than 22.18, `tandem` stops with a clear message and where to get a new one (https://nodejs.org, or `winget install OpenJS.NodeJS.LTS` on Windows).
 
@@ -103,7 +100,7 @@ If you ever type an address by hand, use the host's Tailscale address (`tailscal
 | `tandem start --review` | A worker reviews each goal's merged branch (read only) before it is done |
 | `tandem start --push` | Push each goal's branch to origin, and open a PR if the GitHub CLI is set up |
 | `tandem start --notify <url>` | Post "goal done" (branch, tests, cost) to Slack or Discord |
-| `tandem join <invite>` | In your clone of the project: add this computer's workers to that team |
+| `tandem join <invite>` | Copy the host's project and add this computer's workers to that team |
 | `tandem account add <label> [--agent codex]` | A separate Claude Code or Codex login for a worker |
 | `tandem` / `tandem status` | What is running, with each team's links |
 | `tandem open` / `tandem logs` | Open the board / show the latest log lines |
@@ -156,11 +153,12 @@ Nothing talks to anything else directly. Every part reads and writes the brain, 
 | `docs/` | Architecture, status, roadmap, demo script |
 
 ## Tested
-`.\test.ps1` runs **10 suites, 343 checks**, none of which call an AI. [docs/STATUS.md](docs/STATUS.md) has the numbers and [docs/ROADMAP.md](docs/ROADMAP.md) what is next.
+`.\test.ps1` runs **11 suites, 361 checks**, none of which call an AI. [docs/STATUS.md](docs/STATUS.md) has the numbers and [docs/ROADMAP.md](docs/ROADMAP.md) what is next.
 - **Atomic rules:** 10 clients race for one task and exactly one wins. Lock conflicts leave no partial locks.
 - **Tools:** all 17, through the real MCP protocol, plus a mock mode.
 - **The board:** the whole first-use journey in Chrome, on desktop and phone, including failures.
 - **Failure handling:** a usage limit, a task given back twice, a merge conflict, failing tests.
+- **Host sharing:** a second Tandem state copies a host-served project, then pushes a task branch back to it without GitHub.
 - **Real Claude runs** (`.\test.ps1 -Real`): a goal planned, built by two Claudes, merged, tests passing; a Claude blocked from a locked file; a real merge conflict resolved; a teammate on another clone merged through a shared origin.
 
 ## Limits

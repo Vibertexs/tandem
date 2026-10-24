@@ -167,18 +167,17 @@ try {
   await manager.reducers.setContext({ sessionId: 'live', key: 'project_dir', value: 'C:\\Code\\calc-demo' });
   await nav(A, 'Setup');
   const steps = A.locator('.step');
-  check('setup: six numbered steps, from running to sending a goal', await until(async () => await steps.count() === 6) &&
+  check('setup: five numbered steps, from running to sending a goal', await until(async () => await steps.count() === 5) &&
     (await steps.first().innerText()).includes('Tandem is running') && (await steps.last().innerText()).includes('Send a goal'));
   check('setup: the commands carry this computer\'s real folders', await until(async () => {
     const s = await A.locator('.setup').innerText();
     return s.includes('$env:Path += ";C:\\Code\\tandem"') && s.includes('cd C:\\Code\\calc-demo');
   }, 4000));
   check('setup: the manager step ticks once the manager is online, the goal step once a goal exists',
-    await steps.nth(1).evaluate(e => e.classList.contains('done')) && await steps.nth(5).evaluate(e => e.classList.contains('done')));
+    await steps.nth(1).evaluate(e => e.classList.contains('done')) && await steps.nth(4).evaluate(e => e.classList.contains('done')));
   check('setup: step 3 is not ticked while no Claude worker is online, and gives the command to start them',
     await steps.nth(2).innerText().then(t => t.includes('No Claude worker is online yet') && t.includes('tandem start')) && !(await steps.nth(2).evaluate(e => e.classList.contains('done'))));
-  check('setup: with no GitHub remote, step 4 says how to add one', await steps.nth(3).innerText().then(t => t.includes('git remote add origin')) && !(await steps.nth(3).evaluate(e => e.classList.contains('done'))));
-  check('setup: a team only this computer can reach says how to open it up', await steps.nth(4).innerText().then(t => t.includes('tandem stop --all')));
+  check('setup: the invite step says how to open a local-only team to teammates', await steps.nth(3).innerText().then(t => t.includes('tandem stop --all')) && !(await steps.nth(3).evaluate(e => e.classList.contains('done'))));
   await shot(A, '06a-setup');
 
   // ---- 6. team, shared memory, activity ----
@@ -195,17 +194,17 @@ try {
     const invite = `http://10.1.2.3:${new URL(URL_).port}/?db=${DB}`;
     await L.getByRole('button', { name: 'Invite' }).click();
     const pop = await L.getByRole('dialog', { name: 'Invite' }).innerText().catch(() => '');
-    check('invite: on the network, every page has an Invite button with the link, and without a GitHub remote it says to add one first', pop.includes(invite) && pop.includes('no GitHub remote'), pop);
+    check('invite: on the network, every page has an Invite button with the link, and without a shared project it says how to restart it', pop.includes(invite) && pop.includes('not sharing the project yet'), pop);
     await L.keyboard.press('Escape');
     await nav(L, 'Team');
     const lan = await L.locator('.connect').innerText().catch(() => '');
-    check('team: with no GitHub remote it says to put the project on GitHub first, and shows no join command that could not work', lan.includes('no GitHub remote') && !lan.includes('tandem.cmd join'), lan.slice(0, 400));
-    // the manager publishes the repo's origin: then the steps are clone + join
-    await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: 'https://github.com/acme/shop.git' });
-    const withRepo = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/acme/shop.git'), 4000);
+    check('team: without a shared project it says to restart the host, and shows no join command that could not work', lan.includes('not sharing the project yet') && !lan.includes('tandem.cmd join'), lan.slice(0, 400));
+    // the manager publishes the host's Git address: then the steps are get Tandem + join
+    await manager.reducers.setContext({ sessionId: 'live', key: 'git_url', value: 'http://10.1.2.3:9418/bilal-ux' });
+    const withShare = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/Vibertexs/tandem'), 4000);
     const lan2 = await L.locator('.connect').innerText();
-    check('team: with a shared repo, a joiner clones it, then tandem join in that folder', withRepo && lan2.includes(`..\\tandem\\tandem.cmd join "${invite}"`) && lan2.includes('git clone https://github.com/acme/shop.git'), lan2.slice(0, 400));
-    await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: '' });
+    check('team: with a host-shared project, a joiner gets Tandem then uses one join command', withShare && lan2.includes(`.\\tandem.cmd join "${invite}"`) && lan2.includes('copies the project from the host'), lan2.slice(0, 400));
+    await manager.reducers.setContext({ sessionId: 'live', key: 'git_url', value: '' });
     await L.context().close();
   }
   await shot(A, '07-team');

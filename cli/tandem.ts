@@ -2,7 +2,7 @@
 // tandem: run Tandem from the project you want built. Node 22.18+ runs this TypeScript file as is.
 //
 //   tandem start              in your project's folder: host a team for it, print the invite address
-//   tandem join <address>     in your clone of that project: add this computer's workers to the team
+//   tandem join <address>     copy the host's project and add this computer's workers to the team
 //   tandem stop [--all]       stop what this computer started (--all also stops the brain)
 //   tandem status | open | logs
 //
@@ -43,9 +43,9 @@ const HELP = `tandem: your team's Claude Codes, working as one.
     --manager-account A     the Claude account the manager plans with
     --no-browser            do not open the page
 
-  tandem join <address>     In your clone of the team's repo: add this computer's workers.
+  tandem join <address>     Copy the host's project and add this computer's workers.
                             <address> is the invite the host's page shows, like http://192.168.1.20:5173/?db=shop
-    --simulate, --workers N, --accounts as above; --repo <path> uses your own clone
+    --simulate, --workers N, --accounts as above; --repo <path> uses your own clone instead
 
   tandem account add <label> [--agent codex]   A login for workers (opens that CLI to sign in).
   tandem account list | remove <label>          Each account gets its own login folder in the
@@ -399,7 +399,7 @@ async function start(argv: string[]) {
   say(`  ${bold('Open')}     ${cyan(page)}`);
   if (invite) {
     say(`  ${bold('Invite')}   ${cyan(invite)}${vpn ? dim('  (your Tailscale address)') : ''}`);
-    say(dim('           Others open it in a browser to watch. To add their workers, in their clone of this repo:'));
+    say(dim('           Others open it in a browser to watch. To add their workers, in their Tandem folder:'));
     say(dim(`           tandem join "${invite}"`));
     if (vpn && wifi && wifi !== vpn) say(dim(`           Same wifi and no isolation? http://${wifi}:${PAGE_PORT}/?db=${team} works too.`));
     if (vpn) say(dim('           Tailscale: share this computer with them first (Tailscale admin, Machines, ... , Share).'));

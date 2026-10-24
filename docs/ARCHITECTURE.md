@@ -52,7 +52,7 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 - **With `--review`:** before the goal is done, the manager adds one "Review the goal's work" task. The launcher runs it with read-only tools on the goal branch, and its findings go into the goal's note and the PR.
 
 ## How teammates join
-A teammate does not need approval to work. On their computer, in their clone of the project, they run `tandem join <invite>` (the Team page shows the exact commands), or connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Ask to make changes**, and the owner clicks **Approve**. The manager asks the same way.
+A teammate does not need approval to work. They clone Tandem once, then in its folder run `tandem join <invite>`; the command copies the project from the host into Tandem's private work folder and starts workers that push task branches back to the host. The Team page shows the exact commands. The host's Git server has no separate login, so the invite must stay on a trusted private network such as Tailscale. A teammate can instead connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Ask to make changes**, and the owner clicks **Approve**. The manager asks the same way.
 
 ## Who may do what
 - **Worker actions** (claim, lock, complete, heartbeat, report, cost): only by the identity that registered that worker (or an operator). Anyone may register a new worker; a name in use can only be taken over after its owner has been quiet for 2 minutes.
