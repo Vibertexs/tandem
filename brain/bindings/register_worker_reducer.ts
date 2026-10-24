@@ -11,6 +11,7 @@ import {
 } from "spacetimedb";
 
 export default {
+  sessionId: __t.string(),
   id: __t.string(),
   name: __t.string(),
   plan: __t.string(),

@@ -11,5 +11,6 @@ import {
 } from "spacetimedb";
 
 export default {
+  sessionId: __t.string(),
   ttlSeconds: __t.u32(),
 };

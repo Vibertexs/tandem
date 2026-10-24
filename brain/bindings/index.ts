@@ -36,16 +36,23 @@ import {
 // Import all reducer arg schemas
 import ClaimTaskReducer from "./claim_task_reducer";
 import CompleteTaskReducer from "./complete_task_reducer";
+import CreateJobReducer from "./create_job_reducer";
 import CreateTaskReducer from "./create_task_reducer";
 import HeartbeatReducer from "./heartbeat_reducer";
 import ReapStaleReducer from "./reap_stale_reducer";
 import RegisterWorkerReducer from "./register_worker_reducer";
 import ReleaseLocksReducer from "./release_locks_reducer";
+import ReportProgressReducer from "./report_progress_reducer";
+import ResetSessionReducer from "./reset_session_reducer";
+import SeedTasksReducer from "./seed_tasks_reducer";
+import SetContextReducer from "./set_context_reducer";
 import TakeLocksReducer from "./take_locks_reducer";
+import UpdateCapacityReducer from "./update_capacity_reducer";
 
 // Import all procedure arg schemas
 
 // Import all table schema definitions
+import ContextRow from "./context_table";
 import EventsRow from "./events_table";
 import LocksRow from "./locks_table";
 import TasksRow from "./tasks_table";
@@ -55,11 +62,28 @@ import WorkersRow from "./workers_table";
 
 /** The schema information for all tables in this module. This is defined the same was as the tables would have been defined in the server. */
 const tablesSchema = __schema({
+  context: __table({
+    name: 'context',
+    indexes: [
+      { accessor: 'pk', name: 'context_pk_idx_btree', algorithm: 'btree', columns: [
+        'pk',
+      ] },
+      { accessor: 'session_id', name: 'context_session_id_idx_btree', algorithm: 'btree', columns: [
+        'sessionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'context_pk_key', constraint: 'unique', columns: ['pk'] },
+    ],
+  }, ContextRow),
   events: __table({
     name: 'events',
     indexes: [
       { accessor: 'id', name: 'events_id_idx_btree', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { accessor: 'session_id', name: 'events_session_id_idx_btree', algorithm: 'btree', columns: [
+        'sessionId',
       ] },
     ],
     constraints: [
@@ -69,37 +93,46 @@ const tablesSchema = __schema({
   locks: __table({
     name: 'locks',
     indexes: [
-      { accessor: 'path', name: 'locks_path_idx_btree', algorithm: 'btree', columns: [
-        'path',
+      { accessor: 'pk', name: 'locks_pk_idx_btree', algorithm: 'btree', columns: [
+        'pk',
+      ] },
+      { accessor: 'session_id', name: 'locks_session_id_idx_btree', algorithm: 'btree', columns: [
+        'sessionId',
       ] },
       { accessor: 'task_id', name: 'locks_task_id_idx_btree', algorithm: 'btree', columns: [
         'taskId',
       ] },
     ],
     constraints: [
-      { name: 'locks_path_key', constraint: 'unique', columns: ['path'] },
+      { name: 'locks_pk_key', constraint: 'unique', columns: ['pk'] },
     ],
   }, LocksRow),
   tasks: __table({
     name: 'tasks',
     indexes: [
-      { accessor: 'id', name: 'tasks_id_idx_btree', algorithm: 'btree', columns: [
-        'id',
+      { accessor: 'pk', name: 'tasks_pk_idx_btree', algorithm: 'btree', columns: [
+        'pk',
+      ] },
+      { accessor: 'session_id', name: 'tasks_session_id_idx_btree', algorithm: 'btree', columns: [
+        'sessionId',
       ] },
     ],
     constraints: [
-      { name: 'tasks_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'tasks_pk_key', constraint: 'unique', columns: ['pk'] },
     ],
   }, TasksRow),
   workers: __table({
     name: 'workers',
     indexes: [
-      { accessor: 'id', name: 'workers_id_idx_btree', algorithm: 'btree', columns: [
-        'id',
+      { accessor: 'pk', name: 'workers_pk_idx_btree', algorithm: 'btree', columns: [
+        'pk',
+      ] },
+      { accessor: 'session_id', name: 'workers_session_id_idx_btree', algorithm: 'btree', columns: [
+        'sessionId',
       ] },
     ],
     constraints: [
-      { name: 'workers_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'workers_pk_key', constraint: 'unique', columns: ['pk'] },
     ],
   }, WorkersRow),
 });
@@ -108,12 +141,18 @@ const tablesSchema = __schema({
 const reducersSchema = __reducers(
   __reducerSchema("claim_task", ClaimTaskReducer),
   __reducerSchema("complete_task", CompleteTaskReducer),
+  __reducerSchema("create_job", CreateJobReducer),
   __reducerSchema("create_task", CreateTaskReducer),
   __reducerSchema("heartbeat", HeartbeatReducer),
   __reducerSchema("reap_stale", ReapStaleReducer),
   __reducerSchema("register_worker", RegisterWorkerReducer),
   __reducerSchema("release_locks", ReleaseLocksReducer),
+  __reducerSchema("report_progress", ReportProgressReducer),
+  __reducerSchema("reset_session", ResetSessionReducer),
+  __reducerSchema("seed_tasks", SeedTasksReducer),
+  __reducerSchema("set_context", SetContextReducer),
   __reducerSchema("take_locks", TakeLocksReducer),
+  __reducerSchema("update_capacity", UpdateCapacityReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */

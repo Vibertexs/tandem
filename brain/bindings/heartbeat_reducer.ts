@@ -11,5 +11,6 @@ import {
 } from "spacetimedb";
 
 export default {
+  sessionId: __t.string(),
   workerId: __t.string(),
 };

@@ -12,6 +12,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  sessionId: __t.string().name("session_id"),
   timestamp: __t.timestamp(),
   workerId: __t.option(__t.string()).name("worker_id"),
   type: __t.string(),

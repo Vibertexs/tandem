@@ -10,8 +10,17 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const Context = __t.object("Context", {
+  pk: __t.string(),
+  sessionId: __t.string(),
+  key: __t.string(),
+  value: __t.string(),
+});
+export type Context = __Infer<typeof Context>;
+
 export const Events = __t.object("Events", {
   id: __t.u64(),
+  sessionId: __t.string(),
   timestamp: __t.timestamp(),
   workerId: __t.option(__t.string()),
   type: __t.string(),
@@ -20,6 +29,8 @@ export const Events = __t.object("Events", {
 export type Events = __Infer<typeof Events>;
 
 export const Locks = __t.object("Locks", {
+  pk: __t.string(),
+  sessionId: __t.string(),
   path: __t.string(),
   taskId: __t.string(),
   workerId: __t.string(),
@@ -27,7 +38,21 @@ export const Locks = __t.object("Locks", {
 });
 export type Locks = __Infer<typeof Locks>;
 
+export const TaskInput = __t.object("TaskInput", {
+  id: __t.string(),
+  title: __t.string(),
+  description: __t.string(),
+  files: __t.array(__t.string()),
+  difficulty: __t.string(),
+  model: __t.string(),
+  effort: __t.string(),
+  dependsOn: __t.array(__t.string()),
+});
+export type TaskInput = __Infer<typeof TaskInput>;
+
 export const Tasks = __t.object("Tasks", {
+  pk: __t.string(),
+  sessionId: __t.string(),
   id: __t.string(),
   jobId: __t.option(__t.string()),
   kind: __t.string(),
@@ -47,6 +72,8 @@ export const Tasks = __t.object("Tasks", {
 export type Tasks = __Infer<typeof Tasks>;
 
 export const Workers = __t.object("Workers", {
+  pk: __t.string(),
+  sessionId: __t.string(),
   id: __t.string(),
   name: __t.string(),
   plan: __t.string(),

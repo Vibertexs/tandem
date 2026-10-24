@@ -10,15 +10,16 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  TaskInput,
+} from "./types";
+
 export default {
-  id: __t.string(),
-  jobId: __t.option(__t.string()),
+  sessionId: __t.string(),
+  get task() {
+    return TaskInput;
+  },
   kind: __t.string(),
-  title: __t.string(),
-  description: __t.string(),
-  files: __t.array(__t.string()),
-  difficulty: __t.string(),
-  model: __t.string(),
-  effort: __t.string(),
-  dependsOn: __t.array(__t.string()),
+  jobId: __t.option(__t.string()),
+  assignee: __t.option(__t.string()),
 };

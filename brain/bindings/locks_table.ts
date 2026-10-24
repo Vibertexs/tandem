@@ -11,7 +11,9 @@ import {
 } from "spacetimedb";
 
 export default __t.row({
-  path: __t.string().primaryKey(),
+  pk: __t.string().primaryKey(),
+  sessionId: __t.string().name("session_id"),
+  path: __t.string(),
   taskId: __t.string().name("task_id"),
   workerId: __t.string().name("worker_id"),
   createdAt: __t.timestamp().name("created_at"),

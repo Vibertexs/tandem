@@ -8,19 +8,31 @@ import { type Infer as __Infer } from "spacetimedb";
 // Import all reducer arg schemas
 import ClaimTaskReducer from "../claim_task_reducer";
 import CompleteTaskReducer from "../complete_task_reducer";
+import CreateJobReducer from "../create_job_reducer";
 import CreateTaskReducer from "../create_task_reducer";
 import HeartbeatReducer from "../heartbeat_reducer";
 import ReapStaleReducer from "../reap_stale_reducer";
 import RegisterWorkerReducer from "../register_worker_reducer";
 import ReleaseLocksReducer from "../release_locks_reducer";
+import ReportProgressReducer from "../report_progress_reducer";
+import ResetSessionReducer from "../reset_session_reducer";
+import SeedTasksReducer from "../seed_tasks_reducer";
+import SetContextReducer from "../set_context_reducer";
 import TakeLocksReducer from "../take_locks_reducer";
+import UpdateCapacityReducer from "../update_capacity_reducer";
 
 export type ClaimTaskParams = __Infer<typeof ClaimTaskReducer>;
 export type CompleteTaskParams = __Infer<typeof CompleteTaskReducer>;
+export type CreateJobParams = __Infer<typeof CreateJobReducer>;
 export type CreateTaskParams = __Infer<typeof CreateTaskReducer>;
 export type HeartbeatParams = __Infer<typeof HeartbeatReducer>;
 export type ReapStaleParams = __Infer<typeof ReapStaleReducer>;
 export type RegisterWorkerParams = __Infer<typeof RegisterWorkerReducer>;
 export type ReleaseLocksParams = __Infer<typeof ReleaseLocksReducer>;
+export type ReportProgressParams = __Infer<typeof ReportProgressReducer>;
+export type ResetSessionParams = __Infer<typeof ResetSessionReducer>;
+export type SeedTasksParams = __Infer<typeof SeedTasksReducer>;
+export type SetContextParams = __Infer<typeof SetContextReducer>;
 export type TakeLocksParams = __Infer<typeof TakeLocksReducer>;
+export type UpdateCapacityParams = __Infer<typeof UpdateCapacityReducer>;
 
