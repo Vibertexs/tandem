@@ -40,7 +40,7 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
   - `docs/SPEC.md` is the original plan, and `docs/DEMO.md` is the presenter script.
 
 ## Test plan
-- [x] `.\test.ps1`: 9 suites, 308 checks, all pass. It covers:
+- [x] `.\test.ps1`: 9 suites, 321 checks, all pass. It covers:
   - the brain, access and worker ownership
   - MCP in mock mode, MCP against the real brain, and the manager identity
   - the hook, and the launcher with a usage limit and a restart while capped
@@ -48,7 +48,7 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
   - the page in Chrome, on desktop and phone, including the failure screens
 - [x] `.\test.ps1 -Restart`: the page and a worker survive a brain restart.
 - [x] Real Claude (haiku, capped):
-  - `start.ps1` with real workers, three times: goal → plan → two Claudes → merged `tandem/<goal>` → tests pass → the goal card shows the result and its cost.
+  - `start.ps1` with real workers, four times: goal → plan → two Claudes → merged `tandem/<goal>` → tests pass → the goal card shows the result and its cost.
   - A real merge conflict resolved by a worker Claude, with the merged code running.
   - A teammate on another computer: the worker on a second clone pushes its branches, and the host merges them from origin, tests them and pushes the goal branch.
   - `start.ps1 -Simulate`, several times.

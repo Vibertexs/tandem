@@ -37,32 +37,35 @@ For the real thing, run `.\start.ps1` (no `-Simulate`). Each task becomes a real
 | When things go wrong | A worker that can't finish a task gives it back with a reason (`give_back_task`, tool 17), and a different worker gets it. After two, the board says "needs you" with the reason and a **Try again** button. A merge conflict between two tasks becomes a "Resolve the merge conflict" task: the launcher starts the merge, Claude edits out the markers, and the launcher commits. A worker at its usage limit waits for the reset ("Out of quota until 3:00 PM") and comes back by itself. A goal the manager can't plan (for example, Claude not logged in) shows why, with Try again. |
 | Sharing | With `-Lan`, the page gets the real network address (the adapter with a gateway, not a VirtualBox one), so the Team page's join command, the link and the QR code work from other computers. A local-only team says how to open it up instead of showing a command that can't work. |
 | Notifications | `-Notify <webhook url>` posts "goal done" (branch, test result, cost) to Slack or Discord. |
+| Better work | A task that waited for others starts with their work merged into its worktree, so its Claude reads the real code. |
+| Teammates elsewhere | With `-Push`, the manager tells the page the repo's remote, and the Team page shows the clone step and the join command with `-Repo` and `-Push`. `-Join` checks the host is reachable before starting workers. Proven with real Claude through a shared origin. |
+| Smaller | Cancel a goal. Example goals for a new owner. `/` jumps to the prompt. Goal cards say how long the goal took. An Activity filter (All, Problems, Finished). Commands shown for your OS (start.sh on macOS and Linux). `.worktrees/` stays out of your repo's `git status`. `-SimLimit` for demos. |
 | Docs | New root README with screenshots. New `docs/ROADMAP.md` and `docs/DEMO.md` (the presenter script). Architecture updated. The original spec moved to `docs/SPEC.md`. |
 
 ## Tested
-`.\test.ps1` on the final code: **9 suites, 308 checks, all pass** (no Claude calls).
+`.\test.ps1` on the final code: **9 suites, 321 checks, all pass** (no Claude calls).
 
 | Suite | Checks |
 |---|---|
-| brain (atomic rules, sessions, goals, presence, costs, giving back, limits) | 72 |
+| brain (atomic rules, sessions, goals, presence, costs, giving back, limits, cancel) | 75 |
 | brain: who may do what (owner, requests, worker ownership) | 33 |
 | mcp: mock mode | 17 |
 | mcp: 17 tools, real brain | 32 |
 | mcp: manager identity | 13 |
 | mcp: lock-check hook | 13 |
 | launcher: routing, limit parsing, simulate (including a limit and a restart while capped) | 32 |
-| manager: merge, conflicts, test, finish, push, notify, planning failures | 42 |
-| page in Chrome (the whole first-use journey, failures, desktop and phone) | 54 |
+| manager: merge, conflicts, dependencies, test, finish, push, notify, planning failures | 45 |
+| page in Chrome (the whole first-use journey, failures, sharing, desktop and phone) | 61 |
 
 Also passing:
 - `.\test.ps1 -Restart`: the page and a worker survive a brain restart.
 - Real Claude runs (haiku, each capped at $0.50):
-  - **`start.ps1` with real workers** (`FLOW_REAL=1`), three times, the last one on the final launcher and manager code. The goal is typed on the page, and the manager plans it. Two real Claudes build the calculator, which is merged into `tandem/<goal>`. The workers' tests pass on that branch, and the goal card shows "Tests pass" and its cost. The manager also wrote the shared interface to Shared memory by itself.
+  - **`start.ps1` with real workers** (`FLOW_REAL=1`), four times, the last one on the final launcher and manager code (its "Test calc.py" task started from the "Write calc.py" branch). The goal is typed on the page, and the manager plans it. Two real Claudes build the calculator, which is merged into `tandem/<goal>`. The workers' tests pass on that branch, and the goal card shows "Tests pass" and its cost. The manager also wrote the shared interface to Shared memory by itself.
   - **A real merge conflict** (`launcher/test/conflict-real.ts`): two branches added different functions at the same spot. Haiku resolved the markers, kept both functions, and the merged `calc.py` runs.
   - **A teammate on another computer** (`manager/test/two-computers.ts`): a bare repo stands in for GitHub, with two clones. The host's manager runs on one, and the only worker runs on the other with `--push`. Every task was done on the teammate's clone. The host fetched and merged those branches, the tests passed, and the goal branch was pushed.
   - `start.ps1 -Simulate`: goal → plan → done, several times.
   - Earlier in the night: the full loop twice, the hook blocking a real Claude, and the launcher in a worktree recording a real cost.
-- About 30 real runs were used in total, all haiku.
+- About 34 real runs were used in total, all haiku.
 
 ## Not done, or not proven
 - Not tried on a Mac: `start.sh` was only checked in Git Bash.
