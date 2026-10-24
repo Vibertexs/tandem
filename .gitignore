@@ -8,3 +8,4 @@ __pycache__/
 .worktrees/
 dist/
 target/
+.claude/settings.local.json
