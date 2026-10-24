@@ -2,7 +2,7 @@
 
 ## In one line
 **You run `tandem start` in your project, and the board opens with an invite link others can join.**
-1. In your project's folder: `tandem start`. It starts the brain, the board, the manager and two workers, open to your network, and prints the invite link.
+1. In your project's folder: `tandem start`. It starts the brain, the board, the manager and a Claude worker, open to your network, and prints the invite link.
 2. On the board, click **Control this team**. That gives this browser controller permission and also approves the manager.
 3. Type a goal. It gets its own lane on the board, and the manager splits it into tasks with exact file lists.
 4. The workers (real Claude runs, or simulated) do them without colliding. Teammates who opened the invite watch live. To add their computer's workers, they paste the Invite box's full clone-and-join block; `tandem join <invite>` copies the project host's project and starts their workers.

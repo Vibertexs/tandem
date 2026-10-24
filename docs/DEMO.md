@@ -3,7 +3,7 @@
 The product is the demo: one command starts it, and the page shows real Claude Code workers doing a real goal.
 
 ## Before you go on stage
-- [ ] `tandem start --fresh` in the demo project runs clean on the presenting laptop (brain, page, manager, 2 workers)
+- [ ] `tandem start --fresh` in the demo project runs clean on the presenting laptop (brain, page, manager, 1 worker per computer)
 - [ ] `claude` is logged in on that laptop
 - [ ] A second computer (or phone) on the same wifi can open the invite link
 - [ ] Backup: a recorded video of a full real run is on the laptop

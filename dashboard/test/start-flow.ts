@@ -7,7 +7,7 @@
 // total). Then it also checks the goal's work was merged into one tandem/<goal> branch.
 import { chromium, type Page } from 'playwright-core';
 import { execFileSync, execSync } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,11 +29,14 @@ const seen = (page: Page, text: string | RegExp, ms: number) =>
   page.getByText(text).first().waitFor({ state: 'visible', timeout: ms }).then(() => true, () => false);
 // Runs the tandem command in `cwd`, the way a person would. Output goes to a file so a stray
 // handle in a background process can never keep this test waiting.
+// Its own state folder: `tandem stop` in this test then stops only what this test started, never a
+// real session running on the same computer.
+const TEST_STATE = mkdtempSync(join(tmpdir(), 'tandem-flow-state-'));
 const tandem = (args: string[], cwd: string) => {
   const log = join(tmpdir(), `tandem-${args[0]}-${Date.now()}.log`);
   const fd = openSync(log, 'w');
   // (the fake-coding switch is for tests only: it is an environment variable, not an option)
-  try { execFileSync(process.execPath, [join(ROOT, 'cli', 'tandem.ts'), ...args], { cwd, stdio: ['ignore', fd, fd], env: { ...process.env, ...(REAL ? {} : { TANDEM_SIMULATE: '1' }) } }); }
+  try { execFileSync(process.execPath, [join(ROOT, 'cli', 'tandem.ts'), ...args], { cwd, stdio: ['ignore', fd, fd], env: { ...process.env, TANDEM_STATE: TEST_STATE, ...(REAL ? {} : { TANDEM_SIMULATE: '1' }) } }); }
   catch { /* the output says what went wrong */ } finally { closeSync(fd); }
   return readFileSync(log, 'utf8');
 };
@@ -45,7 +48,7 @@ if (!existsSync(join(REPO, '.git'))) {
   g('add', '-A'); g('commit', '-q', '-m', 'start');
 }
 
-const started = tandem(['start', '--team', DB, ...(REVIEW ? ['--review'] : []), '--fresh', '--local', '--no-browser'], REPO);
+const started = tandem(['start', '--team', DB, '--workers', '2', ...(REVIEW ? ['--review'] : []), '--fresh', '--local', '--no-browser'], REPO);
 console.log(started.split('\n').filter(l => /==|started|ready|Open|Alex|Sam/i.test(l)).join('\n'));
 check('tandem start, run in the project, finishes and says it is running for that project', started.includes(`Tandem is running for ${REPO}`), started.slice(-400));
 
@@ -106,7 +109,7 @@ try {
   const stopped = tandem(['stop'], REPO);
   console.log(stopped.trim());
   await new Promise(r => setTimeout(r, 1500));
-  const left = execSync('powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \\"Name=\'node.exe\'\\" | Where-Object { $_.CommandLine -match \'watch.ts|launcher.ts\' } | Measure-Object).Count"', { encoding: 'utf8' }).trim();
+  const left = execSync('powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \\"Name=\'node.exe\'\\" | Where-Object { $_.CommandLine -match \'watch.ts|launcher.ts\' -and $_.CommandLine.Contains(\'' + REPO.replace(/\\/g, '\\\\') + '\') } | Measure-Object).Count"', { encoding: 'utf8' }).trim();
   check('tandem stop stops the manager and both workers, and none are left running',
     /stopped manager/.test(stopped) && (stopped.match(/stopped worker/g) ?? []).length === 2 && left === '0', { stopped, left });
 }
