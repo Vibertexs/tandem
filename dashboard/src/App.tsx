@@ -4,10 +4,12 @@ import { useBrain } from './useBrain';
 import { Landing, Unreachable } from './Landing';
 import { BoardPage } from './Board';
 import { ActivityPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
+import { SetupPage } from './Setup';
 import { CodeLine, JoinSteps, isManager, managerOnline, online, useNow } from './ui';
 import type { Snapshot } from './brain';
 
 const PAGES = [
+  { key: 'setup', label: 'Setup', icon: '✓' },
   { key: 'board', label: 'Board', icon: '▦' },
   { key: 'team', label: 'Team', icon: '◉' },
   { key: 'memory', label: 'Shared memory', icon: '✎' },
@@ -158,6 +160,7 @@ export function App() {
         {status === 'connecting' && api && <div className="banner">Connection lost. Reconnecting…</div>}
         <main>
           {page === 'board' && <BoardPage {...common} isOp={isOp} present={config.present} go={go} />}
+          {page === 'setup' && <SetupPage snap={snap} team={team ?? { uri: '', db: 'sample' }} now={now} say={say} go={go} />}
           {page === 'team' && <TeamPage {...common} team={team ?? { uri: '', db: 'sample' }} />}
           {page === 'memory' && <MemoryPage {...common} />}
           {page === 'activity' && <ActivityPage {...common} />}

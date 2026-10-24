@@ -62,6 +62,8 @@ tandem start
   Invite   http://192.168.1.20:5173/?db=shop
   Stop     tandem stop
 ```
+The board opens on its own. Its **Setup** page lists every step in order (put `tandem` on your PATH, the manager, real workers, the GitHub remote, inviting a teammate, sending a goal) with this computer's real folders in the commands, and ticks each one as it happens. You can follow that instead of this README.
+
 On the board click **Make me the owner** (it also approves the manager), then describe what you want built. Each task runs as a headless agent in its own git worktree and branch. When the goal is done, its work is merged on one branch, `tandem/<goal>`, with your tests run on it.
 
 **Just trying it out?** `tandem start --demo --simulate` uses a sample project and fake workers, so it costs no Claude usage beyond one small planning run per goal.

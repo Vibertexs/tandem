@@ -43,6 +43,10 @@ try {
   await owner.reducers.approveOperator({ identity: [...owner.db.operatorRequests.iter()][0].identity });
   check('it tells the page which repo a teammate should clone (its origin)', await until(() =>
     [...owner.db.context.iter()].some(c => c.sessionId === 'live' && c.key === 'repo_url' && c.value === 'https://github.com/acme/shop.git'), 10_000));
+  check('it also tells the page where Tandem and the project are, for the Setup page\'s commands', await until(() => {
+    const c = Object.fromEntries([...owner.db.context.iter()].filter(r => r.sessionId === 'live').map(r => [r.key, r.value]));
+    return c.tandem_dir === fileURLToPath(new URL('../..', import.meta.url)).replace(/[\\/]$/, '') && c.project_dir === repo;
+  }, 10_000));
   const goal = () => [...owner.db.goals.iter()].find(g => g.id === 'g1')!;
   check('after two failed planning runs the goal is failed, with the reason', await until(() => goal().status === 'failed', 30_000) &&
     goal().note.includes('Invalid API key') && goal().note.includes('Try again'), [goal().status, goal().note, out.slice(-400)]);

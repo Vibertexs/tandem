@@ -70,8 +70,8 @@ try {
   await shot(A, '02-owner');
   await A.getByRole('button', { name: 'Make me the owner' }).click();
   check('owner: then the board opens, with the prompt on', await until(() => prompt(A).isEnabled()));
-  check('owner: the sidebar has Board, Team, Shared memory, Activity, Settings (goals live on the Board)',
-    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Board|Team|Shared memory|Activity|Settings');
+  check('owner: the sidebar has Setup, Board, Team, Shared memory, Activity, Settings (goals live on the Board)',
+    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Setup|Board|Team|Shared memory|Activity|Settings');
   check('owner: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
   check('owner: it shows one next step: the manager is not connected yet', await seen(A, 'The manager is not connected yet', 3000));
   check('owner: the sidebar says you manage the team', await seen(A, 'You manage this team', 2000));
@@ -161,6 +161,25 @@ try {
   check('goal done: the lane says how it went, how long it took and what it cost', doneLane.includes('Tests pass') && /done in \d/.test(doneLane) && doneLane.includes('$0.01 of Claude usage'), doneLane);
   check('goal done: a finished goal moves below the work still going', (await A.locator('.goal-lane .goal-text').allInnerTexts()).join('|') === 'Other tasks|Build a tiny calculator with tests');
   await shot(A, '06-board-done', true);
+
+  // ---- 5b. the Setup page: steps to follow, with this computer's folders, ticking as they happen ----
+  await manager.reducers.setContext({ sessionId: 'live', key: 'tandem_dir', value: 'C:\\Code\\tandem' });
+  await manager.reducers.setContext({ sessionId: 'live', key: 'project_dir', value: 'C:\\Code\\calc-demo' });
+  await nav(A, 'Setup');
+  const steps = A.locator('.step');
+  check('setup: six numbered steps, from running to sending a goal', await until(async () => await steps.count() === 6) &&
+    (await steps.first().innerText()).includes('Tandem is running') && (await steps.last().innerText()).includes('Send a goal'));
+  check('setup: the commands carry this computer\'s real folders', await until(async () => {
+    const s = await A.locator('.setup').innerText();
+    return s.includes('$env:Path += ";C:\\Code\\tandem"') && s.includes('cd C:\\Code\\calc-demo');
+  }, 4000));
+  check('setup: the manager step ticks once the manager is online, the goal step once a goal exists',
+    await steps.nth(1).evaluate(e => e.classList.contains('done')) && await steps.nth(5).evaluate(e => e.classList.contains('done')));
+  check('setup: workers that fake the coding are called out, with the command for real ones',
+    await steps.nth(2).innerText().then(t => /simulated/i.test(t)) && !(await steps.nth(2).evaluate(e => e.classList.contains('done'))));
+  check('setup: with no GitHub remote, step 4 says how to add one', await steps.nth(3).innerText().then(t => t.includes('git remote add origin')) && !(await steps.nth(3).evaluate(e => e.classList.contains('done'))));
+  check('setup: a team only this computer can reach says how to open it up', await steps.nth(4).innerText().then(t => t.includes('tandem stop --all')));
+  await shot(A, '06a-setup');
 
   // ---- 6. team, shared memory, activity ----
   await nav(A, 'Team');
@@ -291,7 +310,7 @@ try {
   await P.goto(`${URL_}/?db=${DB}`);
   await until(() => prompt(P).isVisible(), 10_000);
   const bar = await P.locator('.sidebar').boundingBox();
-  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 840 && await P.locator('.nav a').count() === 5, bar);
+  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 840 && await P.locator('.nav a').count() === 6, bar);
   const small = await P.locator('.nav a, .btn').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent && (e as HTMLElement).offsetHeight < 44).length);
   check('phone: tap targets are at least 44px tall', small === 0, small);
   check('phone: no sideways scrolling', await P.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
