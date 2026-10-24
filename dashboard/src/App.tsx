@@ -4,7 +4,8 @@ import { useBrain } from './useBrain';
 import { Landing, Unreachable } from './Landing';
 import { BoardPage } from './Board';
 import { ActivityPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
-import { CodeLine, isManager, managerOnline, online, useNow } from './ui';
+import { CodeLine, JoinSteps, isManager, managerOnline, online, useNow } from './ui';
+import type { Snapshot } from './brain';
 
 const PAGES = [
   { key: 'board', label: 'Board', icon: '▦' },
@@ -146,7 +147,7 @@ export function App() {
         <header className="topbar">
           <h1>{config.present ? `${team?.db ?? 'Tandem'}` : title}</h1>
           <span className="spacer" />
-          {!config.mock && !config.present && team && <Invite team={team} say={say} />}
+          {!config.mock && !config.present && team && <Invite team={team} snap={snap} say={say} />}
           {!config.mock && !isOp && !config.present && status === 'connected' && (
             asked
               ? <span className="chip goal-new">⏳ Waiting for the owner to approve you</span>
@@ -170,7 +171,7 @@ export function App() {
 
 // The team's invite, on every page: a link others open in a browser, and the same link for
 // `tandem join` on their computer.
-function Invite({ team, say }: { team: Team; say: (m: string) => void }) {
+function Invite({ team, snap, say }: { team: Team; snap: Snapshot; say: (m: string) => void }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const share = shareable(team);
@@ -193,9 +194,8 @@ function Invite({ team, say }: { team: Team; say: (m: string) => void }) {
         <div className="invite-pop card" role="dialog" aria-label="Invite">
           <p className="small"><strong>Send this link.</strong> <span className="muted">In a browser it shows this board.</span></p>
           <CodeLine code={share.page} say={say} />
-          <p className="small muted">To add their computer's workers, in their clone of the project:</p>
-          <CodeLine code={`tandem join "${share.page}"`} say={say} />
-          <p className="small muted">No clone of the project yet? Add <code className="mono">--simulate</code> to try it with fake workers.</p>
+          <p className="small muted">To add their computer's workers:</p>
+          <JoinSteps link={share.page} repoUrl={snap.context.repo_url ?? ''} say={say} />
         </div>
       )}
     </div>

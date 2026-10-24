@@ -34,6 +34,8 @@ tandem(['account', 'add', 'work1', '--no-login'], repo);
 tandem(['account', 'add', 'school', '--agent', 'codex', '--no-login'], repo);
 const list = tandem(['account', 'list'], repo);
 check('two accounts are listed, with their agent, not signed in yet', /work1\s+claude\s+not signed in/.test(list) && /school\s+codex\s+not signed in/.test(list), list);
+check('a real join run from the Tandem folder itself says to run it from the project clone, or add --simulate',
+  /Tandem folder itself/.test(tandem(['join', 'http://127.0.0.1:5173/?db=x'], fileURLToPath(new URL('..', import.meta.url)))));
 check('an unknown account is refused with how to add it', /No account "nope"/.test(tandem(['start', '--accounts', 'nope', '--simulate', '--local', '--no-manager', '--no-browser', '--team', TEAM], repo)));
 
 const out = tandem(['start', '--accounts', 'all', '--simulate', '--local', '--no-manager', '--no-browser', '--team', TEAM, '--fresh'], repo);

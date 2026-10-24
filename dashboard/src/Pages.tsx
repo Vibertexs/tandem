@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import type { Api, Snapshot } from './brain';
 import { shareable, type Team } from './config';
-import { Avatar, Bar, CodeLine, EV_ICON, WorkerStatus, agentLabel, ago, copy, isManager, money, online, took, liveInfo } from './ui';
+import { Avatar, Bar, CodeLine, EV_ICON, JoinSteps, WorkerStatus, agentLabel, ago, copy, isManager, money, online, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
 
@@ -56,20 +56,7 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
         {share ? (
           <>
             <p className="muted small">Send them the invite: <a href={share.page}>{share.page}</a>. In a browser it shows this board. To add their computer's workers:</p>
-            {repoUrl ? (
-              <>
-                <p className="muted small">1. Get the project:</p>
-                <CodeLine code={`git clone ${repoUrl}`} say={say} />
-                <p className="muted small">2. In that folder:</p>
-                <CodeLine code={`tandem join "${share.page}"`} say={say} />
-              </>
-            ) : (
-              <>
-                <CodeLine code={`tandem join "${share.page}" --simulate`} say={say} />
-                <p className="small muted">This project has no GitHub remote (origin), so workers on other computers can only fake the coding. Add a remote to the repo and run <code className="mono">tandem start</code> again, and they can do real work.</p>
-              </>
-            )}
-            <p className="small muted">Their Claude Code runs under their own login and quota.</p>
+            <JoinSteps link={share.page} repoUrl={repoUrl} say={say} />
           </>
         ) : (
           <>

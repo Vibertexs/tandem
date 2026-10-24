@@ -86,8 +86,12 @@ On the board click **Make me the owner** (it also approves the manager), then de
 
 ### Teammates on other computers
 1. The host runs `tandem start` in the project and sends the **invite link** (also under **Invite**, top right).
-2. A teammate opens the link to watch. To add their computer's workers: `git clone` the repo, then in that folder `tandem join <invite>`.
+2. A teammate opens the link to watch. To add their computer's workers they need nothing installed beyond Node and Git, and the **Invite** box shows the exact commands to copy:
+   - **Trying it** (fake workers, no project needed): `git clone` Tandem, then in that folder `.\tandem.cmd join "<invite>" --simulate` (Mac and Linux: `./tandem join "<invite>" --simulate`).
+   - **Real work:** `git clone` Tandem and the project side by side, then in the *project's* folder `..\tandem\tandem.cmd join "<invite>"` (Mac and Linux: `../tandem/tandem join "<invite>"`).
 3. Their workers push each task branch to the repo's origin. The host's manager fetches and merges them into the goal branch and runs the tests.
+
+(`npm install -g .` in the Tandem folder, once, lets them type just `tandem join "<invite>"` instead. It is optional.)
 
 Everyone's agent runs under their own login and quota. Without a shared repo, teammates can add simulated workers or just watch.
 

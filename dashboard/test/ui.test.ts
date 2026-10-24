@@ -176,16 +176,16 @@ try {
     const invite = `http://10.1.2.3:${new URL(URL_).port}/?db=${DB}`;
     await L.getByRole('button', { name: 'Invite' }).click();
     const pop = await L.getByRole('dialog', { name: 'Invite' }).innerText().catch(() => '');
-    check('invite: on the network, every page has an Invite button with the link and the tandem join command', pop.includes(invite) && pop.includes(`tandem join "${invite}"`), pop);
+    check('invite: on the network, every page has an Invite button with the link and the tandem join command', pop.includes(invite) && pop.includes(`join "${invite}"`) && pop.includes(`git clone https://github.com/Vibertexs/tandem`), pop);
     await L.keyboard.press('Escape');
     await nav(L, 'Team');
     const lan = await L.locator('.connect').innerText().catch(() => '');
-    check('team: with no shared repo, a joiner\'s workers are simulated, and it says how to get real work', lan.includes(`tandem join "${invite}" --simulate`) && lan.includes('no GitHub remote'), lan.slice(0, 400));
+    check('team: with no shared repo, a joiner\'s workers are simulated, and it says how to get real work', lan.includes(`.\\tandem.cmd join "${invite}" --simulate`) && lan.includes('no GitHub remote'), lan.slice(0, 400));
     // the manager publishes the repo's origin: then the steps are clone + join
     await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: 'https://github.com/acme/shop.git' });
     const withRepo = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/acme/shop.git'), 4000);
     const lan2 = await L.locator('.connect').innerText();
-    check('team: with a shared repo, a joiner clones it, then tandem join in that folder', withRepo && lan2.includes(`tandem join "${invite}"`) && !lan2.includes('--simulate'), lan2.slice(0, 400));
+    check('team: with a shared repo, a joiner clones it, then tandem join in that folder', withRepo && lan2.includes(`..\\tandem\\tandem.cmd join "${invite}"`) && lan2.includes('git clone https://github.com/acme/shop.git'), lan2.slice(0, 400));
     await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: '' });
     await L.context().close();
   }
