@@ -1,0 +1,13 @@
+{
+  "name": "tandem",
+  "version": "0.2.0",
+  "description": "Your team's Claude Codes, working as one: tandem start in your project, tandem join from other computers.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "tandem": "cli/tandem.ts"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

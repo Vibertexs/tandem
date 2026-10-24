@@ -1,13 +1,13 @@
 // THE PRODUCT, END TO END, the way a person uses it:
-//   .\start.ps1 -Simulate  ->  open the page  ->  Make me the owner  ->  Approve "Manager Claude"
+//   in the project: tandem start --simulate  ->  open the page  ->  Make me the owner
 //   ->  type a goal  ->  the manager plans it (1 real haiku run)  ->  simulated workers do it
-//   ->  the board shows every task done  ->  .\stop.ps1
+//   ->  the board shows every task done  ->  tandem stop
 // Needs: Chrome, claude on PATH. Uses a fresh team (bilal-start) and a throwaway repo.
 // FLOW_REAL=1: real workers instead of simulated ones (each task is a haiku run, about 4 runs in
 // total). Then it also checks the goal's work was merged into one tandem/<goal> branch.
 import { chromium, type Page } from 'playwright-core';
-import { execSync } from 'node:child_process';
-import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs';
+import { execFileSync, execSync } from 'node:child_process';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,20 +27,26 @@ const check = (name: string, ok: boolean, detail: unknown = '') => {
 };
 const seen = (page: Page, text: string | RegExp, ms: number) =>
   page.getByText(text).first().waitFor({ state: 'visible', timeout: ms }).then(() => true, () => false);
-// Output goes to a file, not a pipe: start.ps1's background processes inherit the handle, so a
-// pipe would never close and execSync would wait forever.
-const ps = (script: string, args: string) => {
-  const log = join(tmpdir(), `tandem-${script}-${Date.now()}.log`);
+// Runs the tandem command in `cwd`, the way a person would. Output goes to a file so a stray
+// handle in a background process can never keep this test waiting.
+const tandem = (args: string[], cwd: string) => {
+  const log = join(tmpdir(), `tandem-${args[0]}-${Date.now()}.log`);
   const fd = openSync(log, 'w');
-  try {
-    execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${join(ROOT, script)}" ${args}`, { cwd: ROOT, stdio: ['ignore', fd, fd] });
-  } catch { /* the output says what went wrong */ } finally { closeSync(fd); }
+  try { execFileSync(process.execPath, [join(ROOT, 'cli', 'tandem.ts'), ...args], { cwd, stdio: ['ignore', fd, fd] }); }
+  catch { /* the output says what went wrong */ } finally { closeSync(fd); }
   return readFileSync(log, 'utf8');
 };
+// the project the team works on: a git repo with a first commit
+if (!existsSync(join(REPO, '.git'))) {
+  mkdirSync(REPO, { recursive: true });
+  const g = (...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@x', ...a], { cwd: REPO, stdio: 'pipe' });
+  g('init', '-q'); writeFileSync(join(REPO, 'README.md'), '# test project\n'); writeFileSync(join(REPO, '.gitignore'), '.worktrees/\n');
+  g('add', '-A'); g('commit', '-q', '-m', 'start');
+}
 
-const started = ps('start.ps1', `-Db ${DB} ${REAL ? '' : '-Simulate'} ${REVIEW ? '-Review' : ''} -Fresh -NoBrowser -Repo ${REPO}`);
-console.log(started.split('\n').filter(l => /==|started|ready|worker|Open/i.test(l)).join('\n'));
-check('start.ps1 finishes and says Ready', /== Ready/.test(started), started.slice(-400));
+const started = tandem(['start', '--team', DB, ...(REAL ? [] : ['--simulate']), ...(REVIEW ? ['--review'] : []), '--fresh', '--local', '--no-browser'], REPO);
+console.log(started.split('\n').filter(l => /==|started|ready|Open|Alex|Sam/i.test(l)).join('\n'));
+check('tandem start, run in the project, finishes and says it is running for that project', started.includes(`Tandem is running for ${REPO}`), started.slice(-400));
 
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
 try {
@@ -97,11 +103,11 @@ try {
   check('the Team page shows the two workers', await page.locator('.worker').nth(1).waitFor({ timeout: 5000 }).then(async () => await page.locator('.worker').count() === 2, () => false));
 } finally {
   await browser.close();
-  const stopped = ps('stop.ps1', '');
+  const stopped = tandem(['stop'], REPO);
   console.log(stopped.trim());
   await new Promise(r => setTimeout(r, 1500));
   const left = execSync('powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \\"Name=\'node.exe\'\\" | Where-Object { $_.CommandLine -match \'watch.ts|launcher.ts\' } | Measure-Object).Count"', { encoding: 'utf8' }).trim();
-  check('stop.ps1 stops the manager and both workers, and none are left running',
+  check('tandem stop stops the manager and both workers, and none are left running',
     /stopped manager/.test(stopped) && (stopped.match(/stopped worker/g) ?? []).length === 2 && left === '0', { stopped, left });
 }
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
