@@ -4,7 +4,7 @@ MCP server that exposes the brain to every Claude as tools. TypeScript, stdio, M
 
 ## Checklist
 - [x] Pick a language and MCP SDK (check current docs): TypeScript, `@modelcontextprotocol/server` v2 (see NOTES.md)
-- [x] Server skeleton that registers every tool in `contract/tools.json` (all 14, `src/server.ts`)
+- [x] Server skeleton that registers every tool in `contract/tools.json` (all 16, `src/server.ts`)
 - [x] Thin brain client module (all database access goes through it): `src/brain-client.ts`
 - [x] **Mock mode** (`BRAIN_MODE=mock`): in-memory brain loaded from `contract/seed.json`, no database needed (`src/mock-brain.ts`)
 - [ ] Register the server with Claude Code (`claude mcp add`, check the docs for the exact syntax). The real-Claude test uses `--mcp-config` instead; `claude mcp add` itself is not tested yet
@@ -18,7 +18,7 @@ Every tool is callable from a real Claude Code session against the mock. The moc
 A Claude Code session can call every tool, and the hook blocks an edit on a locked file. The hook is not built.
 
 ## Manager tools in the live session
-`assign_task`, `create_job` and `set_context` only work in the `live` session for an operator. Run `npm run whoami` here, then paste the identity into the dashboard (live mode, "Authorize another identity"). Until then those tools return a plain error that says so. Worker tools need no authorization.
+`assign_task`, `create_job`, `set_context` and `mark_goal` only work in the `live` session for an operator. Run `npm run whoami` here, then paste the identity into the dashboard (live mode, "Authorize another identity"). Until then those tools return a plain error that says so. Worker tools need no authorization.
 
 ## Run it
 ```

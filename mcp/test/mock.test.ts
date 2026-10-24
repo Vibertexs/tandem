@@ -20,7 +20,7 @@ const call = async (tool: string, args: Record<string, unknown> = {}) => {
   return { isError: r.isError === true, text, data: r.isError ? null : JSON.parse(text) };
 };
 
-check('mock: 14 tools listed', (await client.listTools()).tools.length === 14);
+check('mock: 16 tools listed', (await client.listTools()).tools.length === 16);
 
 const reg = await call('register_worker', { name: 'Tester', plan: 'pro' });
 check('mock: register_worker', reg.data?.worker_id === 'w-tester', reg.text);
@@ -45,6 +45,11 @@ check('mock: create_job', typeof job.data?.job_id === 'string', job.text);
 check('mock: assign_task', typeof (await call('assign_task', { task: { title: 'x', files: ['x'] } })).data?.task_id === 'string');
 check('mock: set_context', (await call('set_context', { key: 'k', value: 'v' })).data?.ok === true && (await call('get_context')).data.context.k === 'v');
 check('mock: get_job_results (none yet)', (await call('get_job_results', { job_id: job.data?.job_id })).data?.results?.length === 0);
+
+const goals = await call('get_goals');
+check('mock: get_goals returns the sample goal', goals.data?.goals?.[0]?.id === 'g-demo', goals.text);
+check('mock: mark_goal planned removes it from the waiting list',
+  (await call('mark_goal', { goal_id: 'g-demo', status: 'planned' })).data?.ok === true && (await call('get_goals')).data.goals.length === 0);
 
 await client.close();
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);

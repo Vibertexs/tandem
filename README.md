@@ -114,6 +114,8 @@ It's not meant for analytics or batch jobs. We don't need either.
 | `get_capacity()` | Everyone's usage, status, and last-seen |
 | `get_status()` | Task board and locks |
 | `set_context(key, value)` | Updates shared decisions and interfaces |
+| `get_goals()` | The goals the operator typed that are still waiting to be planned |
+| `mark_goal(goal_id, status)` | Marks a goal `planning`, then `planned` once its tasks exist |
 
 ## 6. Capacity reporting
 

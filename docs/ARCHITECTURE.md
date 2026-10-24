@@ -23,10 +23,10 @@ Plain words. Three parts, one shared notebook.
 
 ## The parts
 - **Brain** (`brain/`): the shared notebook. Holds tasks, file locks, workers, an event log and shared notes. Its rules are the point: claiming a task, locking its files and unblocking waiting tasks each happen as one indivisible step.
-- **MCP server** (`mcp/`): the buttons Claude can press. 14 tools from `contract/tools.json`. One file (`src/brain-client.ts`) talks to the database. `BRAIN_MODE=mock` swaps in an in-memory copy for building without a database.
+- **MCP server** (`mcp/`): the buttons Claude can press. 16 tools from `contract/tools.json`. One file (`src/brain-client.ts`) talks to the database. `BRAIN_MODE=mock` swaps in an in-memory copy for building without a database.
 - **Dashboard** (`dashboard/`): a live page that reads the same tables. In judge mode, simulated workers in the browser press the same buttons so anyone can try it with no setup.
 - **How you control it**: the dashboard's My team view has a prompt box for operators. What you type is saved as a goal; the manager Claude (not built yet) turns it into tasks. Manage has by-hand forms as a fallback. The terminal manager Claude uses the same actions through the MCP tools. Both end up as rows in the brain; nothing talks to anything else directly.
-- **Not built yet**: the launcher (starts real Claude runs), the manager (reads goals, creates tasks; needs `get_goals` and `mark_goal` tools, see `mcp/NOTES.md`), the lock-check hook, and the team-rules skill.
+- **Not built yet**: the launcher (starts real Claude runs), the manager (reads goals with `get_goals`, creates tasks, marks the goal with `mark_goal`), the lock-check hook, and the team-rules skill.
 
 ## One task, start to finish
 1. `register_worker`: the worker joins the team.

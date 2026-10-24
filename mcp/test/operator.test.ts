@@ -54,6 +54,11 @@ const beforeJob = await call('create_job', { goal: 'g', map_tasks: [draft], merg
 check('before authorizing: create_job is refused too', beforeJob.isError, beforeJob.text);
 const beforeCtx = await call('set_context', { key: 'k', value: 'v' });
 check('before authorizing: set_context is refused too', beforeCtx.isError, beforeCtx.text);
+const beforeGoals = await call('get_goals');
+check('before authorizing: reading goals works (reads are open)', !beforeGoals.isError, beforeGoals.text);
+await human.reducers.postGoal({ sessionId: 'live', id: 'g1', text: 'Plan me' });
+const beforeMark = await call('mark_goal', { goal_id: 'g1', status: 'planning' });
+check('before authorizing: mark_goal is refused', beforeMark.isError && /operator/.test(beforeMark.text), beforeMark.text);
 const reg = await call('register_worker', { name: 'Mgr', plan: 'pro' });
 check('before authorizing: worker tools still work (register_worker)', reg.data?.worker_id === 'w-mgr', reg.text);
 
@@ -64,6 +69,7 @@ check('after authorizing: assign_task works', !after.isError && typeof after.dat
 const afterJob = await call('create_job', { goal: 'g', map_tasks: [draft], merge_task: { title: 'm', files: ['m.md'] } });
 check('after authorizing: create_job works', !afterJob.isError && typeof afterJob.data?.job_id === 'string', afterJob.text);
 check('after authorizing: set_context works', !(await call('set_context', { key: 'k', value: 'v' })).isError);
+check('after authorizing: mark_goal works', !(await call('mark_goal', { goal_id: 'g1', status: 'planned' })).isError);
 await sleep(400);
 check('after authorizing: the 3 tasks (1 assigned, 1 map piece, 1 merge) really exist in live', [...human.db.tasks.iter()].filter(t => t.sessionId === 'live').length === 3);
 

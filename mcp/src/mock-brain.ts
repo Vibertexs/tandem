@@ -3,7 +3,7 @@
 // no sessions, no heartbeats, no stale cleanup, no capped-worker requeue.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { newId, safeParse, type Brain, type Lock, type Task, type TaskDraft, type Worker } from './brain-client.js';
+import { newId, safeParse, type Brain, type Goal, type Lock, type Task, type TaskDraft, type Worker } from './brain-client.js';
 
 type Seed = {
   workers: Worker[]; context: Record<string, string>;
@@ -15,6 +15,7 @@ export class MockBrain implements Brain {
   private tasks: Task[];
   private locks: Lock[] = [];
   private context: Record<string, string>;
+  private goals: Goal[] = [];
 
   constructor() {
     const path = fileURLToPath(new URL('../../contract/seed.json', import.meta.url));
@@ -116,4 +117,20 @@ export class MockBrain implements Brain {
   getCapacity() { return this.workers.map(w => ({ ...w })); }
   getStatus() { return { tasks: this.tasks.map(t => ({ ...t })), locks: this.locks.map(l => ({ ...l })) }; }
   async setContext(key: string, value: string) { this.context[key] = value; }
+
+  // The mock starts with one goal so the manager tools have something to read.
+  getGoals() {
+    if (this.goals.length === 0 && !this.seededGoal) {
+      this.seededGoal = true;
+      this.goals.push({ id: 'g-demo', text: 'Build a login page with an API', status: 'new', created_at: new Date().toISOString() });
+    }
+    return this.goals.filter(g => g.status === 'new').map(g => ({ ...g }));
+  }
+  private seededGoal = false;
+  async markGoal(goalId: string, status: string) {
+    if (!['new', 'planning', 'planned'].includes(status)) throw new Error('bad status');
+    const g = this.goals.find(x => x.id === goalId);
+    if (!g) throw new Error('unknown goal');
+    g.status = status;
+  }
 }

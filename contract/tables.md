@@ -56,6 +56,14 @@ Every table has `session_id` (string). Judge mode uses one session per judge. Li
 | type | string | PROPOSED: task_created, task_assigned, task_claimed, progress, task_done, task_failed, lock_taken, lock_blocked, lock_released, worker_capped, worker_idle, job_progress, merge_unblocked |
 | message | string | plain English; shown in the dashboard log |
 
+## goals
+| Column | Type | Notes |
+|---|---|---|
+| id | string | |
+| text | string | what the operator asked for, in plain words |
+| status | `new`, `planning`, `planned` | the manager moves it along |
+| created_at | timestamp | |
+
 ## Rules
 - Claiming a task and taking locks are atomic: one winner, no partial locks.
 - Completing a task unblocks anything whose `depends_on` is now all done. For a job, the merge task opens when every map task is done, exactly once.

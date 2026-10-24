@@ -162,6 +162,27 @@
         "ok": "boolean"
       },
       "does": "Updates shared decisions and interfaces"
+    },
+    {
+      "name": "get_goals",
+      "side": "manager",
+      "params": {},
+      "returns": {
+        "goals": "goal[]"
+      },
+      "does": "Returns the goals the operator typed that are still waiting (status new)"
+    },
+    {
+      "name": "mark_goal",
+      "side": "manager",
+      "params": {
+        "goal_id": "string",
+        "status": "planning|planned"
+      },
+      "returns": {
+        "ok": "boolean"
+      },
+      "does": "Marks a goal as being planned, or planned once its tasks exist"
     }
   ]
 }

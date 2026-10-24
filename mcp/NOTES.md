@@ -10,7 +10,7 @@
 7. `get_job_results` returns `result[]`, which has no task id. Returned as the plain parsed results.
 8. `assign_task` has both a `task` and separate `model` and `effort`. Here `model` and `effort` are optional fields on the task. Left empty, the launcher decides (as `manager/PROMPT.md` says).
 
-9. **Goals have no tool.** The dashboard saves what the operator types as a goal (`post_goal`), but the 14 tools have no way for the manager Claude to read goals or mark one planned. Proposed contract additions: `get_goals()` returns the goals with status `new`; `mark_goal(goal_id, status)` sets `planning` or `planned`. The brain already supports both (`set_goal_status`). Not added here, because `contract/` and `tools.json` are not changed without agreement.
+9. **Goals had no tool. Done:** with Bilal's agreement, `contract/tools.json` now has `get_goals()` (waiting goals, oldest first) and `mark_goal(goal_id, planning|planned)`, and `contract/tables.md` has a `goals` table. 16 tools. `mark_goal` needs an operator in the live session; `get_goals` is a read and is open.
 
 ## Decisions
 - MCP SDK: `@modelcontextprotocol/server` and `@modelcontextprotocol/client` v2.4 (npm `latest`; the v1 `@modelcontextprotocol/sdk` README calls v1 the maintenance line). Zod v4 (`zod/v4`). Docs: https://ts.sdk.modelcontextprotocol.io/v2/

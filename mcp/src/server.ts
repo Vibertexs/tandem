@@ -1,4 +1,4 @@
-// Tandem MCP server (stdio). All 14 tools from contract/tools.json. Env:
+// Tandem MCP server (stdio). All 16 tools from contract/tools.json. Env:
 //   STDB_URI          default ws://127.0.0.1:3001
 //   STDB_DB           default bilal-dev
 //   TANDEM_SESSION    default "live"
@@ -153,6 +153,18 @@ const handle = serveStdio(() => {
   server.registerTool('get_status', {
     description: 'Task board and locks.',
   }, tool(brain => brain.getStatus()));
+
+  server.registerTool('get_goals', {
+    description: 'Returns the goals the operator typed that are still waiting to be planned (status new), oldest first.',
+  }, tool(brain => ({ goals: brain.getGoals() })));
+
+  server.registerTool('mark_goal', {
+    description: 'Marks a goal "planning" when you start splitting it, and "planned" once its tasks exist.',
+    inputSchema: z.object({ goal_id: z.string(), status: z.enum(['planning', 'planned']) }),
+  }, tool(async (brain, { goal_id, status }) => {
+    await brain.markGoal(goal_id, status);
+    return { ok: true };
+  }));
 
   server.registerTool('set_context', {
     description: 'Updates shared decisions and interfaces. Keep values short: every task reads them.',

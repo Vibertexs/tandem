@@ -12,6 +12,7 @@ export type Task = {
   assignee: string | null; branch: string | null; depends_on: string[];
   result: unknown; result_summary: string | null;
 };
+export type Goal = { id: string; text: string; status: string; created_at: string };
 export type Lock = { path: string; task_id: string; worker_id: string; created_at: string };
 export type Worker = {
   id: string; name: string; plan: string; status: string; usage_5h_pct: number | null;
@@ -39,6 +40,8 @@ export interface Brain {
   getCapacity(): Worker[];
   getStatus(): { tasks: Task[]; locks: Lock[] };
   setContext(key: string, value: string): Promise<void>;
+  getGoals(): Goal[]; // status new, oldest first
+  markGoal(goalId: string, status: string): Promise<void>;
   readonly identity: string;
   disconnect(): void;
 }
@@ -106,6 +109,7 @@ export class BrainClient implements Brain {
               tables.tasks.where(r => r.sessionId.eq(session)),
               tables.locks.where(r => r.sessionId.eq(session)),
               tables.context.where(r => r.sessionId.eq(session)),
+              tables.goals.where(r => r.sessionId.eq(session)),
             ]);
         })
         .onConnectError((_c, e) => reject(e))
@@ -206,5 +210,16 @@ export class BrainClient implements Brain {
 
   async setContext(key: string, value: string) {
     await this.conn.reducers.setContext({ sessionId: this.session, key, value });
+  }
+
+  getGoals(): Goal[] {
+    return [...this.conn.db.goals.iter()]
+      .filter(r => r.sessionId === this.session && r.status === 'new')
+      .sort((a, b) => Number(a.createdAt.microsSinceUnixEpoch - b.createdAt.microsSinceUnixEpoch))
+      .map(r => ({ id: r.id, text: r.text, status: r.status, created_at: iso(r.createdAt) }));
+  }
+
+  async markGoal(goalId: string, status: string) {
+    await this.conn.reducers.setGoalStatus({ sessionId: this.session, id: goalId, status });
   }
 }

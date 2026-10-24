@@ -52,9 +52,9 @@ const B = await session('bob');
 const C = await session('manager'); // never registers: uses manager tools only
 
 const tools = (await A.client.listTools()).tools.map(t => t.name).sort();
-const all14 = ['assign_task', 'claim_task', 'complete_task', 'create_job', 'get_capacity', 'get_context', 'get_job_results',
-  'get_status', 'lock_files', 'register_worker', 'release_files', 'report_capacity', 'report_progress', 'set_context'];
-check('tools: all 14 tools from contract/tools.json are listed', tools.join() === all14.join(), tools);
+const all16 = ['assign_task', 'claim_task', 'complete_task', 'create_job', 'get_capacity', 'get_context', 'get_goals', 'get_job_results',
+  'get_status', 'lock_files', 'mark_goal', 'register_worker', 'release_files', 'report_capacity', 'report_progress', 'set_context'];
+check('tools: all 16 tools from contract/tools.json are listed', tools.join() === all16.join(), tools);
 
 const noReg = await C.call('claim_task');
 check('claim_task: error before register_worker', noReg.isError && /register_worker/.test(noReg.text), noReg.text);
@@ -152,6 +152,22 @@ await sleep(300);
 st = await C.call('get_status');
 const reserved = st.data.tasks.find((t: { id: string }) => t.id === as.data?.task_id);
 check('assign_task: creates an open task reserved for the assignee', reserved?.status === 'open' && reserved.assignee === 'w-bob' && reserved.model === '', reserved);
+
+// ---- goals ----
+await seed.reducers.postGoal({ sessionId: S, id: 'g-old', text: 'First goal' });
+await sleep(50);
+await seed.reducers.postGoal({ sessionId: S, id: 'g-new', text: 'Second goal' });
+await sleep(400);
+const gg = await C.call('get_goals');
+check('get_goals: returns the waiting goals, oldest first', gg.data?.goals?.map((g: { id: string }) => g.id).join() === 'g-old,g-new' && gg.data.goals[0].text === 'First goal', gg.text);
+const mg = await C.call('mark_goal', { goal_id: 'g-old', status: 'planning' });
+await sleep(300);
+const gg2 = await C.call('get_goals');
+check('mark_goal: a goal being planned is no longer returned as waiting', mg.data?.ok === true && gg2.data?.goals?.map((g: { id: string }) => g.id).join() === 'g-new', gg2.text);
+const bad = await C.call('mark_goal', { goal_id: 'g-new', status: 'done' });
+check('mark_goal: only planning or planned are accepted', bad.isError, bad.text);
+const missing = await C.call('mark_goal', { goal_id: 'nope', status: 'planned' });
+check('mark_goal: an unknown goal is an error', missing.isError, missing.text);
 
 // ---- heartbeat and crash ----
 const seen = (id: string) => [...seed.db.workers.iter()].find(w => w.sessionId === S && w.id === id)!.lastSeen.microsSinceUnixEpoch;
