@@ -20,7 +20,7 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
 - **Manager** (`manager/`)
   - A watcher that plans each new goal (`plan.ts`).
   - It then merges, tests and finishes the goal (`merge.ts`, `verify.ts`, `finish.ts`). A conflict becomes a "resolve the merge conflict" task, and failing tests become a fix task.
-  - Optionally, it pushes the goal branch and opens a PR, and posts "goal done" to Slack or Discord.
+  - Optionally, it pushes the goal branch and opens a PR, posts "goal done" to Slack or Discord, and has a worker review the merged branch first (`-Review`).
 - **Launcher** (`launcher/`)
   - Claims a task and runs `claude -p` in a git worktree, with the hook and a budget cap.
   - Routes model and effort by difficulty, records the run's cost and commits.
@@ -40,7 +40,7 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
   - `docs/SPEC.md` is the original plan, and `docs/DEMO.md` is the presenter script.
 
 ## Test plan
-- [x] `.\test.ps1`: 9 suites, 321 checks, all pass. It covers:
+- [x] `.\test.ps1`: 9 suites, 324 checks, all pass. It covers:
   - the brain, access and worker ownership
   - MCP in mock mode, MCP against the real brain, and the manager identity
   - the hook, and the launcher with a usage limit and a restart while capped
@@ -49,6 +49,7 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
 - [x] `.\test.ps1 -Restart`: the page and a worker survive a brain restart.
 - [x] Real Claude (haiku, capped):
   - `start.ps1` with real workers, four times: goal → plan → two Claudes → merged `tandem/<goal>` → tests pass → the goal card shows the result and its cost.
+  - The same flow with `-Review`: a worker reviewed the merged branch and its findings were on the goal card.
   - A real merge conflict resolved by a worker Claude, with the merged code running.
   - A teammate on another computer: the worker on a second clone pushes its branches, and the host merges them from origin, tests them and pushes the goal branch.
   - `start.ps1 -Simulate`, several times.
