@@ -34,35 +34,41 @@ For the real thing, run `.\start.ps1` (no `-Simulate`). Each task becomes a real
 | Start | `start.ps1` / `stop.ps1`: one command for the brain, page, manager and workers. Flags: `-Simulate`, `-Lan`, `-Join`, `-Workers`, `-Repo`, `-Push`, `-Model auto`, `-Fresh`. Safe to run twice. `start.sh` / `stop.sh` for macOS and Linux. |
 | Connection | Workers and the manager reconnect on their own after a brain restart. The page says "Reconnecting…" and recovers. The sidebar shows whether the manager is online. |
 | Teams on several computers | With `-Push`, workers push their task branches and the manager pushes each goal branch. It also opens a PR if the GitHub CLI is set up. |
+| When things go wrong | A worker that can't finish a task gives it back with a reason (`give_back_task`, tool 17), and a different worker gets it. After two, the board says "needs you" with the reason and a **Try again** button. A merge conflict between two tasks becomes a "Resolve the merge conflict" task: the launcher starts the merge, Claude edits out the markers, and the launcher commits. A worker at its usage limit waits for the reset ("Out of quota until 3:00 PM") and comes back by itself. A goal the manager can't plan (for example, Claude not logged in) shows why, with Try again. |
+| Sharing | With `-Lan`, the page gets the real network address (the adapter with a gateway, not a VirtualBox one), so the Team page's join command, the link and the QR code work from other computers. A local-only team says how to open it up instead of showing a command that can't work. |
+| Notifications | `-Notify <webhook url>` posts "goal done" (branch, test result, cost) to Slack or Discord. |
 | Docs | New root README with screenshots. New `docs/ROADMAP.md` and `docs/DEMO.md` (the presenter script). Architecture updated. The original spec moved to `docs/SPEC.md`. |
 
 ## Tested
-`.\test.ps1` on the final code: **9 suites, 256 checks, all pass** (no Claude calls).
+`.\test.ps1` on the final code: **9 suites, 308 checks, all pass** (no Claude calls).
 
 | Suite | Checks |
 |---|---|
-| brain (atomic rules, sessions, goals, presence, costs) | 61 |
+| brain (atomic rules, sessions, goals, presence, costs, giving back, limits) | 72 |
 | brain: who may do what (owner, requests, worker ownership) | 33 |
-| mcp: mock mode | 16 |
-| mcp: 16 tools, real brain | 29 |
+| mcp: mock mode | 17 |
+| mcp: 17 tools, real brain | 32 |
 | mcp: manager identity | 13 |
 | mcp: lock-check hook | 13 |
-| launcher (routing, simulate) | 19 |
-| manager: merge, test, finish, push | 27 |
-| page in Chrome (the whole first-use journey, desktop and phone) | 45 |
+| launcher: routing, limit parsing, simulate (including a limit and a restart while capped) | 32 |
+| manager: merge, conflicts, test, finish, push, notify, planning failures | 42 |
+| page in Chrome (the whole first-use journey, failures, desktop and phone) | 54 |
 
 Also passing:
 - `.\test.ps1 -Restart`: the page and a worker survive a brain restart.
 - Real Claude runs (haiku, each capped at $0.50):
-  - **`start.ps1` with real workers** (`FLOW_REAL=1`), twice. The goal is typed on the page, and the manager plans it. Two real Claudes build the calculator, which is merged into `tandem/<goal>`. The workers' tests pass on that branch, and the goal card shows "Tests pass" and its cost. The manager also wrote the shared interface to Shared memory by itself.
+  - **`start.ps1` with real workers** (`FLOW_REAL=1`), three times, the last one on the final launcher and manager code. The goal is typed on the page, and the manager plans it. Two real Claudes build the calculator, which is merged into `tandem/<goal>`. The workers' tests pass on that branch, and the goal card shows "Tests pass" and its cost. The manager also wrote the shared interface to Shared memory by itself.
+  - **A real merge conflict** (`launcher/test/conflict-real.ts`): two branches added different functions at the same spot. Haiku resolved the markers, kept both functions, and the merged `calc.py` runs.
   - `start.ps1 -Simulate`: goal → plan → done, several times.
   - Earlier in the night: the full loop twice, the hook blocking a real Claude, and the launcher in a worktree recording a real cost.
-- About 21 real runs were used in total, all haiku.
+- About 26 real runs were used in total, all haiku.
 
 ## Not done, or not proven
 - Not tried on a Mac: `start.sh` was only checked in Git Bash.
 - The PR-per-goal step (`gh pr create`) is built but not tried, because `gh` is not installed here. Pushing to an origin is tested against a local bare repo.
-- Two things were not run with real Claude: a real rate limit, and a real "tests fail, fix task" round. The fix round is tested with real git repos and a fake brain.
+- Two things were not run with real Claude: a real usage limit, and a real "tests fail, fix task" round. The limit is tested with simulated workers (capped, requeued, waits, resumes) and the limit-message parsing with sample messages. The fix round is tested with real git repos and a fake brain.
+- `-Lan` was not tried from a second computer. The address detection and the page's share links are tested; Windows may ask to allow node and spacetime on private networks.
+- `-Notify` was tested against a local server, not a real Slack or Discord channel.
 - Identities are saved tokens on each computer, not accounts. Anyone who can reach the brain can watch and add a worker. Keep it on your machine or network until there is a real login.
 - Nothing is hosted on Maincloud (it needs `spacetime login` in a browser).
 

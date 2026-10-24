@@ -8,7 +8,9 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
 - **Brain** (`brain/`, SpacetimeDB module in TypeScript)
   - Atomic claim and lock, all-or-none locks, and dependency unblocking.
   - Goals linked to tasks; finished goals carry their branch, note and cost.
-  - Capacity capping with requeue, and stale-worker cleanup.
+  - Capacity capping with requeue (un-capped when usage drops), and stale-worker cleanup.
+  - Giving a task back: a different worker gets it; after two, it is failed for a person to retry.
+  - Goals the manager could not plan are failed with the reason, and can be sent again.
   - Owner and operators with one-click access requests, presence, and start over.
   - Each worker belongs to the identity that registered it.
 - **MCP server** (`mcp/`)
@@ -17,38 +19,42 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
   - The worker rules skill and the lock-check hook.
 - **Manager** (`manager/`)
   - A watcher that plans each new goal (`plan.ts`).
-  - It then merges, tests and finishes the goal (`merge.ts`, `verify.ts`, `finish.ts`).
-  - Optionally, it pushes the goal branch and opens a PR.
+  - It then merges, tests and finishes the goal (`merge.ts`, `verify.ts`, `finish.ts`). A conflict becomes a "resolve the merge conflict" task, and failing tests become a fix task.
+  - Optionally, it pushes the goal branch and opens a PR, and posts "goal done" to Slack or Discord.
 - **Launcher** (`launcher/`)
   - Claims a task and runs `claude -p` in a git worktree, with the hook and a budget cap.
   - Routes model and effort by difficulty, records the run's cost and commits.
-  - Has a `--simulate` mode, and pushes with `--push`.
+  - Gives a task back after two failed runs. At a usage limit it waits for the reset and comes back.
+  - Resolves merge conflicts: it starts the merge, Claude edits out the markers, it commits.
+  - Has a `--simulate` mode (with `--sim-limit`), and pushes with `--push`.
 - **Page** (`dashboard/`, React + Vite)
   - A host-or-join start screen.
   - A Jira-style app: Board, Goals, Team, Shared memory, Activity, Settings.
   - One next step at a time, a goal filter and per-goal progress, and a task details drawer.
   - One-click owner and approvals, a phone layout and dark mode.
+  - "Needs you" alerts with the reason and Try again, and share links that work from other computers.
 - **Scripts:** `start.ps1` / `stop.ps1` (Windows), `start.sh` / `stop.sh` (macOS, Linux), `test.ps1` (every suite).
 - **Contract and docs**
-  - `tools.json` gained `get_goals` and `mark_goal`.
-  - `tables.md` documents goals, the task's `goal_id`, and the access tables.
+  - `tools.json` gained `get_goals`, `mark_goal` and `give_back_task` (17 tools).
+  - `tables.md` documents goals, the task's `goal_id`, `cost_usd` and `tried_by`, and the access tables.
   - `docs/SPEC.md` is the original plan, and `docs/DEMO.md` is the presenter script.
 
 ## Test plan
-- [x] `.\test.ps1`: 9 suites, 256 checks, all pass. It covers:
+- [x] `.\test.ps1`: 9 suites, 308 checks, all pass. It covers:
   - the brain, access and worker ownership
   - MCP in mock mode, MCP against the real brain, and the manager identity
-  - the hook and the launcher
-  - the manager's merge, test, finish and push
-  - the page in Chrome, on desktop and phone
+  - the hook, and the launcher with a usage limit and a restart while capped
+  - the manager's merge, conflicts, test, finish, push, notify, and planning failures
+  - the page in Chrome, on desktop and phone, including the failure screens
 - [x] `.\test.ps1 -Restart`: the page and a worker survive a brain restart.
 - [x] Real Claude (haiku, capped):
-  - `start.ps1` with real workers, twice: goal → plan → two Claudes → merged `tandem/<goal>` → tests pass → the goal card shows the result and its cost.
+  - `start.ps1` with real workers, three times: goal → plan → two Claudes → merged `tandem/<goal>` → tests pass → the goal card shows the result and its cost.
+  - A real merge conflict resolved by a worker Claude, with the merged code running.
   - `start.ps1 -Simulate`, several times.
   - The full loop, twice.
   - The hook blocking a real Claude.
   - The launcher in a worktree.
-- [ ] Not tried: `start.sh` on a Mac, `gh pr create`, real rate limits, and a real failing-tests fix round.
+- [ ] Not tried: `start.sh` on a Mac, `gh pr create`, `-Lan` from a second computer, a real Slack or Discord webhook, a real usage limit, and a real failing-tests fix round.
 
 ## Notes
 - Every person runs Claude Code under their own login on their own machine. Tandem only coordinates.
