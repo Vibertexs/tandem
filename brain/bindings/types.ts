@@ -120,6 +120,7 @@ export const Workers = __t.object("Workers", {
   usageWeekPct: __t.option(__t.f64()),
   resetAt: __t.option(__t.timestamp()),
   lastSeen: __t.timestamp(),
+  owner: __t.string(),
 });
 export type Workers = __Infer<typeof Workers>;
 

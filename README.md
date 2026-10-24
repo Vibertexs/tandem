@@ -93,7 +93,7 @@ Every suite passes on the final commit. See [docs/STATUS.md](docs/STATUS.md) for
 
 ## Limits
 - `start.ps1` is tested end to end on Windows. `start.sh` (macOS, Linux) does the same steps and was checked in Git Bash, but not yet on a Mac.
-- Anyone who can reach the brain can act as any worker. Only managing the team (goals, approvals, clearing) is restricted to approved people.
+- Identities are saved logins on each computer (SpacetimeDB tokens), not accounts. A worker belongs to the computer that registered it, and managing the team is restricted to approved people. But anyone who can reach the brain can watch it and join as a new worker. Keep it on your machine or your network until it is hosted with a real login.
 - Hosting is local or on your network. Putting the brain on SpacetimeDB's hosted Maincloud needs `spacetime login`.
 
 Built with [SpacetimeDB](https://spacetimedb.com), the [MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/v2/), [Claude Code](https://claude.com/claude-code), React and Vite.

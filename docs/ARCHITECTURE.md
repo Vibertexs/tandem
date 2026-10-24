@@ -51,7 +51,7 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 A teammate does not need approval to work. On their computer they run `.\start.ps1 -Join ws://<host>:3001 -Db <team>` (the Team page shows the exact command), or connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Ask to make changes**, and the owner clicks **Approve**. The manager asks the same way.
 
 ## Who may do what
-- **Worker actions** (register, claim, lock, complete, heartbeat, report): open to everyone, in every session. No per-worker login yet.
+- **Worker actions** (claim, lock, complete, heartbeat, report, cost): only by the identity that registered that worker (or an operator). Anyone may register a new worker; a name in use can only be taken over after its owner has been quiet for 2 minutes.
 - **Manager actions** (goals, tasks and jobs, shared memory, clearing the board, approvals): only an **operator** may do them in the team's `live` session. The first visitor becomes the owner ("Make me the owner"); others ask, and an operator approves.
 
 ## Teams and sessions
@@ -59,6 +59,6 @@ A team is one database on a brain (`-Db`, default `tandem-local`). The page and 
 
 ## Open design questions
 - Who merges the `task/<id>` branches into `main`, and who resolves conflicts? Suggestion: an integrate task run by a worker Claude, escalating to a human, landing through a reviewed PR.
-- No per-worker authentication. Any client can claim to be any worker.
+- Identities are saved tokens, not accounts. A real login (GitHub through SpacetimeDB's OIDC support) is the next step before hosting publicly.
 - No fail tool: a task that fails twice waits for the 2-minute stale cleanup before someone else can take it.
 - Hosting: teammates on other machines and judges need a public brain (Maincloud or a tunnel). Nothing is deployed.

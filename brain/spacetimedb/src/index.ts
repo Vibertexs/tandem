@@ -20,6 +20,7 @@ const workers = table(
     usage_week_pct: t.option(t.f64()),
     reset_at: t.option(t.timestamp()),
     last_seen: t.timestamp(),
+    owner: t.string().default(''), // identity (hex) that registered it; '' = anyone (demo rows)
   }
 );
 
@@ -203,7 +204,18 @@ function reapStaleWorkers(ctx: Ctx, session: string, ttlSeconds: bigint) {
 }
 
 // Marks the caller as alive first (so it is never reaped by its own call), then reaps.
+// A worker belongs to the identity that registered it: only that identity (or an operator) may
+// act for it. Workers with no owner (the demo seed rows) are open to everyone.
+function requireWorkerOwner(ctx: Ctx, session: string, workerId: string) {
+  const worker = ctx.db.workers.pk.find(pk(session, workerId));
+  if (worker && worker.owner && worker.owner !== ctx.sender.toHexString() && !ctx.db.operators.identity.find(ctx.sender)) {
+    throw new SenderError('this worker belongs to someone else');
+  }
+  return worker;
+}
+
 function touchAndReap(ctx: Ctx, session: string, workerId: string) {
+  requireWorkerOwner(ctx, session, workerId);
   const worker = ctx.db.workers.pk.find(pk(session, workerId));
   if (!worker) return undefined;
   ctx.db.workers.pk.update({ ...worker, last_seen: ctx.timestamp });
@@ -234,12 +246,18 @@ export const registerWorker = spacetimedb.reducer(
     checkSession(session_id);
     if (plan !== 'pro' && plan !== 'max') throw new SenderError('plan must be pro or max');
     const existing = ctx.db.workers.pk.find(pk(session_id, id));
+    const me = ctx.sender.toHexString();
     if (existing) {
-      ctx.db.workers.pk.update({ ...existing, name, plan, last_seen: ctx.timestamp });
+      // A name in use by another identity can only be taken over once that one has gone quiet.
+      const quiet = ctx.timestamp.microsSinceUnixEpoch - existing.last_seen.microsSinceUnixEpoch > STALE_AFTER_SECONDS * 1_000_000n;
+      if (existing.owner && existing.owner !== me && !quiet) {
+        throw new SenderError(`the name ${name} is in use by another computer right now`);
+      }
+      ctx.db.workers.pk.update({ ...existing, name, plan, last_seen: ctx.timestamp, owner: me });
     } else {
       ctx.db.workers.insert({
         pk: pk(session_id, id), session_id, id, name, plan, status: 'idle',
-        usage_5h_pct: undefined, usage_week_pct: undefined, reset_at: undefined, last_seen: ctx.timestamp,
+        usage_5h_pct: undefined, usage_week_pct: undefined, reset_at: undefined, last_seen: ctx.timestamp, owner: me,
       });
       addEvent(ctx, session_id, id, 'worker_idle', `${name} joined the team`);
     }
@@ -351,6 +369,7 @@ export const completeTask = spacetimedb.reducer(
     result: t.option(t.string()),
   },
   (ctx, { session_id, worker_id, task_id, branch, summary, result }) => {
+    requireWorkerOwner(ctx, session_id, worker_id);
     const task = ctx.db.tasks.pk.find(pk(session_id, task_id));
     if (!task) throw new SenderError('unknown task');
     if (task.status !== 'claimed' || task.assignee !== worker_id) {
@@ -418,6 +437,7 @@ export const takeLocks = spacetimedb.reducer(
 export const releaseLocks = spacetimedb.reducer(
   { session_id: t.string(), worker_id: t.string(), task_id: t.string() },
   (ctx, { session_id, worker_id, task_id }) => {
+    requireWorkerOwner(ctx, session_id, worker_id);
     const task = ctx.db.tasks.pk.find(pk(session_id, task_id));
     if (!task || task.assignee !== worker_id) {
       throw new SenderError('task is not assigned to this worker');
@@ -449,7 +469,7 @@ export const updateCapacity = spacetimedb.reducer(
     status: t.option(t.string()),
   },
   (ctx, { session_id, worker_id, usage_5h, usage_week, reset_at, status }) => {
-    const worker = ctx.db.workers.pk.find(pk(session_id, worker_id));
+    const worker = requireWorkerOwner(ctx, session_id, worker_id);
     if (!worker) throw new SenderError('unknown worker');
     for (const u of [usage_5h, usage_week]) {
       if (u !== undefined && (u < 0 || u > 100)) throw new SenderError('usage must be 0-100');
@@ -509,7 +529,7 @@ export const resetSession = spacetimedb.reducer(
       ctx.db.workers.insert({
         pk: pk(session_id, w.id), session_id, id: w.id, name: w.name, plan: w.plan, status: w.status,
         usage_5h_pct: w.usage_5h_pct ?? undefined, usage_week_pct: w.usage_week_pct ?? undefined,
-        reset_at: undefined, last_seen: ctx.timestamp,
+        reset_at: undefined, last_seen: ctx.timestamp, owner: '',
       });
     }
     for (const [key, value] of Object.entries(seed.context)) {
@@ -676,6 +696,7 @@ const cleanCost = (usd: number) => (Number.isFinite(usd) && usd > 0 ? Math.min(u
 export const recordCost = spacetimedb.reducer(
   { session_id: t.string(), worker_id: t.string(), task_id: t.string(), usd: t.f64() },
   (ctx, { session_id, worker_id, task_id, usd }) => {
+    requireWorkerOwner(ctx, session_id, worker_id);
     const task = ctx.db.tasks.pk.find(pk(session_id, task_id));
     if (!task) throw new SenderError('unknown task');
     if (task.assignee !== worker_id) throw new SenderError('task is not assigned to this worker');

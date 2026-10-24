@@ -97,6 +97,22 @@ check('claim: the first operator is named Owner', owner?.name === 'Owner', owner
 check('add_goal_cost: a non-operator cannot add planning cost in live', await rejects(c.conn.reducers.addGoalCost({ sessionId: 'live', id: 'g1', usd: 1 })));
 check('finish_goal: a non-operator cannot finish a goal in live', await rejects(c.conn.reducers.finishGoal({ sessionId: 'live', id: 'g1', branch: '', note: '' })));
 
+// A worker belongs to the identity that registered it. Two fresh identities, neither an operator.
+const mine = await client();
+const other = await client();
+await mine.conn.reducers.registerWorker({ sessionId: 'own-1', id: 'w-c', name: 'Cee', plan: 'pro' });
+await create(a.conn, 'own-1', 'o1');
+check('owner: someone else cannot claim, heartbeat or report as my worker',
+  await rejects(other.conn.reducers.claimTask({ sessionId: 'own-1', workerId: 'w-c' })) &&
+  await rejects(other.conn.reducers.heartbeat({ sessionId: 'own-1', workerId: 'w-c' })) &&
+  await rejects(other.conn.reducers.updateCapacity({ sessionId: 'own-1', workerId: 'w-c', usage5H: 100 })));
+check('owner: nobody can take over my name while I am online', await rejects(other.conn.reducers.registerWorker({ sessionId: 'own-1', id: 'w-c', name: 'Cee', plan: 'pro' })));
+check('owner: I can act as my own worker', !(await rejects(mine.conn.reducers.claimTask({ sessionId: 'own-1', workerId: 'w-c' }))) &&
+  !(await rejects(mine.conn.reducers.completeTask({ sessionId: 'own-1', workerId: 'w-c', taskId: 'o1', branch: 'b', summary: 's' }))));
+check('owner: an operator may still act for any worker (for example, to cap it)', !(await rejects(a.conn.reducers.updateCapacity({ sessionId: 'own-1', workerId: 'w-c', usage5H: 50 }))));
+mine.conn.disconnect();
+other.conn.disconnect();
+
 // Start over
 await create(a.conn, 'live', 'x9');
 await a.conn.reducers.postGoal({ sessionId: 'live', id: 'g9', text: 'again' });

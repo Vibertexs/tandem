@@ -21,4 +21,5 @@ export default __t.row({
   usageWeekPct: __t.option(__t.f64()).name("usage_week_pct"),
   resetAt: __t.option(__t.timestamp()).name("reset_at"),
   lastSeen: __t.timestamp().name("last_seen"),
+  owner: __t.string(),
 });

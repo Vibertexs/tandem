@@ -25,7 +25,7 @@ Hello world published, and two clients claiming one task gives exactly one winne
 - Column names are snake_case in the database (as in the contract). Generated client rows are camelCase (`usage5HPct`, `dependsOn`).
 
 ## Known limits
-- Worker actions (register, claim, lock, complete, heartbeat, report) are open to everyone in every session. Any client can pass any `worker_id`. There is no per-worker auth yet.
+- A worker belongs to the identity that registered it (`workers.owner`); only that identity or an operator may act for it. Anyone may register a new worker. Identities are saved tokens, not accounts.
 - Judge sandboxes (any session except `live`) are open to everyone on purpose.
 - `claim_operator` is first come, first served: claim it right after you publish a shared database.
 - Enum-like fields are strings, only some are validated.
