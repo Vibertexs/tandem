@@ -81,6 +81,10 @@ try {
     } catch (e) { out = String((e as { stderr?: string }).stderr ?? e); ok = /OK\s*$/.test(out); }
     finally { try { execSync(`git -C ${REPO} worktree remove --force ${REPO}\\.worktrees\\verify`, { stdio: 'pipe' }); } catch { /* gone */ } }
     check("the workers' tests pass on the goal branch", ok, out.slice(-300));
+    await page.locator('.nav a', { hasText: 'Goals' }).click();
+    const card = await page.locator('.goal-card').first().innerText().catch(() => '');
+    check('the goal card says the tests passed and what it cost', /Tests pass/.test(card) && /\$\d+\.\d+ of Claude usage/.test(card), card);
+    await page.locator('.nav a', { hasText: 'Board' }).click();
   }
   check('the board shows the goal at 100%', await page.locator('.goal-row').first().innerText().then(t => /(\d+)\/\1/.test(t)).catch(() => false));
   if (SHOTS) await page.screenshot({ path: join(SHOTS, 'flow-done.png'), fullPage: true });
