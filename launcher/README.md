@@ -3,7 +3,7 @@
 One per teammate. Runs on their machine, logged in as themselves. Pulls tasks and runs each one as a fresh headless Claude Code run in its own git worktree. Code: `launcher.ts` (the Python placeholder `launcher.py` is left untouched and unused).
 
 ## Run it
-`.\start.ps1` in the repo root starts two launchers for you (`-Workers N` for more, `-Simulate` for fake coding, `-Join ws://<host>:3001 -Db <team>` to work for someone else's team). By hand:
+`tandem start` in your project starts two launchers for you (`--workers N` for more, `--simulate` for fake coding). `tandem join <invite>` starts them for someone else's team. By hand:
 ```
 cd brain && npm install && cd ../mcp && npm install && cd ../launcher && npm install
 # real runs (uses your Claude quota):

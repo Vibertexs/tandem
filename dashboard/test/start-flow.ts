@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const REAL = process.env.FLOW_REAL === '1';
-const REVIEW = REAL && process.env.FLOW_REVIEW === '1'; // also -Review: one more run per goal
+const REVIEW = REAL && process.env.FLOW_REVIEW === '1'; // also --review: one more run per goal
 const DB = REAL ? 'bilal-real' : 'bilal-start';
 const REPO = REAL ? 'C:\\Code\\scratch\\real-repo' : 'C:\\Code\\scratch\\start-repo';
 const URL_ = `http://localhost:5173/?db=${DB}`;

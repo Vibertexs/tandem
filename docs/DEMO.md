@@ -3,26 +3,26 @@
 The product is the demo: one command starts it, and the page shows real Claude Code workers doing a real goal.
 
 ## Before you go on stage
-- [ ] `.\start.ps1 -Fresh` runs clean on the presenting laptop (brain, page, manager, 2 workers)
+- [ ] `tandem start --fresh` in the demo project runs clean on the presenting laptop (brain, page, manager, 2 workers)
 - [ ] `claude` is logged in on that laptop
-- [ ] A second computer (or phone) on the same wifi can open the page (`.\start.ps1 -Lan`)
-- [ ] Backup: `.\start.ps1 -Simulate -Fresh` works too (no Claude calls, same page). Add `-SimLimit 60` to show a worker hitting its usage limit.
+- [ ] A second computer (or phone) on the same wifi can open the invite link
+- [ ] Backup: `tandem start --demo --simulate --fresh` works too (no Claude calls, same page). Add `--sim-limit 60` to show a worker hitting its usage limit.
 - [ ] Backup video of a full run is on the laptop
 
 ## Presenter script (about 3 minutes)
 1. Pitch line: your team's Claude Codes working as one, with no collisions and no idle quota.
 2. Open the page. Click **Make me the owner** (it also approves the manager).
 3. Type a goal, for example: *Create a tiny Python calculator: calc.py with add and sub, test_calc.py with unittest tests, and a README.md.*
-4. The manager plans it (about 30 seconds). Tasks appear on the board, each with its files.
+4. The manager plans it (about 30 seconds). The goal gets its own lane on the board, with its tasks and their files.
 5. Two workers pick them up. Click a card: why it went to that worker, which files it holds, its timeline.
 6. **Shared memory** tab: the interfaces the manager wrote so parallel workers agree.
-7. When every task is done, the goal card shows the merged branch, "Tests pass", and the Claude cost.
-8. **Team** tab: "Connect a computer" gives the one line a teammate runs to join.
+7. When every task is done, the goal's lane shows the merged branch, "Tests pass", and the Claude cost.
+8. **Invite** (top right): the link a teammate opens, and the `tandem join` line that adds their computer's workers.
 
 If there is time, show what happens when things go wrong:
-- **A usage limit** (`-Simulate -SimLimit 60`): the first worker goes "Out of quota until …", its task moves to the other worker, and a minute later it comes back by itself.
-- **Cancel a goal:** on the Goals page, Cancel goal removes its tasks that had not started.
-- **The page on a phone:** scan the QR code in Settings (start with `-Lan`).
+- **A usage limit** (`--simulate --sim-limit 60`): the first worker goes "Out of quota until …", its task moves to the other worker, and a minute later it comes back by itself.
+- **Cancel a goal:** in the goal's lane, Cancel goal removes its tasks that had not started.
+- **The page on a phone:** scan the QR code in Settings.
 
 ## If a judge asks
 - "Is it real?" Yes. Each task is a headless `claude -p` run in its own git worktree. The goal's tasks are merged into one `tandem/<goal>` branch and its tests are run.

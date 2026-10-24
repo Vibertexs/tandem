@@ -19,54 +19,62 @@ When a few people each run an AI coding agent on the same repo:
 - **What it cost.** Every Claude run's cost is recorded, per task and per goal.
 - **A live board.** Waiting → To do → In progress → Done, per goal or all together. You see who is on what, for how long, their latest note, and why each task is where it is.
 
-| Start | Goals, each ending as one branch | A task's details |
-|---|---|---|
-| ![Host or join](docs/img/start.png) | ![Goals](docs/img/goals.png) | ![Task details](docs/img/task.png) |
+| Start | A task's details |
+|---|---|
+| ![Host or join](docs/img/start.png) | ![Task details](docs/img/task.png) |
 
 ## Quick start
-You need [Node.js](https://nodejs.org) 20+, Git, [Claude Code](https://claude.com/claude-code), and the [SpacetimeDB CLI](https://spacetimedb.com/install).
+You need [Node.js](https://nodejs.org) 22.18 or newer, Git, [Claude Code](https://claude.com/claude-code), and the [SpacetimeDB CLI](https://spacetimedb.com/install) (Windows: `iwr https://windows.spacetimedb.com -useb | iex`; macOS and Linux: `curl -sSf https://install.spacetimedb.com | sh`).
 
-| | Install SpacetimeDB | Start Tandem |
-|---|---|---|
-| Windows (PowerShell) | `iwr https://windows.spacetimedb.com -useb \| iex` | `.\start.ps1 -Simulate` |
-| macOS / Linux | `curl -sSf https://install.spacetimedb.com \| sh` | `./start.sh --simulate` |
+Once, in the Tandem folder, put the `tandem` command on your PATH:
+```
+npm install -g .
+```
+(Or run it as `C:\path\to\tandem\tandem.cmd`, or `/path/to/tandem/tandem` on macOS and Linux.)
 
-The two scripts take the same options (`-Simulate` / `--simulate`, and so on). The rest of this README uses the Windows spelling.
-That starts everything and opens the page:
-- the brain (a local database)
-- the page (http://localhost:5173)
-- the manager
-- two workers
+Then, in **your project's folder** (any git repo with a first commit):
+```
+tandem start
+```
+It starts everything for that project and opens the board. It also prints an **invite link** that other computers on your network can open:
+```
+  ✓ brain    started
+  ✓ team     "shop"
+  ✓ page     started
+  ✓ manager  started: it plans every goal you type
+  ✓ workers  Alex, Sam (Claude, haiku)
 
-`-Simulate` makes the workers fake the coding, so the demo costs no Claude usage, except one small planning run per goal.
+  Open     http://localhost:5173/?db=shop
+  Invite   http://192.168.1.20:5173/?db=shop
+  Stop     tandem stop
+```
+On the board, click **Make me the owner** (it also approves the manager), then describe what you want built. Each task becomes a headless Claude Code run in its own git worktree and branch. When the goal is done, its work is merged on one branch, `tandem/<goal>`, with your tests run on it.
 
-On the page:
-1. Click **Make me the owner** (it also approves the manager that `start.ps1` started).
-2. Describe what you want built, for example *"A tiny Python calculator with add and sub, tests, and a README"*. Watch the board.
-
-For real work, drop `-Simulate`. Each task becomes a real headless Claude Code run in its own git worktree and branch. When the goal is done, its work is on one branch (the page shows it, with a copy-able `git checkout`). Stop everything with `.\stop.ps1`.
+Just trying it out? `tandem start --demo --simulate` uses a sample project, and the workers fake the coding (no Claude usage except one small planning run per goal).
 
 | Command | What it does |
 |---|---|
-| `.\start.ps1` | Host a team on this computer (brain, page, manager, 2 real workers) |
-| `.\start.ps1 -Simulate` | Same, with workers that fake the coding |
-| `.\start.ps1 -Lan` | Let other computers on your network join. The Team page then shows the exact command and link to share |
-| `.\start.ps1 -Join ws://<host>:3001 -Db <team>` | Add this computer's workers to someone else's team |
-| `.\start.ps1 -Workers 4 -Repo C:\path\to\repo` | More workers, working on your own repo |
-| `.\start.ps1 -Model auto` | Real workers pick the model by task difficulty (`launcher/routing.json`) instead of always using haiku |
-| `.\start.ps1 -Notify <webhook url>` | Post "goal done" (branch, test result, cost) to a Slack or Discord channel |
-| `.\start.ps1 -Review` | Before a goal is done, a worker Claude reviews its merged branch (read only); the findings go on the goal card and in the PR |
-| `.\stop.ps1` | Stop what `start.ps1` started (`-All` stops the brain too) |
+| `tandem start` | Host a team for the project you are in, open to your network. The board opens |
+| `tandem start --simulate` | Same, with workers that fake the coding |
+| `tandem start --local` | Only this computer can join |
+| `tandem start --workers 4` | More workers on this computer (run it again any time; what runs is kept) |
+| `tandem start --model auto` | Workers pick the model by task difficulty (`launcher/routing.json`) instead of always using haiku |
+| `tandem start --review` | Before a goal is done, a worker Claude reviews its merged branch (read only); the findings go on the board and in the PR |
+| `tandem start --push` | Push each goal's branch to origin, and open a PR if the GitHub CLI is set up |
+| `tandem start --notify <webhook url>` | Post "goal done" (branch, test result, cost) to a Slack or Discord channel |
+| `tandem join <invite>` | In your clone of the project: add this computer's workers to that team |
+| `tandem` or `tandem status` | What is running, with each team's links |
+| `tandem open` / `tandem logs` | Open this project's board / show the latest log lines |
+| `tandem stop` | Stop what this computer started (`--all` stops the brain too) |
 
-The page also works on a phone.
+The board also works on a phone.
 
 ### Teammates on other computers
-1. The host starts the team open to the network, on a clone of the team's GitHub repo: `.\start.ps1 -Lan -Push -Repo C:\path\to\clone`.
-2. The **Team** page then shows each teammate the exact steps: clone the repo next to their Tandem folder, then `.\start.ps1 -Join ws://<host>:3001 -Db <team> -Repo ..\<repo> -Push`.
-3. Their workers push each task branch. The host's manager fetches and merges them into the goal branch, runs the tests, and pushes it (opening a PR if the GitHub CLI is set up).
+1. The host runs `tandem start` in the project (a clone of your GitHub repo) and sends the **invite link** (it is also under **Invite**, top right of the board).
+2. A teammate opens the link to watch. To add their computer's workers: `git clone` the repo, then in that folder `tandem join <invite>`. The **Team** page shows both commands.
+3. Their workers push each task branch to the repo's origin. The host's manager fetches and merges them into the goal branch and runs the tests.
 
-Everyone's Claude Code runs under their own login and quota. Without a shared repo, teammates can still add simulated workers or just watch the board.
-
+Everyone's Claude Code runs under their own login and quota. Without a shared repo (no origin remote), teammates can still add simulated workers or just watch.
 ## How it works
 ```
  You, in the browser       Manager Claude            A worker on each computer
@@ -102,10 +110,10 @@ Every suite passes on the final commit. See [docs/STATUS.md](docs/STATUS.md) for
   - A Claude blocked from editing a locked file.
   - The launcher committing work on its task branch.
   - A Claude resolving a real merge conflict, with the merged code running.
-  - `start.ps1` with real workers: a goal typed on the page, planned, built by two Claudes, merged into one branch, and its tests passing.
+  - `tandem start` with real workers: a goal typed on the page, planned, built by two Claudes, merged into one branch, and its tests passing.
 
 ## Limits
-- `start.ps1` is tested end to end on Windows. `start.sh` (macOS, Linux) does the same steps and was checked in Git Bash, but not yet on a Mac.
+- `tandem` is one cross-platform TypeScript file, tested end to end on Windows. It has not been tried on a Mac or Linux yet.
 - Identities are saved logins on each computer (SpacetimeDB tokens), not accounts. A worker belongs to the computer that registered it, and managing the team is restricted to approved people. But anyone who can reach the brain can watch it and join as a new worker. Keep it on your machine or your network until it is hosted with a real login.
 - Hosting is local or on your network. Putting the brain on SpacetimeDB's hosted Maincloud needs `spacetime login`.
 

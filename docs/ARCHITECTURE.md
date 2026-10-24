@@ -22,7 +22,7 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 - **MCP server** (`mcp/`): the buttons Claude can press. 17 tools from `contract/tools.json`. One file (`src/brain-client.ts`) talks to the database. `BRAIN_MODE=mock` swaps in an in-memory copy.
 - **Dashboard** (`dashboard/`): the web page. Start screen (host or join), then a Jira-style app: Board (prompt, next step, Waiting → To do → In progress → Done, task details), Goals, Team, Shared memory, Activity, Settings.
 - **Manager** (`manager/`): `watch.ts` waits for goals and runs `plan.ts` (one headless Claude with `PROMPT.md`) that reads goals (`get_goals`), splits each into tasks with file lists and dependencies (`assign_task`, `create_job`), and marks it planned (`mark_goal`). When every task of a goal is done, `finish.ts` merges their branches into `tandem/<goal>`, runs the project's tests, and either finishes the goal or adds one fix task.
-- **start.ps1 / stop.ps1**: one command starts the brain, the page, the manager and the workers (`-Simulate` for fake coding, `-Lan` to let others join, `-Join` to add workers to someone else's team).
+- **tandem** (`cli/tandem.ts`): `tandem start` in your project starts the brain, the page, the manager and the workers, open to your network, and prints the invite link. `tandem join <invite>` adds a computer's workers to a team. `tandem stop`, `tandem status`.
 - **Worker rules** (`mcp/skill/SKILL.md`): what every worker Claude follows. Claim, touch only your files, respect locks, report, complete.
 - **Lock-check hook** (`mcp/hook/check-lock.mjs`): stops a Claude from editing a file another task holds. This is enforcement, not just a rule.
 - **Launcher** (`launcher/launcher.ts`): on each teammate's machine. Claims a task, runs `claude -p` in a git worktree on branch `task/<id>`, commits, completes. `--simulate` fakes the coding for demos.
@@ -49,10 +49,10 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 - **A worker cannot finish a task:** it calls `give_back_task` with a reason (the launcher does this after two failed runs). The locks are freed and a different worker gets it. If a second worker gives it back too, it is marked failed: the page says "needs you" with the reason, and an operator presses **Try again**.
 - **Two task branches conflict:** the manager adds a "Resolve the merge conflict with task/X" task for the files that conflict. The launcher starts that merge in the worker's worktree, Claude edits out the conflict markers, and the launcher commits the merge. The goal is finished once it is merged. A conflict that is still there after its fix task is left for a person ("merge by hand").
 - **The tests fail on the goal branch:** the manager adds one "Fix the failing tests" task to the goal and checks again when it is done.
-- **With `-Review`:** before the goal is done, the manager adds one "Review the goal's work" task. The launcher runs it with read-only tools on the goal branch, and its findings go into the goal's note and the PR.
+- **With `--review`:** before the goal is done, the manager adds one "Review the goal's work" task. The launcher runs it with read-only tools on the goal branch, and its findings go into the goal's note and the PR.
 
 ## How teammates join
-A teammate does not need approval to work. On their computer they run `.\start.ps1 -Join ws://<host>:3001 -Db <team>` (the Team page shows the exact command), or connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Ask to make changes**, and the owner clicks **Approve**. The manager asks the same way.
+A teammate does not need approval to work. On their computer, in their clone of the project, they run `tandem join <invite>` (the Team page shows the exact commands), or connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Ask to make changes**, and the owner clicks **Approve**. The manager asks the same way.
 
 ## Who may do what
 - **Worker actions** (claim, lock, complete, heartbeat, report, cost): only by the identity that registered that worker (or an operator). Anyone may register a new worker; a name in use can only be taken over after its owner has been quiet for 2 minutes.

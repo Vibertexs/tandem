@@ -3,7 +3,7 @@
 The planner: a Claude Code session with the tandem MCP that turns the operator's goals into tasks.
 
 ## How to run it
-`.\start.ps1` in the repo root starts the manager for you (`watch.ts`). By hand: `cd manager && npm install && npx tsx watch.ts --repo <repo>` (env `STDB_URI`, `STDB_DB`).
+`tandem start` in your project starts the manager for you (`watch.ts`). By hand: `cd manager && npm install && npx tsx watch.ts --repo <repo>` (env `STDB_URI`, `STDB_DB`).
 
 1. The first time, the watcher asks to manage the team. The page shows "Manager Claude wants to help manage this team"; click **Approve**. Its login is saved, so this happens once.
 2. You type a goal on the Board. Within a few seconds the watcher sees it and runs `plan.ts` once for all waiting goals.
@@ -21,7 +21,7 @@ The planner: a Claude Code session with the tandem MCP that turns the operator's
 
 Tests: `npm test` here (merge, conflicts, verify, finish, push, notify, and the watcher with a fake Claude; no Claude calls). `npm run test:two` is the real two-computers test (about 4 haiku runs).
 
-Planning is one headless `claude -p` run (haiku, `--max-budget-usd 0.50` by default; `start.ps1 -ManagerModel` changes the model). It uses `--mcp-config`, so nothing is added to your Claude Code settings. For an interactive manager instead, start Claude Code with the tandem MCP and paste `PROMPT.md`.
+Planning is one headless `claude -p` run (haiku, `--max-budget-usd 0.50` by default; `tandem start --manager-model` changes the model). It uses `--mcp-config`, so nothing is added to your Claude Code settings. For an interactive manager instead, start Claude Code with the tandem MCP and paste `PROMPT.md`.
 
 ## Checklist
 - [x] Finish `PROMPT.md` (fill in the [FILL] parts): goals come from `get_goals`; 1 worked example

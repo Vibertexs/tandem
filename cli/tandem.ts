@@ -245,8 +245,8 @@ async function start(argv: string[]) {
     if (!(await waitFor('127.0.0.1', BRAIN_PORT, 20))) fail(`The brain did not start. See ${join(LOGS, 'brain.err')}`);
     done('brain', `started${o.local ? ' (this computer only)' : ''}`);
   } else done('brain', 'running');
-  run(spacetime, ['server', 'add', 'dev3001', '--url', `http://127.0.0.1:${BRAIN_PORT}`, '--no-fingerprint']);
-  const pub = run(spacetime, ['publish', team, '--server', 'dev3001', '--no-config', '--module-path', join(ROOT, 'brain', 'spacetimedb'), '--yes', ...(o.fresh ? ['--delete-data=always'] : [])]);
+  // published by address, so nothing is added to your SpacetimeDB CLI's server list
+  const pub = run(spacetime, ['publish', team, '--server', `http://127.0.0.1:${BRAIN_PORT}`, '--no-config', '--module-path', join(ROOT, 'brain', 'spacetimedb'), '--yes', ...(o.fresh ? ['--delete-data=always'] : [])]);
   if (!pub.ok) fail(`${pub.out}\nCould not set up the team "${team}". If Tandem was updated and this team is old, tandem start --fresh starts it over (this wipes its board).`);
   done('team', o.fresh ? `"${team}", fresh` : `"${team}"`);
 

@@ -1,9 +1,9 @@
 # PR: Tandem: a shared brain so a team's Claude Code agents work as one
 
-Open from `bilal/polish` into `main`. The branch carries every earlier branch, so this one PR is everything.
+Open from `bilal/one-view` into `main`. The branch carries every earlier branch, so this one PR is everything.
 
 ## Summary
-You type a goal on a web page, and a manager Claude splits it into tasks with exact file lists. Each worker claims tasks from a shared SpacetimeDB brain, which locks their files atomically. A worker is a teammate's Claude Code, or one started by `start.ps1`. When a goal's tasks are done, their branches are merged into one `tandem/<goal>` branch and the project's tests run on it. The page shows all of it live, including what each task and goal cost.
+You run `tandem start` in your project and type a goal on the board it opens. A manager Claude splits it into tasks with exact file lists. Each worker claims tasks from a shared SpacetimeDB brain, which locks their files atomically. A worker is a Claude Code run on the host, on a teammate's computer (`tandem join <invite>`), or a teammate's own Claude Code session. When a goal's tasks are done, their branches are merged into one `tandem/<goal>` branch and the project's tests run on it. The page shows all of it live, including what each task and goal cost.
 
 - **Brain** (`brain/`, SpacetimeDB module in TypeScript)
   - Atomic claim and lock, all-or-none locks, and dependency unblocking.
@@ -20,7 +20,7 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
 - **Manager** (`manager/`)
   - A watcher that plans each new goal (`plan.ts`).
   - It then merges, tests and finishes the goal (`merge.ts`, `verify.ts`, `finish.ts`). A conflict becomes a "resolve the merge conflict" task, and failing tests become a fix task.
-  - Optionally, it pushes the goal branch and opens a PR, posts "goal done" to Slack or Discord, and has a worker review the merged branch first (`-Review`).
+  - Optionally, it pushes the goal branch and opens a PR, posts "goal done" to Slack or Discord, and has a worker review the merged branch first (`--review`).
 - **Launcher** (`launcher/`)
   - Claims a task and runs `claude -p` in a git worktree, with the hook and a budget cap.
   - Routes model and effort by difficulty, records the run's cost and commits.
@@ -28,12 +28,12 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
   - Resolves merge conflicts: it starts the merge, Claude edits out the markers, it commits.
   - Has a `--simulate` mode (with `--sim-limit`), and pushes with `--push`.
 - **Page** (`dashboard/`, React + Vite)
-  - A host-or-join start screen.
-  - A Jira-style app: Board, Goals, Team, Shared memory, Activity, Settings.
-  - One next step at a time, a goal filter and per-goal progress, and a task details drawer.
+  - A host-or-join start screen that takes a pasted invite link.
+  - One board: each goal is a swimlane with its tasks in Waiting, To do, In progress and Done; finished goals fold. Also Team, Shared memory, Activity, Settings.
+  - An Invite button on every page, one next step at a time, and a task details drawer.
   - One-click owner and approvals, a phone layout and dark mode.
   - "Needs you" alerts with the reason and Try again, and share links that work from other computers.
-- **Scripts:** `start.ps1` / `stop.ps1` (Windows), `start.sh` / `stop.sh` (macOS, Linux), `test.ps1` (every suite).
+- **The `tandem` command** (`cli/tandem.ts`, one cross-platform TypeScript file, Node 22.18+): `tandem start` in your project, `tandem join <invite>`, `tandem stop`, `tandem status`, `tandem open`, `tandem logs`. `test.ps1` runs every suite.
 - **Contract and docs**
   - `tools.json` gained `get_goals`, `mark_goal` and `give_back_task` (17 tools).
   - `tables.md` documents goals, the task's `goal_id`, `cost_usd` and `tried_by`, and the access tables.
@@ -48,15 +48,15 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
   - the page in Chrome, on desktop and phone, including the failure screens
 - [x] `.\test.ps1 -Restart`: the page and a worker survive a brain restart.
 - [x] Real Claude (haiku, capped):
-  - `start.ps1` with real workers, four times: goal → plan → two Claudes → merged `tandem/<goal>` → tests pass → the goal card shows the result and its cost.
-  - The same flow with `-Review`: a worker reviewed the merged branch and its findings were on the goal card.
+  - Real workers, four times: goal → plan → two Claudes → merged `tandem/<goal>` → tests pass → the goal's lane shows the result and its cost.
+  - The same flow with `--review`: a worker reviewed the merged branch and its findings were on the board.
   - A real merge conflict resolved by a worker Claude, with the merged code running.
   - A teammate on another computer: the worker on a second clone pushes its branches, and the host merges them from origin, tests them and pushes the goal branch.
-  - `start.ps1 -Simulate`, several times.
+  - `tandem start --simulate` in a test project, end to end through the page (one real planning run).
   - The full loop, twice.
   - The hook blocking a real Claude.
   - The launcher in a worktree.
-- [ ] Not tried: `start.sh` on a Mac, `gh pr create`, `-Lan` from a second physical computer, a real Slack or Discord webhook, a real usage limit, and a real failing-tests fix round.
+- [ ] Not tried: `tandem` on a Mac or Linux, `gh pr create`, a second physical computer, a real Slack or Discord webhook, a real usage limit, and a real failing-tests fix round.
 
 ## Notes
 - Every person runs Claude Code under their own login on their own machine. Tandem only coordinates.

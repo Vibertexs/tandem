@@ -1,6 +1,6 @@
 # mcp (owner: Bilal; skill and hook: Omar)
 
-> Normally you don't run this yourself: `.\start.ps1` in the repo root starts the manager and workers, and they start this server for each Claude run.
+> Normally you don't run this yourself: `tandem start` in your project starts the manager and workers, and they start this server for each Claude run.
 
 MCP server that exposes the brain to every Claude as tools. TypeScript, stdio, MCP SDK v2. Source: `src/`.
 

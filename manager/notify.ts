@@ -1,5 +1,5 @@
 // Optional: tells a Slack or Discord channel when a goal is done (an "incoming webhook" URL,
-// from start.ps1 -Notify or TANDEM_WEBHOOK). Never throws: a notification is never worth failing for.
+// from tandem start --notify or TANDEM_WEBHOOK). Never throws: a notification is never worth failing for.
 import type { Goal, Task } from '../mcp/src/brain-client.js';
 
 export function goalDoneMessage(goal: Goal, tasks: Task[], branch: string, note: string): string {

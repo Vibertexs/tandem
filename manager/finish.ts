@@ -106,7 +106,7 @@ export async function finishGoal(
     if (reviewed?.result_summary) note = `${note} Review: ${reviewed.result_summary}`.trim();
   }
   if (push && merged.merged.length > 0) {
-    // With -Push: share the result. Opens a pull request too when the GitHub CLI is set up.
+    // With --push: share the result. Opens a pull request too when the GitHub CLI is set up.
     const pushed = pushIfRemote(repo, merged.target);
     if (pushed === 'pushed') {
       const body = `Planned and built by Tandem.\n\nGoal: ${goal.text}\n\n` +
