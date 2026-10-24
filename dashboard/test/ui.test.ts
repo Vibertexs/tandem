@@ -157,8 +157,8 @@ try {
   check('team: each worker card says how many tasks it finished', await until(async () => /\d+ tasks? done/.test(await A.locator('.worker').first().innerText())));
   check('team: both workers are listed as online cards', await until(async () => await A.locator('.worker').count() === 2) && await seen(A, 'Alex', 2000) && await seen(A, 'Sam', 1000));
   const connect = await A.locator('.connect').innerText();
-  check('team: "Connect a computer" gives the exact join command for this team', connect.includes(`-Join ws://127.0.0.1:3001 -Db ${DB}`), connect.slice(0, 160));
-  check('team: a team only this computer can reach says how to open it to the network', connect.includes('Right now only this computer can reach this team') && connect.includes('.\\start.ps1 -Lan'), connect.slice(0, 200));
+  check('team: a team only this computer can reach says so, with the one command to open it up (no join command that cannot work)',
+    connect.includes('Right now only this computer can reach this team') && connect.includes('.\\stop.ps1 -All; .\\start.ps1 -Lan') && !connect.includes('-Join'), connect.slice(0, 300));
   {
     // start.ps1 -Lan opens the page with &lan=<ip>: the join command and the link use that address.
     const L = await (await browser.newContext({ viewport: desktop })).newPage();

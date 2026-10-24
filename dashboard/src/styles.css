@@ -215,7 +215,7 @@ span.goal-pick { cursor: default; }
 .rows .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .rows .row:last-child { border-bottom: 0; }
 ul.rows.card { padding: 6px 18px; }
-.worker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.worker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; }
 .worker header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .worker header > div { flex: 1; min-width: 0; }
 .worker.is-offline { opacity: 0.6; }

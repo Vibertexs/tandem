@@ -98,11 +98,22 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
       </div>
       <section className="card connect" aria-labelledby="connect-h">
         <h2 id="connect-h">Connect a computer</h2>
-        {!share && <p className="small warn">Right now only this computer can reach this team. To let others join, restart it open to your network: <code className="mono">.\stop.ps1 -All</code>, then <code className="mono">.\start.ps1 -Lan</code>. This page then shows the address to share.</p>}
-        <p className="muted small">On the other computer, get the Tandem folder (clone the repo), then run:</p>
-        <CodeLine code={join} say={say} />
-        <p className="small muted">It starts workers there that join this team. Add <code className="mono">-Simulate</code> for workers that fake the coding. On macOS or Linux: <code className="mono">./start.sh --join {uri} --db {team.db}</code></p>
-        {share && <p className="small muted">They can watch the board at <a href={share.page}>{share.page}</a></p>}
+        {share ? (
+          <>
+            <p className="muted small">On the other computer, get the Tandem folder (clone the repo), then run:</p>
+            <CodeLine code={join} say={say} />
+            <p className="small muted">It starts workers there that join this team. Add <code className="mono">-Simulate</code> for workers that fake the coding. On macOS or Linux: <code className="mono">./start.sh --join {uri} --db {team.db}</code></p>
+            <p className="small muted">They can watch the board at <a href={share.page}>{share.page}</a></p>
+          </>
+        ) : (
+          <>
+            <p className="small warn">Right now only this computer can reach this team.</p>
+            <p className="muted small">To let other computers join, restart it open to your network. This page then shows the command to run on them.</p>
+            <CodeLine code={'.\\stop.ps1 -All; .\\start.ps1 -Lan'} say={say} />
+            <p className="muted small">Or add more workers on this computer:</p>
+            <CodeLine code={'.\\start.ps1 -Workers 4'} say={say} />
+          </>
+        )}
         <details>
           <summary className="small">Or use your own Claude Code session as a worker</summary>
           <ol className="steps small">
