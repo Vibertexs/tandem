@@ -117,3 +117,6 @@ export const EV_ICON: Record<string, string> = {
 };
 
 export const isManager = (name: string) => /manager/i.test(name);
+// The manager pings every 15 seconds while it runs.
+export const managerOnline = (snap: Snapshot, now: number) =>
+  snap.presence.some(p => p.kind === 'manager' && now - p.lastSeen.getTime() < 45_000);

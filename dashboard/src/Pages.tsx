@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import type { Api, Snapshot } from './brain';
 import type { Team } from './config';
 import { GoalChip } from './Board';
+import { stageOf } from './ui';
 import { Avatar, Bar, EV_ICON, WorkerStatus, ago, copy, isManager, online, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
@@ -23,21 +24,41 @@ function useAct(say: (m: string) => void) {
 const list = (text: string) => text.split(/[,\n]/).map(x => x.trim()).filter(Boolean);
 
 // ---------- Goals ----------
-export function GoalsPage({ snap, now }: Common) {
+const STAGE_ICON = { waiting: '○', todo: '○', doing: '▶', done: '✓' } as const;
+export function GoalsPage({ snap, now, say }: Common) {
   return (
     <div className="page">
-      <p className="muted lead">Everything you asked for, newest first. The manager turns each goal into tasks on the board.</p>
-      {snap.goals.length === 0 ? <div className="card empty-board"><p className="muted">No goals yet. Send one from the Board.</p></div> : (
-        <ul className="plain rows card">
-          {snap.goals.map(g => (
-            <li key={g.id} className="row">
-              <span className="goal-text grow">{g.text}</span>
-              <GoalChip status={g.status} />
-              <span className="small muted">{ago(g.createdAt, now)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <p className="muted lead">Everything you asked for, newest first. The manager turns each goal into tasks; when they are all done, their work is merged into one branch.</p>
+      {snap.goals.length === 0 && <div className="card empty-board"><p className="muted">No goals yet. Send one from the Board.</p></div>}
+      <div className="goal-cards">
+        {snap.goals.map(g => {
+          const mine = snap.tasks.filter(t => t.goalId === g.id);
+          const done = mine.filter(t => t.status === 'done').length;
+          return (
+            <article key={g.id} className="card goal-card">
+              <header><h2 className="grow">{g.text}</h2><GoalChip status={g.status} /></header>
+              <p className="small muted">Sent {ago(g.createdAt, now)}{mine.length ? ` · ${done} of ${mine.length} tasks done` : ''}</p>
+              {mine.length > 0 && <div className="bar"><div className="bar-fill job-fill" style={{ width: `${Math.round((100 * done) / mine.length)}%` }} /></div>}
+              {mine.length > 0 && (
+                <ul className="plain goal-tasks">
+                  {mine.map(t => {
+                    const who = snap.workers.find(w => w.id === t.assignee);
+                    const st = stageOf(t);
+                    return <li key={t.id} className={`stage-${st}`}><span aria-hidden="true">{STAGE_ICON[st]}</span> {t.title}{who ? <span className="small muted"> · {who.name}</span> : null}</li>;
+                  })}
+                </ul>
+              )}
+              {g.status === 'new' && <p className="small muted">The manager has not picked this up yet.</p>}
+              {g.branch && (
+                <div className="branch-box">
+                  <span className="small">All of its work is on <code className="mono">{g.branch}</code></span>
+                  <button type="button" className="link" onClick={() => copy(`git checkout ${g.branch}`, say, 'Command copied')}>copy git checkout</button>
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -29,6 +29,7 @@ branch('task/c', 'README.md', 'from c\n');
 branch('task/d', 'README.md', 'from d\n'); // conflicts with task/c
 writeFileSync(join(repo, 'notes.txt'), 'my open work\n'); // uncommitted work in the main checkout
 
+const mainBefore = git('rev-parse', 'main');
 const r = mergeGoal(repo, 'g1', 'Build the calculator', ['task/a', 'task/b', 'task/c', 'task/d', 'task/gone']);
 check('clean branches are merged, in order', r.merged.join() === 'task/a,task/b,task/c', r);
 check('a conflicting branch is skipped and reported, not forced', r.failed.join() === 'task/d', r);
@@ -37,7 +38,7 @@ check('the result is one branch named tandem/<goal>', r.target === 'tandem/g1' &
 const files = git('ls-tree', '--name-only', 'tandem/g1').split('\n');
 check('the goal branch has the work from every merged task', ['calc.py', 'test_calc.py', 'README.md'].every(f => files.includes(f)), files);
 check('the goal branch has task/c\'s README, untouched by the failed merge', git('show', 'tandem/g1:README.md') === 'from c');
-check('main is untouched', git('rev-parse', 'main') === git('rev-parse', 'main') && !git('ls-tree', '--name-only', 'main').split('\n').includes('calc.py'));
+check('main is untouched', git('rev-parse', 'main') === mainBefore && !git('ls-tree', '--name-only', 'main').split('\n').includes('calc.py'));
 check('your uncommitted work in the repo is untouched', readFileSync(join(repo, 'notes.txt'), 'utf8') === 'my open work\n' && git('branch', '--show-current') === 'main');
 check('the temporary worktree is cleaned up', !existsSync(join(repo, '.worktrees', 'merge-g1')));
 check('the note tells you what to do', /task\/d/.test(mergeNote(r)) && /by hand/.test(mergeNote(r)) && /task\/gone/.test(mergeNote(r)), mergeNote(r));

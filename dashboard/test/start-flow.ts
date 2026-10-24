@@ -49,7 +49,7 @@ try {
   await page.getByLabel('Describe what you want built').fill('Create a tiny Python calculator: calc.py with add(a, b) and sub(a, b), test_calc.py with unittest tests, and a README.md.');
   await page.getByRole('button', { name: /^Send/ }).click();
   check('the goal is sent and waits for the manager', await seen(page, /Waiting for the manager|Being planned/, 5000));
-  check('the manager plans it (✓ Planned) within 3 minutes', await page.locator('.latest').getByText('✓ Planned').waitFor({ timeout: 180_000 }).then(() => true, () => false));
+  check('the manager plans it within 3 minutes', await page.locator('.latest').getByText(/Planned|Done/).waitFor({ timeout: 180_000 }).then(() => true, () => false));
   const total = await page.locator('.summary-top strong').innerText().catch(() => '');
   check('the plan has at least 2 tasks', Number(total.match(/of (\d+)/)?.[1] ?? 0) >= 2, total);
   if (SHOTS) await page.screenshot({ path: join(SHOTS, 'flow-planned.png') });
@@ -59,6 +59,8 @@ try {
     return !!m && m[1] === m[2];
   }, undefined, { timeout: 180_000 }).then(() => true, () => false);
   check('the simulated workers finish every task', allDone, await page.locator('.summary-top strong').innerText().catch(() => ''));
+  check('the manager marks the goal done', await page.locator('.latest').getByText('✓ Done').waitFor({ timeout: 30_000 }).then(() => true, () => false));
+  check('the board shows the goal at 100%', await page.locator('.goal-row').first().innerText().then(t => /(\d+)\/\1/.test(t)).catch(() => false));
   if (SHOTS) await page.screenshot({ path: join(SHOTS, 'flow-done.png'), fullPage: true });
   await page.locator('.nav a', { hasText: 'Shared memory' }).click();
   const interfaces = await page.getByLabel('Interfaces').inputValue().catch(() => '');

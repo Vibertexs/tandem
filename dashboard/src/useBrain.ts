@@ -18,7 +18,7 @@ export function seedSnapshot(): Snapshot {
     tasks: seed.tasks.slice(0, 8).map(t => ({
       id: t.id, jobId: t.job_id, kind: t.kind, title: t.title, description: t.description, files: t.files,
       difficulty: t.difficulty, model: t.model, effort: t.effort, status: t.status, assignee: null, branch: null,
-      dependsOn: t.depends_on, result: null, resultSummary: null,
+      dependsOn: t.depends_on, result: null, resultSummary: null, goalId: '',
     })),
     context: { ...seed.context },
   };

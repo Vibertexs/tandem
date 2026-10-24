@@ -17,7 +17,7 @@ try {
   const page = await (await browser.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
   await page.goto(URL_);
   check('the board opens for this team', await page.locator('.columns').waitFor({ timeout: 10_000 }).then(() => true, () => false));
-  check('the latest goal shows as planned', await page.locator('.latest').getByText('✓ Planned').waitFor({ timeout: 5000 }).then(() => true, () => false));
+  check('the latest goal shows as planned', await page.locator('.latest').getByText(/Planned|Done/).waitFor({ timeout: 5000 }).then(() => true, () => false));
   const summary = await page.locator('.summary-top strong').innerText().catch(() => '');
   const m = summary.match(/^(\d+) of (\d+) tasks done$/);
   check('the summary says every task is done', !!m && m[1] === m[2] && Number(m[2]) >= 2, summary);

@@ -1,7 +1,7 @@
 // The main page: tell the team what to build, then watch the tasks move across the board.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Api, Snapshot, Task } from './brain';
-import { Avatar, EV_ICON, STAGES, ago, isManager, liveInfo, lockBlocking, online, stageOf, took, why, type Stage } from './ui';
+import { Avatar, EV_ICON, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, online, stageOf, took, why, type Stage } from './ui';
 
 type Props = { snap: Snapshot; api: Api | null; isOp: boolean; now: number; say: (m: string) => void; present: boolean; go: (page: string) => void };
 
@@ -30,6 +30,15 @@ function NextStep({ snap, api, isOp, now, say, go }: Props) {
     );
   }
   const hasManager = snap.operators.some(o => isManager(o.name));
+  if (hasManager && !managerOnline(snap, now) && snap.goals.some(g => g.status === 'new')) {
+    return (
+      <div className="next card subtle">
+        <span className="next-icon" aria-hidden="true">💤</span>
+        <div><strong>The manager is offline, so new goals are waiting.</strong>
+          <p className="small muted">On the host, run <code className="mono">.\start.ps1</code> again. It picks up where it left off.</p></div>
+      </div>
+    );
+  }
   if (!hasManager) {
     return (
       <div className="next card subtle">
@@ -83,10 +92,35 @@ function Prompt({ snap, api, isOp, say }: Props) {
 }
 
 export function GoalChip({ status }: { status: string }) {
+  const text = status === 'new' ? '⏳ Waiting for the manager' : status === 'planning' ? '✎ Being planned'
+    : status === 'done' ? '✓ Done' : '▶ Planned';
+  return <span className={`chip goal-${status}`}>{text}</span>;
+}
+
+// How far along each goal is. Clicking one shows only its tasks on the board.
+export function GoalProgress({ snap, filter, setFilter, say }: { snap: Snapshot; filter: string | null; setFilter?: (g: string | null) => void; say: (m: string) => void }) {
+  const rows = snap.goals.filter(g => snap.tasks.some(t => t.goalId === g.id)).slice(0, 6);
+  if (rows.length === 0) return null;
   return (
-    <span className={`chip goal-${status}`}>
-      {status === 'new' ? '⏳ Waiting for the manager' : status === 'planning' ? '✎ Being planned' : '✓ Planned'}
-    </span>
+    <ul className="plain goal-rows" aria-label="Goals in progress">
+      {rows.map(g => {
+        const mine = snap.tasks.filter(t => t.goalId === g.id);
+        const done = mine.filter(t => t.status === 'done').length;
+        const pct = Math.round((100 * done) / mine.length);
+        const on = filter === g.id;
+        return (
+          <li key={g.id} className={`goal-row ${on ? 'on' : ''}`}>
+            {setFilter
+              ? <button type="button" className="goal-pick" onClick={() => setFilter(on ? null : g.id)} aria-pressed={on} title={on ? 'Show all tasks' : 'Show only this goal'}>{g.text}</button>
+              : <span className="goal-pick">{g.text}</span>}
+            <div className="bar"><div className="bar-fill job-fill" style={{ width: `${pct}%` }} /></div>
+            <span className="small muted nowrap">{done}/{mine.length}</span>
+            <GoalChip status={g.status} />
+            {g.branch && <button type="button" className="link mono" onClick={() => copy(`git checkout ${g.branch}`, say, `Copied: git checkout ${g.branch}`)} title="Copy the git command">{g.branch}</button>}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -164,6 +198,7 @@ function Drawer({ t, snap, now, onClose }: { t: Task; snap: Snapshot; now: numbe
       <h2>{t.title}</h2>
       <p className="muted mono small">{t.id}</p>
       <dl className="facts">
+        {t.goalId && <><dt>Goal</dt><dd>{snap.goals.find(g => g.id === t.goalId)?.text ?? t.goalId}</dd></>}
         <dt>Assignee</dt><dd>{who ? <><Avatar name={who.name} size={22} /> {who.name}</> : t.assignee ? `Reserved for ${t.assignee}` : 'Nobody yet'}</dd>
         <dt>Files</dt><dd className="mono small">{t.files.map(f => <div key={f}>{snap.locks.some(l => l.path === f) ? '🔒 ' : ''}{f}</div>)}</dd>
         {deps.length > 0 && <><dt>After</dt><dd>{deps.map(d => <div key={d.id}>{d.status === 'done' ? '✓' : '○'} {d.title}</div>)}</dd></>}
@@ -186,9 +221,13 @@ function Drawer({ t, snap, now, onClose }: { t: Task; snap: Snapshot; now: numbe
 }
 
 export function BoardPage(p: Props) {
-  const { snap, now, present } = p;
+  const { now, present, say } = p;
   const [open, setOpen] = useState<string | null>(null);
-  const task = snap.tasks.find(t => t.id === open);
+  const [filter, setFilter] = useState<string | null>(null);
+  const activeFilter = filter && p.snap.goals.some(g => g.id === filter) ? filter : null;
+  // With a goal picked, the whole board (summary, columns) shows only that goal's tasks.
+  const snap = useMemo(() => activeFilter ? { ...p.snap, tasks: p.snap.tasks.filter(t => t.goalId === activeFilter) } : p.snap, [p.snap, activeFilter]);
+  const task = p.snap.tasks.find(t => t.id === open);
 
   // Highlight cards that just moved.
   const prev = useRef(new Map<string, string>());
@@ -210,6 +249,8 @@ export function BoardPage(p: Props) {
     <div className="page board-page">
       {!present && <NextStep {...p} />}
       {!present && <Prompt {...p} />}
+      <GoalProgress snap={p.snap} filter={activeFilter} setFilter={setFilter} say={say} />
+      {activeFilter && <p className="small filter-note">Showing one goal. <button type="button" className="link" onClick={() => setFilter(null)}>Show all tasks</button></p>}
       {snap.tasks.length > 0 && <Summary snap={snap} />}
       {snap.tasks.length === 0 ? (
         <div className="empty-board card">
@@ -229,7 +270,7 @@ export function BoardPage(p: Props) {
           ))}
         </div>
       )}
-      {task && <><div className="scrim" onClick={() => setOpen(null)} /><Drawer t={task} snap={snap} now={now} onClose={() => setOpen(null)} /></>}
+      {task && <><div className="scrim" onClick={() => setOpen(null)} /><Drawer t={task} snap={p.snap} now={now} onClose={() => setOpen(null)} /></>}
     </div>
   );
 }

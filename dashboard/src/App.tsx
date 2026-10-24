@@ -4,7 +4,7 @@ import { useBrain } from './useBrain';
 import { Landing, Unreachable } from './Landing';
 import { BoardPage } from './Board';
 import { ActivityPage, GoalsPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
-import { online, useNow } from './ui';
+import { isManager, managerOnline, online, useNow } from './ui';
 
 const PAGES = [
   { key: 'board', label: 'Board', icon: '▦' },
@@ -97,6 +97,9 @@ export function App() {
             <span className={`dot ${status === 'connected' ? 'on' : 'off'}`} aria-hidden="true" />
             <span className="team-name">{config.mock ? 'Sample data' : team!.db}</span>
             <span className="small muted">{status === 'connected' ? `${workersOnline} worker${workersOnline === 1 ? '' : 's'} online` : 'Reconnecting…'}</span>
+            {status === 'connected' && !config.mock && (
+              <span className="small muted">{managerOnline(snap, now) ? '● Manager online' : snap.operators.some(o => isManager(o.name)) ? '○ Manager offline' : '○ No manager yet'}</span>
+            )}
           </div>
           <ul className="plain nav">
             {PAGES.map(p => (

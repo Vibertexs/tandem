@@ -7,7 +7,7 @@ import { mkdirSync } from 'node:fs';
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DbConnection } from '../../brain/bindings/index.js';
+import { DbConnection, tables } from '../../brain/bindings/index.js';
 
 const URL_ = process.env.UI_URL ?? 'http://localhost:4173';
 const CHROME = process.env.CHROME ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe';
@@ -72,7 +72,8 @@ try {
 
   // ---- 3. the manager asks, the owner approves with one click ----
   const manager = await new Promise<DbConnection>((res, rej) => {
-    DbConnection.builder().withUri('ws://127.0.0.1:3001').withDatabaseName(DB).onConnect(c => res(c)).onConnectError((_c, e) => rej(e)).build();
+    DbConnection.builder().withUri('ws://127.0.0.1:3001').withDatabaseName(DB)
+      .onConnect(c => { c.subscriptionBuilder().onApplied(() => res(c)).subscribe([tables.goals]); }).onConnectError((_c, e) => rej(e)).build();
   });
   await manager.reducers.requestOperator({ name: 'Manager Claude' });
   check('approve: the board shows "Manager Claude wants to help" with Approve', await seen(A, 'Manager Claude wants to help manage this team.', 5000));
@@ -86,8 +87,22 @@ try {
   await A.getByRole('button', { name: /^Send/ }).click();
   check('goal: the latest goal shows "Waiting for the manager"', await seen(A, 'Waiting for the manager', 4000) && await seen(A, 'Build a tiny calculator with tests', 1000));
   check('goal: the Goals tab shows a count of 1 waiting', await A.locator('.nav a', { hasText: 'Goals' }).locator('.badge-count').innerText().then(t => t === '1'));
+  check('manager: approved but not running, with a goal waiting, the next step says the manager is offline', await seen(A, 'The manager is offline, so new goals are waiting.', 4000) && await seen(A, 'Manager offline', 1000));
+  await manager.reducers.ping({ sessionId: 'live', name: 'Manager Claude', kind: 'manager' });
+  check('manager: once it pings, the sidebar says Manager online and the offline step goes away',
+    await seen(A, 'Manager online', 4000) && await until(() => A.getByText('The manager is offline').count().then(n => n === 0), 4000));
+  // play the manager: plan the goal into two tasks that belong to it
+  const goalId = [...manager.db.goals.iter()].find(g => g.sessionId === 'live')!.id;
+  await manager.reducers.setGoalStatus({ sessionId: 'live', id: goalId, status: 'planning' });
+  for (const [id, title, file] of [['t-calc', 'Write calc.py', 'calc.py'], ['t-test', 'Test calc.py', 'test_calc.py']]) {
+    await manager.reducers.createTask({ sessionId: 'live', kind: 'normal', task: { id, title, description: '', files: [file], difficulty: 'easy', model: '', effort: 'default', dependsOn: id === 't-test' ? ['t-calc'] : [] } });
+  }
+  await manager.reducers.setGoalStatus({ sessionId: 'live', id: goalId, status: 'planned' });
+  check('goal: the board shows the goal with its own progress (0/2, Planned)',
+    await until(async () => (await A.locator('.goal-row').first().innerText()).includes('0/2') && (await A.locator('.goal-row').first().innerText()).includes('Planned'), 6000), await A.locator('.goal-row').first().innerText().catch(() => ''));
   await nav(A, 'Goals');
-  check('goal: the Goals page lists it', await seen(A, 'Everything you asked for') && await A.locator('.rows .row').count() === 1);
+  check('goal: the Goals page shows it as one card with its 2 planned tasks', await seen(A, 'Everything you asked for') && await A.locator('.goal-card').count() === 1 && await seen(A, '0 of 2 tasks done', 2000));
+  await nav(A, 'Board');
 
   // ---- 5. add work by hand, then simulated workers pick it up ----
   await nav(A, 'Settings');
@@ -100,7 +115,11 @@ try {
   await A.getByRole('button', { name: 'Create job' }).click();
   await seen(A, 'Big job created', 4000);
   await nav(A, 'Board');
-  check('board: tasks land in To do, the merge task in Waiting', await until(async () => await col(A, 'To do').locator('.task').count() === 4 && await col(A, 'Waiting').getByText('Merge the results').isVisible()));
+  check('board: tasks land in To do, the merge task and the dependent test in Waiting', await until(async () => await col(A, 'To do').locator('.task').count() === 5 && await col(A, 'Waiting').locator('.task').count() === 2));
+  await A.locator('.goal-pick').first().click();
+  check('goal filter: picking a goal shows only its tasks', await until(async () => await A.locator('.columns .task').count() === 2) && await seen(A, 'Showing one goal.', 1000));
+  await A.getByRole('button', { name: 'Show all tasks' }).click();
+  check('goal filter: Show all tasks brings every task back', await until(async () => await A.locator('.columns .task').count() === 7));
   for (const name of ['Alex', 'Sam']) {
     launchers.push(spawn(process.execPath, ['--import', launcherTsx, launcherTs, '--name', name, '--simulate', '--sim-ms', '2500', '--poll', '1'], {
       env: { ...process.env, STDB_URI: 'ws://127.0.0.1:3001', STDB_DB: DB, TANDEM_SESSION: 'live' }, stdio: 'ignore',
@@ -117,12 +136,21 @@ try {
   await shot(A, '05-drawer');
   await A.keyboard.press('Escape');
   check('details: Escape closes it', await until(() => drawer.count().then(n => n === 0), 2000));
-  check('board: everything finishes (5 of 5) and the big job reaches 3/3', await seen(A, '5 of 5 tasks done', 60_000) && await seen(A, 'Big job: 3/3 pieces done', 1000));
+  check('board: everything finishes (7 of 7) and the big job reaches 3/3', await seen(A, '7 of 7 tasks done', 90_000) && await seen(A, 'Big job: 3/3 pieces done', 1000));
+  await manager.reducers.finishGoal({ sessionId: 'live', id: goalId, branch: `tandem/${goalId}`, note: '' });
+  check('goal done: the goal row says Done and shows its branch', await until(async () => {
+    const row = await A.locator('.goal-row').first().innerText();
+    return row.includes('2/2') && row.includes('Done') && row.includes(`tandem/${goalId}`);
+  }, 5000), await A.locator('.goal-row').first().innerText().catch(() => ''));
   await shot(A, '06-board-done', true);
 
   // ---- 6. team, shared memory, activity ----
+  await nav(A, 'Goals');
+  const card = await A.locator('.goal-card').first().innerText();
+  check('goals page: the finished goal lists its tasks and where its work is', card.includes('Write calc.py') && card.includes('Test calc.py') && card.includes(`tandem/${goalId}`) && card.includes('2 of 2 tasks done'), card);
+  await shot(A, '06b-goals');
   await nav(A, 'Team');
-  check('team: both workers are listed as online cards', await A.locator('.worker').count() === 2 && await seen(A, 'Alex', 2000) && await seen(A, 'Sam', 1000));
+  check('team: both workers are listed as online cards', await until(async () => await A.locator('.worker').count() === 2) && await seen(A, 'Alex', 2000) && await seen(A, 'Sam', 1000));
   const connect = await A.locator('.connect').innerText();
   check('team: "Connect a computer" gives the exact join command for this team', connect.includes(`-Join ws://127.0.0.1:3001 -Db ${DB}`), connect.slice(0, 160));
   await shot(A, '07-team');
