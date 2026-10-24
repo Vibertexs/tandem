@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { config, forgetTeam, rememberTeam, type Team } from './config';
 import { useBrain } from './useBrain';
 import { Landing, Unreachable } from './Landing';
@@ -45,6 +45,26 @@ export function App() {
     return () => window.removeEventListener('hashchange', on);
   }, []);
   const go = (k: string) => { location.hash = `/${k}`; };
+
+  // The tab title shows the team and how far along it is: "(3/7) tandem-local · Tandem".
+  const doneCount = snap.tasks.filter(t => t.status === 'done').length;
+  useEffect(() => {
+    const name = config.mock ? 'Sample' : team?.db;
+    const progress = snap.tasks.length && doneCount < snap.tasks.length ? `(${doneCount}/${snap.tasks.length}) ` : '';
+    document.title = name ? `${progress}${name} · Tandem` : 'Tandem';
+  }, [team?.db, doneCount, snap.tasks.length]);
+
+  // Say so when a goal finishes, wherever you are in the app.
+  const goalStatus = useRef(new Map<string, string>());
+  useEffect(() => {
+    for (const g of snap.goals) {
+      const before = goalStatus.current.get(g.id);
+      if (before && before !== 'done' && g.status === 'done') {
+        say(`✓ Goal done: ${g.text.slice(0, 60)}${g.branch ? ` (branch ${g.branch})` : ''}`);
+      }
+      goalStatus.current.set(g.id, g.status);
+    }
+  }, [snap.goals, say]);
 
   const open = (t: Team) => {
     rememberTeam(t);

@@ -3,6 +3,7 @@
 One per teammate. Runs on their machine, logged in as themselves. Pulls tasks and runs each one as a fresh headless Claude Code run in its own git worktree. Code: `launcher.ts` (the Python placeholder `launcher.py` is left untouched and unused).
 
 ## Run it
+`.\start.ps1` in the repo root starts two launchers for you (`-Workers N` for more, `-Simulate` for fake coding, `-Join ws://<host>:3001 -Db <team>` to work for someone else's team). By hand:
 ```
 cd brain && npm install && cd ../mcp && npm install && cd ../launcher && npm install
 # real runs (uses your Claude quota):
@@ -21,7 +22,7 @@ Env: `STDB_URI`, `STDB_DB`, `TANDEM_SESSION` (default `live`), `LAUNCHER_BUDGET_
    - the lock-check hook, via `--settings`, so it cannot edit files other tasks hold
    - the model and effort from `routing.json`
    - the budget cap
-4. Commit the changes on the task branch, then `complete_task` with that branch.
+4. Commit the changes on the task branch, then `complete_task` with that branch. When every task of a goal is done, the manager merges these branches into one `tandem/<goal id>` branch.
 5. A rate-limit message caps the worker (usage 100), and the brain puts the task back in the queue. A failed run is retried once at `retry_effort`.
 
 ## Checklist

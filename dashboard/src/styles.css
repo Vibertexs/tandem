@@ -40,6 +40,10 @@ a { color: var(--accent-strong); }
 code, .mono { font-family: var(--mono); }
 pre { margin: 6px 0 2px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; white-space: pre-wrap; word-break: break-all; font-size: 0.82rem; }
 .muted { color: var(--muted); }
+.codeline { display: flex; align-items: stretch; gap: 0; margin: 6px 0 2px; }
+.codeline pre { margin: 0; flex: 1; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.copy-btn { border: 1px solid var(--line); border-left: 0; background: var(--card); color: var(--accent-strong); font: inherit; font-size: 0.8rem; font-weight: 600; padding: 0 14px; border-radius: 0 10px 10px 0; cursor: pointer; min-height: 40px; }
+.copy-btn:hover { background: var(--accent-soft); }
 .small { font-size: 0.82rem; }
 .center { text-align: center; }
 .warn { color: var(--warn); }

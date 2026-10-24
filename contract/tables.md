@@ -32,6 +32,7 @@ Every table has `session_id` (string). Judge mode uses one session per judge. Li
 | depends_on | task id[] | |
 | result | JSON or null | map tasks: see result-format.json |
 | result_summary | string or null | |
+| goal_id | string | the goal it was planned for ('' if none); set by the brain while that goal is `planning` |
 
 ## locks
 | Column | Type |
@@ -61,8 +62,12 @@ Every table has `session_id` (string). Judge mode uses one session per judge. Li
 |---|---|---|
 | id | string | |
 | text | string | what the operator asked for, in plain words |
-| status | `new`, `planning`, `planned` | the manager moves it along |
+| status | `new`, `planning`, `planned`, `done` | the manager moves it along; one goal is `planning` at a time |
 | created_at | timestamp | |
+| branch | string | when done: the branch with all of the goal's work merged (`tandem/<goal id>`) |
+
+## operators, operator_requests, presence
+Who may manage the team (`operators`, the first one is the owner), who is asking to (`operator_requests`, approved or dismissed on the page), and who is connected (`presence`, the manager pings it every 15 seconds). Identities, names and timestamps only.
 
 ## Rules
 - Claiming a task and taking locks are atomic: one winner, no partial locks.

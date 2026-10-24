@@ -111,6 +111,16 @@ export const copy = (text: string, say: (m: string) => void, what = 'Copied') =>
   void navigator.clipboard?.writeText(text).then(() => say(`${what}.`), () => say('Could not copy. Select the text instead.'));
 };
 
+// A command to run, with a copy button beside it.
+export function CodeLine({ code, say }: { code: string; say: (m: string) => void }) {
+  return (
+    <div className="codeline">
+      <pre className="mono">{code}</pre>
+      <button type="button" className="copy-btn" onClick={() => copy(code, say, 'Copied')} aria-label={`Copy: ${code}`}>Copy</button>
+    </div>
+  );
+}
+
 export const EV_ICON: Record<string, string> = {
   task_created: '＋', task_assigned: '→', task_claimed: '▶', task_done: '✓', task_failed: '✕', progress: '…',
   lock_taken: '🔒', lock_released: '🔓', worker_capped: '■', worker_idle: '○', job_progress: '▤', merge_unblocked: '★',

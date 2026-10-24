@@ -1,7 +1,7 @@
 // What you see before you are connected to a team: host one, or join one.
 import { useState } from 'react';
 import { defaultUri, type Team } from './config';
-import { copy } from './ui';
+import { CodeLine } from './ui';
 
 export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: string) => void }) {
   const [hostTeam, setHostTeam] = useState('tandem-local');
@@ -27,8 +27,7 @@ export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: s
           <p className="muted">Run the team on this computer. Do this once.</p>
           <ol className="steps">
             <li>In the Tandem folder, run:
-              <pre className="mono">.\start.ps1</pre>
-              <button type="button" className="link" onClick={() => copy('.\\start.ps1', say, 'Command copied')}>copy</button>
+              <CodeLine code={'.\\start.ps1'} say={say} />
               <span className="small muted">It starts the brain, the manager and two workers, then opens this page. Add <code className="mono">-Simulate</code> for workers that fake the coding (no Claude usage).</span>
             </li>
             <li>Already running? Open it:

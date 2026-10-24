@@ -5,7 +5,7 @@ import type { Api, Snapshot } from './brain';
 import type { Team } from './config';
 import { GoalChip } from './Board';
 import { stageOf } from './ui';
-import { Avatar, Bar, EV_ICON, WorkerStatus, ago, copy, isManager, online, took, liveInfo } from './ui';
+import { Avatar, Bar, CodeLine, EV_ICON, WorkerStatus, ago, copy, isManager, online, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
 
@@ -91,13 +91,12 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
       <section className="card connect" aria-labelledby="connect-h">
         <h2 id="connect-h">Connect a computer</h2>
         <p className="muted small">On the other computer, get the Tandem folder (clone the repo), then run:</p>
-        <pre className="mono small">{join}</pre>
-        <button type="button" className="link" onClick={() => copy(join, say, 'Command copied')}>copy</button>
+        <CodeLine code={join} say={say} />
         <p className="small muted">It starts workers there that join this team. Use <code className="mono">-Simulate</code> instead for workers that fake the coding.</p>
         <details>
           <summary className="small">Or use your own Claude Code session as a worker</summary>
           <ol className="steps small">
-            <li>Connect it: <pre className="mono">{mcp}</pre><button type="button" className="link" onClick={() => copy(mcp, say, 'Command copied')}>copy</button></li>
+            <li>Connect it: <CodeLine code={mcp} say={say} /></li>
             <li>Give it the team rules: copy <code className="mono">mcp/skill/SKILL.md</code> to <code className="mono">.claude/skills/tandem-worker/SKILL.md</code> in your project.</li>
             <li>Tell it: <em>Register with the tandem tools using my name, then claim a task, do it, and complete it. Repeat until no tasks are left.</em></li>
           </ol>
