@@ -5,6 +5,8 @@
 #   .\start.ps1 -Simulate       workers fake the coding (no Claude calls for the work; good for demos)
 #   .\start.ps1 -Lan            also let other computers on your network join (prints the address)
 #   .\start.ps1 -Fresh          wipe the team's database first
+#   .\start.ps1 -Push           push task and goal branches to the repo's origin (needed when workers
+#                               are on other computers; opens a PR per goal if the GitHub CLI is set up)
 #   .\start.ps1 -Model auto     real workers pick the model by task difficulty (launcher/routing.json)
 #                               instead of always using haiku (the cheap default)
 # Join someone else's team from this computer (starts workers here that work for that team):
@@ -19,6 +21,7 @@ param(
   [switch]$Simulate,
   [switch]$NoManager,
   [switch]$Lan,
+  [switch]$Push,
   [switch]$Fresh,
   [string]$Model = 'haiku',
   [string]$ManagerModel = 'haiku',
@@ -136,7 +139,9 @@ if ($hosting -and -not $NoManager -and (Running 'manager')) {
 } elseif ($hosting -and -not $NoManager) {
   Step 'Manager (plans every goal you type)'
   $env:TANDEM_TOKEN_FILE = Join-Path $root "mcp\.tandem\manager-token-$Db"
-  Spawn 'manager' 'node' @('--import', (Tsx 'manager'), (Join-Path $root 'manager\watch.ts'), '--repo', $Repo, '--model', $ManagerModel, '--budget', $Budget) 'manager'
+  $managerArgs = @('--import', (Tsx 'manager'), (Join-Path $root 'manager\watch.ts'), '--repo', $Repo, '--model', $ManagerModel, '--budget', $Budget)
+  if ($Push) { $managerArgs += '--push' }
+  Spawn 'manager' 'node' $managerArgs 'manager'
   Write-Host '  started. The first time, the page asks you to approve "Manager Claude".'
 }
 
@@ -152,6 +157,7 @@ if ($Workers -gt 0) {
     $env:LAUNCHER_BUDGET_USD = $Budget
     $nodeArgs = @('--import', (Tsx 'launcher'), (Join-Path $root 'launcher\launcher.ts'), '--name', $name, '--repo', $Repo)
     if ($Simulate) { $nodeArgs += @('--simulate', '--sim-ms', '3000') }
+    if ($Push) { $nodeArgs += '--push' }
     Spawn "worker $name" 'node' $nodeArgs "worker-$name"
     Write-Host "  $name"
   }

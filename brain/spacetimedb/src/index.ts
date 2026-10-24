@@ -94,6 +94,7 @@ const goals = table(
     status: t.string(), // new | planning | planned | done
     created_at: t.timestamp(),
     branch: t.string().default(''), // when done: the branch with all of its work merged
+    note: t.string().default(''), // when done: how it went ("Tests pass", what could not be merged)
   }
 );
 
@@ -569,7 +570,7 @@ export const postGoal = spacetimedb.reducer(
     const clean = text.trim();
     if (clean.length === 0 || clean.length > 2000) throw new SenderError('a goal is 1 to 2000 characters');
     if (ctx.db.goals.pk.find(pk(session_id, id))) throw new SenderError(`goal ${id} already exists`);
-    ctx.db.goals.insert({ pk: pk(session_id, id), session_id, id, text: clean, status: 'new', created_at: ctx.timestamp, branch: '' });
+    ctx.db.goals.insert({ pk: pk(session_id, id), session_id, id, text: clean, status: 'new', created_at: ctx.timestamp, branch: '', note: '' });
     addEvent(ctx, session_id, undefined, 'task_created', `Goal sent to the manager: ${clean.slice(0, 80)}`);
   }
 );
@@ -650,7 +651,7 @@ export const finishGoal = spacetimedb.reducer(
     requireOperator(ctx, session_id);
     const goal = ctx.db.goals.pk.find(pk(session_id, id));
     if (!goal) throw new SenderError('unknown goal');
-    ctx.db.goals.pk.update({ ...goal, status: 'done', branch });
+    ctx.db.goals.pk.update({ ...goal, status: 'done', branch, note: note.slice(0, 500) });
     const short = goal.text.length > 60 ? goal.text.slice(0, 57) + '...' : goal.text;
     addEvent(ctx, session_id, undefined, 'merge_unblocked',
       `Goal done: ${short}${branch ? ` Everything is on branch ${branch}.` : ''}${note ? ` ${note}` : ''}`);

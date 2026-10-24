@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { mergeGoal, mergeNote } from '../merge.js';
+import { mergeGoal, mergeNote, pushIfRemote } from '../merge.js';
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail: unknown = '') => {
@@ -48,6 +48,15 @@ mkdirSync(join(repo, 'docs'), { recursive: true });
 branch('task/e', 'docs/usage.md', 'how to\n');
 const again = mergeGoal(repo, 'g1', 'Build the calculator', ['task/e']);
 check('merging again adds to the existing goal branch', again.merged.join() === 'task/e' && git('ls-tree', '-r', '--name-only', 'tandem/g1').includes('docs/usage.md'));
+
+// pushing: nothing happens without a remote; with one, the branch arrives there
+check('push: with no origin remote, nothing is pushed', pushIfRemote(repo, 'tandem/g1') === 'no-remote');
+const bare = mkdtempSync(join(tmpdir(), 'tandem-origin-'));
+execFileSync('git', ['init', '-q', '--bare', bare], { stdio: 'pipe' });
+git('remote', 'add', 'origin', bare);
+check('push: with an origin remote, the goal branch is pushed', pushIfRemote(repo, 'tandem/g1') === 'pushed' &&
+  execFileSync('git', ['--git-dir', bare, 'rev-parse', '--verify', '--quiet', 'refs/heads/tandem/g1'], { encoding: 'utf8' }).trim() === git('rev-parse', 'tandem/g1'));
+check('push: a branch that does not exist fails without throwing', pushIfRemote(repo, 'nope/branch') === 'failed');
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

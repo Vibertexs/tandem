@@ -116,7 +116,7 @@ export function GoalProgress({ snap, filter, setFilter, say }: { snap: Snapshot;
             <div className="bar"><div className="bar-fill job-fill" style={{ width: `${pct}%` }} /></div>
             <span className="small muted nowrap">{done}/{mine.length}</span>
             <GoalChip status={g.status} />
-            {g.branch && <button type="button" className="link mono" onClick={() => copy(`git checkout ${g.branch}`, say, `Copied: git checkout ${g.branch}`)} title="Copy the git command">{g.branch}</button>}
+            {g.branch && <button type="button" className="link mono" onClick={() => copy(`git checkout ${g.branch}`, say, `Copied: git checkout ${g.branch}`)} title={g.note ? `${g.note} Click to copy the git command.` : 'Copy the git command'}>{g.branch}</button>}
           </li>
         );
       })}

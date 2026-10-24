@@ -261,9 +261,9 @@ await admin.reducers.setGoalStatus({ sessionId: H, id: 'g1', status: 'planning' 
 await admin.reducers.setGoalStatus({ sessionId: H, id: 'g2', status: 'planning' });
 await sleep(300);
 check('goal link: only one goal is planned at a time (starting g2 finishes planning g1)', goalRow('g1').status === 'planned' && goalRow('g2').status === 'planning');
-await admin.reducers.finishGoal({ sessionId: H, id: 'g1', branch: 'tandem/g1', note: '' });
+await admin.reducers.finishGoal({ sessionId: H, id: 'g1', branch: 'tandem/g1', note: 'Tests pass (python -m unittest).' });
 await sleep(300);
-check('finish: the goal is done and remembers its branch', goalRow('g1').status === 'done' && goalRow('g1').branch === 'tandem/g1');
+check('finish: the goal is done and remembers its branch and how it went', goalRow('g1').status === 'done' && goalRow('g1').branch === 'tandem/g1' && goalRow('g1').note === 'Tests pass (python -m unittest).');
 check('finish: the log says where the work is', hv.events().some(e => e.message.includes('Goal done: Build the calculator') && e.message.includes('tandem/g1')));
 await clients[0].reducers.ping({ sessionId: H, name: 'Manager Claude', kind: 'manager' });
 await sleep(200);

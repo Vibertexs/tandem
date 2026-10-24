@@ -45,3 +45,17 @@ export function mergeNote(r: MergeResult): string {
     r.missing.length ? `Not on this computer: ${r.missing.join(', ')}.` : '',
   ].filter(Boolean).join(' ');
 }
+
+// Pushes `branch` to `origin` if the repo has one. Returns what happened, never throws.
+export function pushIfRemote(repo: string, branch: string): 'pushed' | 'no-remote' | 'failed' {
+  try { git(repo, 'remote', 'get-url', 'origin'); } catch { return 'no-remote'; }
+  try { git(repo, 'push', '-q', 'origin', `${branch}:${branch}`); return 'pushed'; } catch { return 'failed'; }
+}
+
+// Opens a pull request for `branch` with the GitHub CLI, if it is installed and logged in.
+export function openPullRequest(repo: string, branch: string, title: string, body: string): string | null {
+  try {
+    const url = execFileSync('gh', ['pr', 'create', '--head', branch, '--title', title.slice(0, 120), '--body', body], { cwd: repo, encoding: 'utf8', stdio: 'pipe' }).trim();
+    return url.split('\n').pop() ?? null;
+  } catch { return null; }
+}

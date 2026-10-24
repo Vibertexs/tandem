@@ -192,6 +192,8 @@ span.goal-pick { cursor: default; }
 .goal-tasks li { padding: 3px 0; font-size: 0.88rem; }
 .goal-tasks li.stage-done { color: var(--muted); }
 .goal-tasks li.stage-doing span[aria-hidden] { color: var(--accent-strong); }
+.goal-note { padding: 6px 10px; border-radius: 8px; background: var(--panel); }
+.goal-note.ok-note { color: var(--accent-strong); }
 .branch-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; background: var(--accent-soft); border-radius: 10px; }
 .chip.goal-done { background: var(--accent-strong); color: var(--bg); border-color: transparent; }
 

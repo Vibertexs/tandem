@@ -36,6 +36,7 @@ export const Goals = __t.object("Goals", {
   status: __t.string(),
   createdAt: __t.timestamp(),
   branch: __t.string(),
+  note: __t.string(),
 });
 export type Goals = __Infer<typeof Goals>;
 

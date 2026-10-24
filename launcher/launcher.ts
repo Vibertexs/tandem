@@ -2,7 +2,8 @@
 // It pulls tasks from the brain and runs each as a fresh headless Claude Code run in its own git
 // worktree. The Python placeholder launcher.py is left untouched.
 //
-//   tsx launcher.ts --name Sam [--plan pro] [--repo <path>] [--simulate] [--exit-when-idle] [--max-tasks N]
+//   tsx launcher.ts --name Sam [--plan pro] [--repo <path>] [--simulate] [--exit-when-idle] [--max-tasks N] [--push]
+// --push: push each task branch to origin, so a host on another computer can merge it.
 //
 // Env: STDB_URI, STDB_DB, TANDEM_SESSION (default live), TANDEM_TOKEN_FILE,
 //      LAUNCHER_BUDGET_USD  per-run cap for claude -p (default 0.50)
@@ -15,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { BrainClient, type Task } from '../mcp/src/brain-client.js';
 import { loadRouting, route } from './routing.js';
+import { pushIfRemote } from '../manager/merge.js';
 
 const { values: opt } = parseArgs({
   options: {
@@ -26,6 +28,7 @@ const { values: opt } = parseArgs({
     'max-tasks': { type: 'string', default: '0' },
     poll: { type: 'string', default: '3' },
     'sim-ms': { type: 'string', default: '1500' },
+    push: { type: 'boolean', default: false },
   },
 });
 if (!opt.name) { console.error('usage: tsx launcher.ts --name <name> [--simulate] ...'); process.exit(2); }
@@ -123,6 +126,11 @@ async function realRun(t: Task) {
       git(tree, 'add', '-A');
       const dirty = git(tree, 'status', '--porcelain');
       if (dirty) git(tree, '-c', 'user.name=tandem', '-c', 'user.email=tandem@localhost', 'commit', '-q', '-m', `${t.title} (${t.id})`);
+      // With --push the branch reaches the host's manager even from another computer.
+      if (opt.push) {
+        const pushed = pushIfRemote(tree, branch);
+        if (pushed !== 'pushed') await brain.reportProgress(workerId, t.id, pushed === 'no-remote' ? 'no origin remote: branch not pushed' : 'could not push the branch');
+      }
       const summary = out.trim().split('\n').filter(Boolean).pop()?.slice(0, 200) ?? 'done';
       await brain.completeTask(workerId, t.id, branch, summary, t.kind === 'map' ? { status: 'ok', files_touched: t.files, findings: [], notes: summary } : undefined);
       return 'done';

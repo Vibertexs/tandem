@@ -7,7 +7,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Goal, Task, TaskDraft } from '../mcp/src/brain-client.js';
-import { mergeGoal, mergeNote } from './merge.js';
+import { mergeGoal, mergeNote, openPullRequest, pushIfRemote } from './merge.js';
 import { testBranch, type TestRun } from './verify.js';
 
 export const FIX_TITLE = 'Fix the failing tests';
@@ -24,6 +24,7 @@ export type Outcome = 'done' | 'fixing';
 export async function finishGoal(
   brain: FinishBrain, repo: string, goal: Goal, tasks: Task[],
   test: (repo: string, branch: string) => TestRun = testBranch,
+  push = false,
 ): Promise<Outcome> {
   const branches = [...new Set(tasks.map(t => t.branch ?? '').filter(b => b.startsWith('task/')))];
   if (branches.length === 0) {
@@ -57,6 +58,18 @@ export async function finishGoal(
       note = `${note} Tests still fail (${run.command}): check ${merged.target} by hand.`.trim();
     } else if (run.ran) {
       note = `${note} Tests pass (${run.command}).`.trim();
+    }
+  }
+  if (push && merged.merged.length > 0) {
+    // With -Push: share the result. Opens a pull request too when the GitHub CLI is set up.
+    const pushed = pushIfRemote(repo, merged.target);
+    if (pushed === 'pushed') {
+      const body = `Planned and built by Tandem.\n\nGoal: ${goal.text}\n\n` +
+        tasks.map(t => `- ${t.title}${t.result_summary ? `: ${t.result_summary}` : ''}`).join('\n') + (note ? `\n\n${note}` : '');
+      const pr = openPullRequest(repo, merged.target, goal.text, body);
+      note = `${note} Pushed to origin.${pr ? ` Pull request: ${pr}` : ''}`.trim();
+    } else if (pushed === 'failed') {
+      note = `${note} Could not push ${merged.target} to origin.`.trim();
     }
   }
   await brain.finishGoal(goal.id, merged.merged.length ? merged.target : '', note);

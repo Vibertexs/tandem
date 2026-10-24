@@ -4,7 +4,8 @@
 //     tandem/<goal id>, runs the project's tests on it, and either calls the goal done or adds one
 //     task to fix the failing tests (finish.ts).
 //
-//   npx tsx watch.ts [--repo <path>] [--budget 0.50] [--model haiku]
+//   npx tsx watch.ts [--repo <path>] [--budget 0.50] [--model haiku] [--push]
+// --push: push each finished goal branch to origin (and open a PR if the GitHub CLI is set up).
 //
 // The first time, it asks to become an operator. Click Approve on "Manager Claude" on the page.
 // Its login is saved, so this happens once.
@@ -22,6 +23,7 @@ const { values: opt } = parseArgs({
     budget: { type: 'string', default: '0.50' },
     model: { type: 'string', default: 'haiku' },
     poll: { type: 'string', default: '3' },
+    push: { type: 'boolean', default: false },
   },
 });
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -70,7 +72,7 @@ for (;;) {
     const mine = tasks.filter(t => t.goal_id === g.id);
     if (mine.length > 0 && mine.every(t => t.status === 'done')) {
       try {
-        const outcome = await finishGoal(brain, REPO, g, mine);
+        const outcome = await finishGoal(brain, REPO, g, mine, undefined, opt.push);
         log(outcome === 'done' ? `goal ${g.id} done` : `goal ${g.id}: tests fail after merging; added a task to fix them`);
       } catch (e) { log(`could not finish goal ${g.id}: ${(e as Error).message}`); }
     }

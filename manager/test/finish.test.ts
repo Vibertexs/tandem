@@ -60,6 +60,17 @@ function repoWith(testExpect: number) {
   check('still failing after one fix: the goal is done with a note, no second fix task', out2 === 'done' && second.calls.tasks.length === 0 && /Tests still fail/.test(second.calls.finish?.note ?? ''), second.calls);
 }
 {
+  // with push: the finished goal branch goes to origin, and the note says so
+  const repo = repoWith(5);
+  const bare = mkdtempSync(join(tmpdir(), 'tandem-origin-'));
+  execFileSync('git', ['init', '-q', '--bare', bare], { stdio: 'pipe' });
+  execFileSync('git', ['remote', 'add', 'origin', bare], { cwd: repo, stdio: 'pipe' });
+  const { brain, calls } = fakeBrain();
+  const out = await finishGoal(brain, repo, goal, [task('a', 'task/a', ['calc.py']), task('b', 'task/b', ['test_calc.py'])], undefined, true);
+  const onOrigin = execFileSync('git', ['--git-dir', bare, 'branch', '--list', 'tandem/g1'], { encoding: 'utf8' }).trim();
+  check('with push: the goal branch is on origin and the note says "Pushed to origin"', out === 'done' && onOrigin.includes('tandem/g1') && /Pushed to origin/.test(calls.finish?.note ?? ''), calls.finish);
+}
+{
   const { brain, calls } = fakeBrain();
   const out = await finishGoal(brain, tmpdir(), goal, [task('a', 'sim/a', ['calc.py'])]);
   check('simulated workers: done, nothing to merge', out === 'done' && calls.finish?.branch === '' && /Simulated/.test(calls.finish.note), calls);
