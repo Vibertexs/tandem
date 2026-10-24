@@ -4,12 +4,12 @@
 //   tandem start              in your project's folder: host a team for it, print the invite address
 //   tandem join <address>     in your clone of that project: add this computer's workers to the team
 //   tandem stop [--all]       stop what this computer started (--all also stops the brain)
-//   tandem status             what is running
+//   tandem status | open | logs
 //
 // Run `tandem help` for the options. Every person's Claude Code runs under their own login.
 import { spawn, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
-import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { hostname, networkInterfaces } from 'node:os';
 import { basename, delimiter, dirname, join, resolve } from 'node:path';
@@ -47,12 +47,18 @@ const HELP = `tandem: your team's Claude Codes, working as one.
   tandem stop               Stop what this computer started (the brain keeps running).
     --all                   also stop the brain
 
-  tandem status             What is running.
+  tandem status             What is running, with each team's links. (Just "tandem" does this too.)
+  tandem open               Open this project's board in the browser.
+  tandem logs [part]        The latest log lines: all, or one part (manager, alex, brain, page).
 `;
 
 // ---------- small helpers ----------
 const say = (m = '') => console.log(m);
-const step = (m: string) => say(`\n== ${m}`);
+// a little colour when it goes to a terminal, plain text when it goes to a file or a pipe
+const tty = process.stdout.isTTY && !process.env.NO_COLOR;
+const paint = (code: string) => (s: string) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
+const bold = paint('1'), dim = paint('2'), cyan = paint('36'), green = paint('32');
+const done = (what: string, detail: string) => say(`  ${green('✓')} ${what.padEnd(8)} ${dim(detail)}`);
 const fail = (m: string): never => { console.error(`\n${m}`); process.exit(1); };
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'team';
@@ -149,7 +155,7 @@ function installPackages(dirs: string[]) {
   const npm = which('npm') ?? fail('npm is not installed. Install Node.js 22.18 or newer from https://nodejs.org');
   for (const d of dirs) {
     if (existsSync(join(ROOT, d, 'node_modules'))) continue;
-    say(`  installing packages in ${d} (first run only)`);
+    say(dim(`  installing packages in ${d} (first run only)…`));
     const r = run(npm, ['install', '--silent', '--no-fund', '--no-audit'], join(ROOT, d));
     if (!r.ok) fail(`npm install failed in ${d}:\n${r.out}`);
   }
@@ -181,10 +187,13 @@ function demoRepo(): string {
 }
 
 type WorkerOpts = { simulate: boolean; push: boolean; model: string; budget: string; suffix: string; offset: number; simLimit?: number };
-function startWorkers(team: string, uri: string, repo: string, count: number, opts: WorkerOpts) {
+// Starts the workers that are not running yet. Returns all of their names.
+function startWorkers(team: string, uri: string, repo: string, count: number, opts: WorkerOpts): string[] {
+  const names: string[] = [];
   for (let i = 0; i < count; i++) {
     const name = NAMES[(i + opts.offset) % NAMES.length] + opts.suffix;
-    if (running(`worker ${name}`, team)) { say(`  ${name} (already running)`); continue; }
+    names.push(name);
+    if (running(`worker ${name}`, team)) continue;
     const args = ['--import', tsx('launcher'), join(ROOT, 'launcher', 'launcher.ts'), '--name', name, '--repo', repo];
     if (opts.simulate) args.push('--simulate', '--sim-ms', '3000');
     // for demos: the first worker hits a usage limit on its first task, then comes back
@@ -195,8 +204,8 @@ function startWorkers(team: string, uri: string, repo: string, count: number, op
       TANDEM_TOKEN_FILE: join(ROOT, 'mcp', '.tandem', `worker-${name}-${team}`),
       LAUNCHER_MODEL: opts.model === 'auto' ? undefined : opts.model, LAUNCHER_BUDGET_USD: opts.budget,
     });
-    say(`  ${name}`);
   }
+  return names;
 }
 
 // ---------- tandem start ----------
@@ -225,27 +234,27 @@ async function start(argv: string[]) {
     if (!which(t)) fail(t === 'spacetime' ? 'The SpacetimeDB CLI is not installed. See https://spacetimedb.com/install'
       : t === 'claude' ? 'Claude Code (claude) is not installed or not on PATH. Or try: tandem start --simulate --no-manager' : `${t} is not installed.`);
   }
-  step('Getting ready');
+  say();
+  say(`  ${bold('Tandem')} ${dim(`· team "${team}" · ${repo}`)}`);
+  say();
   installPackages(['brain/spacetimedb', 'brain', 'mcp', 'dashboard', 'launcher', 'manager']);
 
-  step('The brain (SpacetimeDB)');
   const spacetime = which('spacetime')!;
   if (!(await reachable('127.0.0.1', BRAIN_PORT))) {
     background('brain', '', spacetime, ['start', '--listen-addr', `${o.local ? '127.0.0.1' : '0.0.0.0'}:${BRAIN_PORT}`], ROOT);
     if (!(await waitFor('127.0.0.1', BRAIN_PORT, 20))) fail(`The brain did not start. See ${join(LOGS, 'brain.err')}`);
-    say(`  started${o.local ? ' (this computer only)' : ''}`);
-  } else say('  already running');
+    done('brain', `started${o.local ? ' (this computer only)' : ''}`);
+  } else done('brain', 'running');
   run(spacetime, ['server', 'add', 'dev3001', '--url', `http://127.0.0.1:${BRAIN_PORT}`, '--no-fingerprint']);
   const pub = run(spacetime, ['publish', team, '--server', 'dev3001', '--no-config', '--module-path', join(ROOT, 'brain', 'spacetimedb'), '--yes', ...(o.fresh ? ['--delete-data=always'] : [])]);
   if (!pub.ok) fail(`${pub.out}\nCould not set up the team "${team}". If Tandem was updated and this team is old, tandem start --fresh starts it over (this wipes its board).`);
-  say(`  team "${team}" is ready`);
+  done('team', o.fresh ? `"${team}", fresh` : `"${team}"`);
 
-  step('The page');
   if (!(await reachable('127.0.0.1', PAGE_PORT))) {
     background('page', '', process.execPath, [join(ROOT, 'dashboard', 'node_modules', 'vite', 'bin', 'vite.js'), '--port', String(PAGE_PORT), '--strictPort'], join(ROOT, 'dashboard'));
     if (!(await waitFor('127.0.0.1', PAGE_PORT, 20))) fail(`The page did not start. See ${join(LOGS, 'page.err')}`);
-    say('  started');
-  } else say('  already running');
+    done('page', 'started');
+  } else done('page', 'running');
 
   // the invite: only if the brain is really open to the network
   const ip = o.local ? null : await lanAddress();
@@ -253,8 +262,7 @@ async function start(argv: string[]) {
   const uri = `ws://127.0.0.1:${BRAIN_PORT}`;
 
   if (!o['no-manager']) {
-    step('The manager (plans every goal you type)');
-    if (running('manager', team)) say('  already running');
+    if (running('manager', team)) done('manager', 'running');
     else {
       const args = ['--import', tsx('manager'), join(ROOT, 'manager', 'watch.ts'), '--repo', repo, '--model', o['manager-model']!, '--budget', o.budget!];
       if (o.push) args.push('--push');
@@ -263,29 +271,33 @@ async function start(argv: string[]) {
       background('manager', team, process.execPath, args, ROOT, {
         STDB_URI: uri, STDB_DB: team, TANDEM_SESSION: 'live', TANDEM_TOKEN_FILE: join(ROOT, 'mcp', '.tandem', `manager-token-${team}`),
       });
-      say('  started');
+      done('manager', 'started: it plans every goal you type');
     }
   }
   if (workers > 0) {
-    step(`${workers} worker${workers === 1 ? '' : 's'}${o.simulate ? ' (simulated: no Claude usage)' : o.model === 'auto' ? ' (Claude, model by difficulty)' : ` (Claude, ${o.model})`}`);
-    startWorkers(team, uri, repo, workers, { simulate: o.simulate, push: o.push, model: o.model!, budget: o.budget!, suffix: '', offset: 0, simLimit: Number(o['sim-limit']) });
+    const names = startWorkers(team, uri, repo, workers, { simulate: o.simulate, push: o.push, model: o.model!, budget: o.budget!, suffix: '', offset: 0, simLimit: Number(o['sim-limit']) });
+    done('workers', `${names.join(', ')}${o.simulate ? ' (simulated: no Claude usage)' : o.model === 'auto' ? ' (Claude, model by difficulty)' : ` (Claude, ${o.model})`}`);
   }
 
   const page = `http://localhost:${PAGE_PORT}/?db=${team}${shared ? `&lan=${ip}` : ''}`;
   const invite = shared ? `http://${ip}:${PAGE_PORT}/?db=${team}` : null;
-  step(`Tandem is running for ${repo}`);
-  say(`  Open:    ${page}`);
+  remember(team, { page, repo, invite });
+  say();
+  say(`  Tandem is running for ${repo}`);
+  say();
+  say(`  ${bold('Open')}     ${cyan(page)}`);
   if (invite) {
-    say(`  Invite:  ${invite}`);
-    say('           Others open it in a browser to watch, or add their workers from their clone of this repo:');
-    say(`           tandem join ${invite}`);
-    if (WIN) say('           (If Windows asks whether node and spacetime may use the network, allow private networks.)');
+    say(`  ${bold('Invite')}   ${cyan(invite)}`);
+    say(dim('           Others open it in a browser to watch. To add their workers, in their clone of this repo:'));
+    say(dim(`           tandem join ${invite}`));
   } else if (!o.local) {
-    say('  Only this computer can join: the brain was started for this computer only.');
-    say('  To invite others: tandem stop --all, then tandem start');
-  } else say('  Only this computer can join (--local).');
-  say('  First time: click "Make me the owner" on the page (it also approves the manager).');
-  say('  Stop:    tandem stop');
+    say(`  ${bold('Invite')}   ${dim('only this computer can join: the brain was started for this computer only.')}`);
+    say(dim('           To invite others: tandem stop --all, then tandem start'));
+  } else say(`  ${bold('Invite')}   ${dim('only this computer can join (--local)')}`);
+  say(`  ${bold('Stop')}     tandem stop`);
+  say();
+  say(dim('  First time: click "Make me the owner" on the page. It also approves the manager.'));
+  if (invite && WIN) say(dim('  If Windows asks whether node and spacetime may use the network, allow private networks.'));
   if (!o['no-browser']) openBrowser(page);
 }
 
@@ -318,13 +330,15 @@ async function joinTeam(argv: string[]) {
     team: { type: 'string' }, model: { type: 'string', default: 'haiku' }, budget: { type: 'string', default: '0.50' },
     'no-browser': { type: 'boolean', default: false },
   } });
-  if (!positionals[0]) fail('Which team? tandem join <address>, using the invite the host\'s page shows.');
+  if (!positionals[0]) fail('Which team? tandem join <invite>, using the link the host\'s page shows (Invite, top right).');
   const { host, team } = parseAddress(positionals[0], o.team);
-  step(`Joining team "${team}" at ${host}`);
+  say();
+  say(`  ${bold('Tandem')} ${dim(`· joining team "${team}" at ${host}`)}`);
+  say();
   if (!(await reachable(host, BRAIN_PORT, 2500))) {
     fail(`Cannot reach ${host}:${BRAIN_PORT}. Check the invite on the host's page, that both computers are on the same network, and that the host did not use --local.`);
   }
-  say('  the host is reachable');
+  done('host', 'reachable');
 
   const workers = Number(o.workers);
   let repo = repoAt(process.cwd());
@@ -337,48 +351,111 @@ async function joinTeam(argv: string[]) {
     }
     if (!git(repo!, 'remote', 'get-url', 'origin').ok) fail(`${repo} has no origin remote. The workers push their branches there for the host to merge.`);
     if (!which('claude')) fail('Claude Code (claude) is not installed or not on PATH. Or add --simulate.');
-    if (!repoUrl) say('  note: the host\'s repo has no origin remote, so it cannot fetch the branches your workers push. Ask them to add one.');
+    done('repo', repo!);
+    if (!repoUrl) say(dim('  note: the host\'s repo has no origin remote, so it cannot fetch the branches your workers push. Ask them to add one.'));
   }
   repo ??= process.cwd();
   installPackages(['brain', 'mcp', 'launcher', 'manager']);
 
   if (workers > 0) {
-    step(`${workers} worker${workers === 1 ? '' : 's'}${o.simulate ? ' (simulated: no Claude usage)' : ` (Claude, ${o.model})`}`);
-    startWorkers(team, `ws://${host}:${BRAIN_PORT}`, repo, workers, {
+    const names = startWorkers(team, `ws://${host}:${BRAIN_PORT}`, repo, workers, {
       simulate: o.simulate, push: !o.simulate, model: o.model!, budget: o.budget!, suffix: `-${slug(hostname())}`, offset: 3,
     });
+    done('workers', `${names.join(', ')}${o.simulate ? ' (simulated: no Claude usage)' : ` (Claude, ${o.model}; they push their branches)`}`);
   }
   const page = `http://${host}:${PAGE_PORT}/?db=${team}`;
-  step('Joined');
-  say(`  Board:  ${page}`);
-  say('  Stop:   tandem stop');
+  remember(team, { page, repo, host });
+  say();
+  say(`  Joined team "${team}"`);
+  say();
+  say(`  ${bold('Board')}    ${cyan(page)}`);
+  say(`  ${bold('Stop')}     tandem stop`);
+  say();
+  say(dim('  You can watch right away. To send goals, click "Ask to make changes" on the page.'));
   if (!o['no-browser']) openBrowser(page);
 }
 
-// ---------- tandem stop / status ----------
+// ---------- the teams this computer started or joined (for status and open) ----------
+type TeamInfo = { page: string; repo: string; invite?: string | null; host?: string };
+const TEAMS = join(STATE, 'teams.json');
+function teams(): Record<string, TeamInfo> { try { return JSON.parse(readFileSync(TEAMS, 'utf8')); } catch { return {}; } }
+function remember(team: string, info: TeamInfo) { mkdirSync(STATE, { recursive: true }); writeFileSync(TEAMS, JSON.stringify({ ...teams(), [team]: info }, null, 2)); }
+
+// The team this folder's project runs as, else the only team running here.
+function currentTeam(argv: string[]): string | null {
+  const { values } = parseArgs({ args: argv, strict: false, options: { team: { type: 'string' } } });
+  if (typeof values.team === 'string') return slug(values.team);
+  const repo = repoAt(process.cwd());
+  const known = teams();
+  const here = Object.entries(known).find(([, t]) => repo && resolve(t.repo) === repo)?.[0];
+  if (here) return here;
+  const active = [...new Set(loadProcs().map(p => p.team).filter(Boolean))];
+  return active.length === 1 ? active[0] : null;
+}
+
+// ---------- tandem stop / status / open / logs ----------
 async function stop(argv: string[]) {
   const all = argv.includes('--all');
   const keep: Proc[] = [];
+  let stopped = 0;
   for (const p of loadProcs()) {
     if (p.name === 'brain' && !all) { keep.push(p); continue; }
     kill(p.pid);
-    say(`stopped ${p.name}${p.team ? ` (${p.team})` : ''}`);
+    stopped++;
+    say(`  ${green('✓')} stopped ${p.name}${p.team ? dim(` (${p.team})`) : ''}`);
   }
   if (all && (await reachable('127.0.0.1', BRAIN_PORT))) {
     // a brain this command did not start (for example, from an older version)
     if (WIN) run('taskkill', ['/IM', 'spacetime*', '/T', '/F']);
     else run('pkill', ['-f', 'spacetime']);
-    say('stopped the brain');
+    stopped++;
+    say(`  ${green('✓')} stopped the brain`);
   }
+  if (!stopped) say(dim(`  Nothing to stop${keep.length ? ' (the brain keeps running; tandem stop --all stops it too)' : ''}.`));
   saveProcs(keep);
 }
 
 async function status() {
   const procs = loadProcs();
-  say(`brain   ${(await reachable('127.0.0.1', BRAIN_PORT)) ? 'running' : 'stopped'} (port ${BRAIN_PORT})`);
-  say(`page    ${(await reachable('127.0.0.1', PAGE_PORT)) ? `running: http://localhost:${PAGE_PORT}` : 'stopped'}`);
-  for (const p of procs.filter(x => x.team)) say(`${p.name.padEnd(7)} team ${p.team}`);
-  if (!procs.some(x => x.team)) say('no manager or workers running');
+  const brain = await reachable('127.0.0.1', BRAIN_PORT);
+  const page = await reachable('127.0.0.1', PAGE_PORT);
+  say();
+  say(`  ${brain ? green('●') : dim('○')} brain    ${brain ? `running ${dim(`(port ${BRAIN_PORT})`)}` : dim('stopped')}`);
+  say(`  ${page ? green('●') : dim('○')} page     ${page ? `running ${dim(`(port ${PAGE_PORT})`)}` : dim('stopped')}`);
+  const known = teams();
+  const active = [...new Set(procs.map(p => p.team).filter(Boolean))];
+  for (const t of active) {
+    const mine = procs.filter(p => p.team === t);
+    const workers = mine.filter(p => p.name.startsWith('worker ')).map(p => p.name.slice(7));
+    say();
+    say(`  ${bold(t)}${known[t]?.repo ? dim(`  ${known[t].repo}`) : ''}`);
+    say(`    ${mine.some(p => p.name === 'manager') ? 'manager, ' : ''}${workers.length} worker${workers.length === 1 ? '' : 's'}${workers.length ? dim(` (${workers.join(', ')})`) : ''}`);
+    if (known[t]?.page) say(`    ${bold('Open')}    ${cyan(known[t].page)}`);
+    if (known[t]?.invite) say(`    ${bold('Invite')}  ${cyan(known[t].invite!)}`);
+  }
+  if (!active.length) say(dim('\n  No team is running here. In your project\'s folder: tandem start'));
+  say();
+}
+
+function openPage(argv: string[]) {
+  const team = currentTeam(argv);
+  const info = team ? teams()[team] : undefined;
+  if (!team || !info) fail('Which team? Run tandem open in the project\'s folder, or tandem open --team NAME. (tandem status lists them.)');
+  say(`  ${cyan(info!.page)}`);
+  openBrowser(info!.page);
+}
+
+function logs(argv: string[]) {
+  const team = currentTeam(argv);
+  const part = argv.find(a => !a.startsWith('--')) ?? ''; // manager, alex, brain, page...
+  const files = existsSync(LOGS) ? readdirSync(LOGS).filter(f => f.endsWith('.log')) : [];
+  const picked = files.filter(f => (team ? f.startsWith(`${team}-`) || /^(brain|page)\./.test(f) : true) && f.toLowerCase().includes(part.toLowerCase()));
+  if (!picked.length) fail(`No logs${part ? ` for "${part}"` : ''} yet. They are in ${LOGS}`);
+  for (const f of picked) {
+    const lines = readFileSync(join(LOGS, f), 'utf8').trimEnd().split('\n').slice(-15);
+    say(`\n  ${bold(f.replace(/\.log$/, ''))} ${dim(join(LOGS, f))}`);
+    for (const l of lines) say(`    ${l}`);
+  }
 }
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -386,4 +463,7 @@ if (cmd === 'start') await start(rest);
 else if (cmd === 'join') await joinTeam(rest);
 else if (cmd === 'stop') await stop(rest);
 else if (cmd === 'status') await status();
+else if (cmd === 'open') openPage(rest);
+else if (cmd === 'logs') logs(rest);
+else if (!cmd && loadProcs().some(p => p.team)) await status(); // just `tandem`: what is running
 else { say(HELP); if (cmd && cmd !== 'help' && cmd !== '--help' && cmd !== '-h') process.exit(2); }
