@@ -76,6 +76,55 @@ function addEvent(ctx: Ctx, workerId: string | undefined, type: string, message:
   });
 }
 
+// A worker that has not sent a heartbeat for this long is treated as dead.
+// The MCP server sends one every 30 seconds while its session is alive.
+const STALE_AFTER_SECONDS = 120n;
+
+// Frees the locks of every claimed task whose worker went silent and puts the
+// task back to `open` so someone else can claim it.
+function reapStaleWorkers(ctx: Ctx, ttlSeconds: bigint) {
+  const now = ctx.timestamp.microsSinceUnixEpoch;
+  for (const task of [...ctx.db.tasks.iter()]) {
+    if (task.status !== 'claimed' || task.assignee === undefined) continue;
+    const owner = ctx.db.workers.id.find(task.assignee);
+    if (owner && now - owner.last_seen.microsSinceUnixEpoch <= ttlSeconds * 1_000_000n) continue;
+    for (const lock of [...ctx.db.locks.task_id.filter(task.id)]) {
+      ctx.db.locks.path.delete(lock.path);
+    }
+    ctx.db.tasks.id.update({ ...task, status: 'open', assignee: undefined });
+    if (owner) {
+      ctx.db.workers.id.update({ ...owner, status: owner.status === 'busy' ? 'idle' : owner.status });
+    }
+    addEvent(ctx, task.assignee, 'lock_released',
+      `${owner?.name ?? task.assignee} went silent. Released locks and reopened: ${task.title}`);
+  }
+}
+
+// Marks the caller as alive first (so it is never reaped by its own call), then reaps.
+function touchAndReap(ctx: Ctx, workerId: string) {
+  const worker = ctx.db.workers.id.find(workerId);
+  if (!worker) return undefined;
+  ctx.db.workers.id.update({ ...worker, last_seen: ctx.timestamp });
+  reapStaleWorkers(ctx, STALE_AFTER_SECONDS);
+  return ctx.db.workers.id.find(workerId);
+}
+
+export const heartbeat = spacetimedb.reducer(
+  { worker_id: t.string() },
+  (ctx, { worker_id }) => {
+    if (!touchAndReap(ctx, worker_id)) throw new SenderError('unknown worker');
+  }
+);
+
+// Test hook and manual cleanup. Anyone can call it, so the minimum is 1 second.
+// TODO: restrict who may call this before the database is shared.
+export const reapStale = spacetimedb.reducer(
+  { ttl_seconds: t.u32() },
+  (ctx, { ttl_seconds }) => {
+    reapStaleWorkers(ctx, BigInt(Math.max(1, ttl_seconds)));
+  }
+);
+
 export const registerWorker = spacetimedb.reducer(
   { id: t.string(), name: t.string(), plan: t.string() },
   (ctx, { id, name, plan }) => {
@@ -137,7 +186,7 @@ export const createTask = spacetimedb.reducer(
 export const claimTask = spacetimedb.reducer(
   { worker_id: t.string() },
   (ctx, { worker_id }) => {
-    const worker = ctx.db.workers.id.find(worker_id);
+    const worker = touchAndReap(ctx, worker_id);
     if (!worker) throw new SenderError('unknown worker');
     if (worker.status === 'capped') throw new SenderError('worker is capped');
     for (const task of ctx.db.tasks.iter()) {
@@ -221,6 +270,7 @@ export const completeTask = spacetimedb.reducer(
 export const takeLocks = spacetimedb.reducer(
   { worker_id: t.string(), task_id: t.string(), paths: t.array(t.string()) },
   (ctx, { worker_id, task_id, paths }) => {
+    touchAndReap(ctx, worker_id);
     const task = ctx.db.tasks.id.find(task_id);
     if (!task || task.status !== 'claimed' || task.assignee !== worker_id) {
       throw new SenderError('task is not claimed by this worker');
