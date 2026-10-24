@@ -324,7 +324,10 @@ check('presence: a ping shows who is here, and pinging again updates the same ro
   await clients[3].reducers.describeWorker({ sessionId: D, workerId: 'w-c', agent: 'codex', account: 'school' });
   await sleep(300);
   check('agent: it can say it runs Codex on the "school" login', w().agent === 'codex' && w().account === 'school', [w().agent, w().account]);
-  check('agent: only claude or codex', await rejects(clients[3].reducers.describeWorker({ sessionId: D, workerId: 'w-c', agent: 'gpt', account: '' })));
+  check('agent: only claude, codex or simulated', await rejects(clients[3].reducers.describeWorker({ sessionId: D, workerId: 'w-c', agent: 'gpt', account: '' })));
+  await clients[3].reducers.describeWorker({ sessionId: D, workerId: 'w-c', agent: 'simulated', account: '' });
+  await sleep(300);
+  check('agent: a worker that fakes the coding says simulated', w().agent === 'simulated', w().agent);
 }
 
 // 14. Giving a task back: a different worker gets it; after two give-backs it needs a person.

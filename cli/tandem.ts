@@ -110,6 +110,19 @@ async function waitFor(host: string, port: number, seconds: number) {
   return false;
 }
 
+// This computer's Tailscale address (100.x.y.z), or null if Tailscale is not installed or not
+// connected. It works from any wifi, and only people you shared it with can reach it, so it is the
+// better invite on public wifi (which often stops devices talking to each other).
+function tailscaleAddress(): string | null {
+  const exe = which('tailscale')
+    ?? [process.env.ProgramFiles && join(process.env.ProgramFiles, 'Tailscale', 'tailscale.exe'), '/Applications/Tailscale.app/Contents/MacOS/Tailscale']
+      .find(p => p && existsSync(p)) ?? null;
+  if (!exe) return null;
+  const r = run(exe, ['ip', '-4']);
+  const ip = r.out.split('\n').map(l => l.trim()).find(l => /^100\.\d+\.\d+\.\d+$/.test(l));
+  return r.ok && ip ? ip : null;
+}
+
 // This computer's address on the network others would use: the one the default route goes out
 // of (a UDP "connect" sends nothing). Falls back to the first ordinary network card.
 function lanAddress(): Promise<string | null> {
@@ -338,7 +351,10 @@ async function start(argv: string[]) {
   } else done('page', 'running');
 
   // the invite: only if the brain is really open to the network
-  const ip = o.local ? null : await lanAddress();
+  // (a VPN address such as Tailscale's is preferred; the venue wifi's address is shown as the other way)
+  const vpn = o.local ? null : tailscaleAddress();
+  const wifi = o.local ? null : await lanAddress();
+  const ip = vpn ?? wifi;
   const shared = !!ip && await reachable(ip, BRAIN_PORT);
   const uri = `ws://127.0.0.1:${BRAIN_PORT}`;
 
@@ -369,9 +385,12 @@ async function start(argv: string[]) {
   say();
   say(`  ${bold('Open')}     ${cyan(page)}`);
   if (invite) {
-    say(`  ${bold('Invite')}   ${cyan(invite)}`);
+    say(`  ${bold('Invite')}   ${cyan(invite)}${vpn ? dim('  (your Tailscale address)') : ''}`);
     say(dim('           Others open it in a browser to watch. To add their workers, in their clone of this repo:'));
-    say(dim(`           tandem join ${invite}`));
+    say(dim(`           tandem join "${invite}"`));
+    if (vpn && wifi && wifi !== vpn) say(dim(`           Same wifi and no isolation? http://${wifi}:${PAGE_PORT}/?db=${team} works too.`));
+    if (vpn) say(dim('           Tailscale: share this computer with them first (Tailscale admin, Machines, ... , Share).'));
+    else if (wifi) say(dim('           On public wifi, devices often cannot reach each other. If they cannot, use Tailscale and run tandem start again.'));
   } else if (!o.local) {
     say(`  ${bold('Invite')}   ${dim('only this computer can join: the brain was started for this computer only.')}`);
     say(dim('           To invite others: tandem stop --all, then tandem start'));

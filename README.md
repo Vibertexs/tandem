@@ -91,6 +91,13 @@ On the board click **Make me the owner** (it also approves the manager), then de
 
 Everyone's agent runs under their own login and quota. Without a shared repo, teammates can add simulated workers or just watch.
 
+**On public wifi (a hackathon, a cafe), use Tailscale.** Venue wifi often stops devices talking to each other, and anyone on it could reach an open brain. [Tailscale](https://tailscale.com/download) makes a private network between your devices:
+1. Everyone installs Tailscale and signs in. The host shares their computer: Tailscale admin, **Machines**, **⋯** next to it, **Share**, and sends the link. Teammates **Accept**.
+2. The host runs `tandem start` as usual. If Tailscale is running, the **Invite** is the host's Tailscale address (`100.x.y.z`) instead of the wifi address, and the venue-wifi address is printed as the other way.
+3. Teammates use that invite: open it in a browser, or `tandem join "<invite>"`.
+
+If you ever type an address by hand, use the host's Tailscale address (`tailscale ip -4` prints it), not the wifi one.
+
 ### Several accounts, Claude and Codex
 ```
 tandem account add work1                  # opens Claude Code: /login, sign in, /exit
