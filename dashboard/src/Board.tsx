@@ -86,7 +86,7 @@ function Prompt({ snap, api, isOp, say }: Props) {
   };
   return (
     <section className="prompt" aria-label="Send work to the team">
-      <form onSubmit={send}>
+      <form onSubmit={send} className={isOp ? '' : 'readonly'}>
         <input value={text} onChange={e => setText(e.target.value)} disabled={!isOp || busy}
           aria-label="Describe what you want built"
           placeholder={isOp ? 'Describe what you want built…' : 'View only: ask to make changes'} />
@@ -230,7 +230,7 @@ function Drawer({ t, snap, now, onClose, api, isOp, say }: { t: Task; snap: Snap
       <p className="muted mono small">{t.id}</p>
       <dl className="facts">
         {t.goalId && <><dt>Goal</dt><dd>{snap.goals.find(g => g.id === t.goalId)?.text ?? t.goalId}</dd></>}
-        <dt>Assignee</dt><dd>{who ? <><Avatar name={who.name} size={22} /> {who.name}</> : t.assignee ? `Reserved for ${t.assignee}` : 'Nobody yet'}</dd>
+        <dt>Assignee</dt><dd>{who ? <span className="who"><Avatar name={who.name} size={22} /> {who.name}</span> : t.assignee ? `Reserved for ${t.assignee}` : 'Nobody yet'}</dd>
         <dt>Files</dt><dd className="mono small">{t.files.map(f => <div key={f}>{snap.locks.some(l => l.path === f) ? '🔒 ' : ''}{f}</div>)}</dd>
         {deps.length > 0 && <><dt>After</dt><dd>{deps.map(d => <div key={d.id}>{d.status === 'done' ? '✓' : '○'} {d.title}</div>)}</dd></>}
         <dt>Model</dt><dd>{t.model || 'by difficulty'} · {t.difficulty}</dd>

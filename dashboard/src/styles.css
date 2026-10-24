@@ -215,6 +215,7 @@ span.goal-pick { cursor: default; }
 .rows .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .rows .row:last-child { border-bottom: 0; }
 ul.rows.card { padding: 6px 18px; }
+.who { display: inline-flex; align-items: center; gap: 8px; }
 .worker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; }
 .worker header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .worker header > div { flex: 1; min-width: 0; }
@@ -256,6 +257,9 @@ ol.log.card { padding: 6px 18px; }
   .list.wrap { grid-template-columns: 1fr; }
   .prompt form { flex-direction: column; }
   .prompt .btn { width: 100%; }
+  .prompt form.readonly .btn { display: none; } /* a viewer has nothing to send; the input says so */
+  .column { min-height: 0; } /* stacked: empty columns stay short */
+  .column .empty { margin: 0 4px 4px; }
   .row2 { grid-template-columns: 1fr; }
   .job { grid-template-columns: 1fr; }
   .goal-row { grid-template-columns: 1fr auto; }
