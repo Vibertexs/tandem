@@ -95,13 +95,18 @@ export class BrainClient implements Brain {
 
   static connect(uri: string, database: string, session: string): Promise<BrainClient> {
     const file = tokenFile(database);
+    let first = true;
     return new Promise((resolve, reject) => {
       DbConnection.builder()
         .withUri(uri)
         .withDatabaseName(database)
         .withToken(readToken(file))
+        // If the brain restarts, keep going: the SDK reconnects and replays the subscription.
+        .withAutomaticReconnect()
         .onConnect((c, identity, token) => {
           saveToken(file, token);
+          if (!first) return;
+          first = false;
           c.subscriptionBuilder()
             .onApplied(() => resolve(new BrainClient(c, session, identity.toHexString())))
             .subscribe([

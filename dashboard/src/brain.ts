@@ -73,6 +73,7 @@ export function connect(
   on: { change: () => void; connected: (identity: string) => void; error: (e: unknown) => void; lost: () => void },
 ): DbConnection {
   const key = tokenKey(uri, database);
+  let first = true;
   return DbConnection.builder()
     .withUri(uri)
     .withDatabaseName(database)
@@ -80,6 +81,10 @@ export function connect(
     .withAutomaticReconnect()
     .onConnect((c, identity, token) => {
       saveToken(key, token);
+      // After a reconnect the SDK replays the subscription and the row callbacks stay registered;
+      // registering them again would double every update.
+      if (!first) { on.connected(identity.toHexString()); on.change(); return; }
+      first = false;
       for (const t of [c.db.workers, c.db.tasks, c.db.locks, c.db.events, c.db.context, c.db.goals, c.db.operators, c.db.operatorRequests, c.db.presence]) {
         t.onInsert(on.change);
         t.onUpdate(on.change);
