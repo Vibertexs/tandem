@@ -35,10 +35,13 @@ export function GoalsPage({ snap, now, say }: Common) {
           const mine = snap.tasks.filter(t => t.goalId === g.id);
           const done = mine.filter(t => t.status === 'done').length;
           const cost = g.costUsd + mine.reduce((sum, t) => sum + t.costUsd, 0);
+          // when it was finished, from the brain's "Goal done" log line
+          const short = g.text.length > 60 ? g.text.slice(0, 57) + '...' : g.text;
+          const doneAt = g.status === 'done' ? snap.events.find(e => e.type === 'merge_unblocked' && e.message.startsWith(`Goal done: ${short}`))?.time : undefined;
           return (
             <article key={g.id} className="card goal-card">
               <header><h2 className="grow">{g.text}</h2><GoalChip status={g.status} /></header>
-              <p className="small muted">Sent {ago(g.createdAt, now)}{mine.length ? ` · ${done} of ${mine.length} tasks done` : ''}{cost > 0 ? ` · ${money(cost)} of Claude usage` : ''}</p>
+              <p className="small muted">Sent {ago(g.createdAt, now)}{doneAt ? ` · done in ${took(g.createdAt, doneAt.getTime())}` : ''}{mine.length ? ` · ${done} of ${mine.length} tasks done` : ''}{cost > 0 ? ` · ${money(cost)} of Claude usage` : ''}</p>
               {mine.length > 0 && <div className="bar"><div className="bar-fill job-fill" style={{ width: `${Math.round((100 * done) / mine.length)}%` }} /></div>}
               {mine.length > 0 && (
                 <ul className="plain goal-tasks">

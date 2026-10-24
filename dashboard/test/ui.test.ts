@@ -84,6 +84,11 @@ try {
   check('approve: after approving, the next step is "No workers are online"', await seen(A, 'No workers are online.', 5000));
 
   // ---- 4. send a goal ----
+  check('goal: a new owner gets example goals; clicking one fills the prompt', await A.locator('.chip.example').count() === 3 &&
+    await A.locator('.chip.example').first().click().then(() => prompt(A).inputValue()).then(v => v.startsWith('A tiny Python calculator')));
+  await A.locator('body').click({ position: { x: 5, y: 5 } });
+  await A.keyboard.press('/');
+  check('goal: "/" jumps to the prompt', await prompt(A).evaluate(el => el === document.activeElement));
   await prompt(A).fill('Build a tiny calculator with tests');
   await A.getByRole('button', { name: /^Send/ }).click();
   check('goal: the latest goal shows "Waiting for the manager"', await seen(A, 'Waiting for the manager', 4000) && await seen(A, 'Build a tiny calculator with tests', 1000));
@@ -151,7 +156,7 @@ try {
   await nav(A, 'Goals');
   const card = await A.locator('.goal-card').first().innerText();
   check('goals page: the finished goal lists its tasks and where its work is', card.includes('Write calc.py') && card.includes('Test calc.py') && card.includes(`tandem/${goalId}`) && card.includes('2 of 2 tasks done'), card);
-  check('goals page: it shows how it went and what it cost', card.includes('Tests pass') && card.includes('$0.01 of Claude usage'), card);
+  check('goals page: it shows how it went, how long it took and what it cost', card.includes('Tests pass') && /done in \d/.test(card) && card.includes('$0.01 of Claude usage'), card);
   await shot(A, '06b-goals');
   await nav(A, 'Team');
   check('team: each worker card says how many tasks it finished', await until(async () => /\d+ tasks? done/.test(await A.locator('.worker').first().innerText())));

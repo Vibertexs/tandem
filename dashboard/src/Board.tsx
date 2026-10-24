@@ -88,10 +88,27 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
   return null;
 }
 
+// For a first-time owner: goals small enough to finish in a few minutes.
+const EXAMPLES = [
+  'A tiny Python calculator: calc.py with add and sub, unittest tests, and a README',
+  'A command-line to-do list in Python that saves to todo.json, with unittest tests',
+  'A one-page pomodoro timer: index.html, styles.css and app.js',
+];
+
 function Prompt({ snap, api, isOp, say }: Props) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
   const latest = snap.goals[0];
+  // "/" jumps to the prompt, like search boxes do
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+      if (e.key === '/' && !typing && input.current && !input.current.disabled) { e.preventDefault(); input.current.focus(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!api || !text.trim() || busy) return;
@@ -103,11 +120,16 @@ function Prompt({ snap, api, isOp, say }: Props) {
   return (
     <section className="prompt" aria-label="Send work to the team">
       <form onSubmit={send} className={isOp ? '' : 'readonly'}>
-        <input value={text} onChange={e => setText(e.target.value)} disabled={!isOp || busy}
+        <input ref={input} value={text} onChange={e => setText(e.target.value)} disabled={!isOp || busy}
           aria-label="Describe what you want built"
           placeholder={isOp ? 'Describe what you want built…' : 'View only: ask to make changes'} />
         <button type="submit" className="btn primary" disabled={!isOp || busy || !text.trim()}>Send</button>
       </form>
+      {isOp && !latest && !text && (
+        <p className="small examples"><span className="muted">Try one:</span>
+          {EXAMPLES.map(x => <button key={x} type="button" className="chip example" onClick={() => { setText(x); input.current?.focus(); }}>{x}</button>)}
+        </p>
+      )}
       {latest && (
         <p className="small latest">
           <span className="muted">Latest goal:</span> <span className="goal-text">{latest.text}</span>

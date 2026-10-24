@@ -141,6 +141,9 @@ textarea { resize: vertical; }
 .prompt input:disabled { opacity: 0.65; }
 .prompt .btn { min-height: 56px; padding: 0 30px; font-size: 1.02rem; }
 .prompt .btn::after { content: ' \2192'; }
+.examples { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 12px; }
+.chip.example { cursor: pointer; font: inherit; font-size: 0.85rem; text-align: left; }
+.chip.example:hover { border-color: var(--accent-strong); color: var(--ink); }
 .latest { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 12px; }
 .goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60ch; }
 .summary { display: flex; flex-direction: column; gap: 10px; }
