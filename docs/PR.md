@@ -63,4 +63,3 @@ You run `tandem start` in your project and type a goal on the board it opens. A 
 - Identities are saved tokens, not accounts. A real login is the next step before hosting publicly.
 - The Python placeholders from the scaffold are left untouched and unused.
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
