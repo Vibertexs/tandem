@@ -29,7 +29,7 @@ Hello world published, and two clients claiming one task gives exactly one winne
 - Nothing is published to `tandem` or Maincloud.
 
 ## Tests
-`npm test` (45 checks): 10-client race, locks, map-reduce, stale workers, session isolation, create_job, reservations, capacity, context, reset and seed.
+`npm test`: 10-client race, locks, map-reduce, stale workers, session isolation, create_job, reservations, capacity, context, reset and seed.
 
 ## Run it locally
 Port 3000 may be taken, so use 3001. Always pass `--server` and `--no-config`.

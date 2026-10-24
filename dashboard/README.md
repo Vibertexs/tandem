@@ -41,7 +41,7 @@ URL options: `?mode=live`, `?view=present`, `?mock=1`, `?uri=ws://host:3000&db=n
 
 ## Tests
 - `npm test`: every scenario against the real brain, using the same simulator as the browser (24 checks).
-- `npm run test:ui`: the real page in Chrome via playwright-core, desktop and phone size (49 checks). Needs `npm run build && npm run preview -- --port 4173`, and Chrome. Set `SHOTS=<folder>` to save screenshots.
+- `npm run test:ui`: the real page in Chrome via playwright-core, desktop and phone size (38 checks). Needs `npm run build && npm run preview -- --port 4173`, and Chrome. Set `SHOTS=<folder>` to save screenshots.
 
 ## Known limits
 - The simulator runs in the page. If a judge closes the tab mid-run, their sandbox stops moving until they come back.
