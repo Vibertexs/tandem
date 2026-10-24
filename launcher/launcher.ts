@@ -92,7 +92,13 @@ async function realRun(t: Task) {
   const repo = resolve(opt.repo!);
   const tree = join(repo, '.worktrees', t.id);
   const branch = `task/${t.id}`;
-  if (!existsSync(tree)) { mkdirSync(join(repo, '.worktrees'), { recursive: true }); git(repo, 'worktree', 'add', '-q', '-b', branch, tree); }
+  if (!existsSync(tree)) {
+    mkdirSync(join(repo, '.worktrees'), { recursive: true });
+    // A task added to a goal after its work was merged (like a test fix) starts from the goal branch.
+    let base = 'HEAD';
+    if (t.goal_id) { try { git(repo, 'rev-parse', '--verify', '--quiet', `refs/heads/tandem/${t.goal_id}`); base = `tandem/${t.goal_id}`; } catch { /* no goal branch yet */ } }
+    git(repo, 'worktree', 'add', '-q', '-b', branch, tree, base);
+  }
   const me = brain.getCapacity().find(w => w.id === workerId);
   const routing = loadRouting();
   let { model, effort } = route(t, me?.usage_5h_pct ?? null, routing);

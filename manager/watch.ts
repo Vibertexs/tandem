@@ -1,7 +1,8 @@
 // The manager, always on:
 //  1. waits for goals and plans each batch with one headless Claude run (manager/run.ps1);
 //  2. when every task of a goal is done, merges the goal's task branches into one branch,
-//     tandem/<goal id>, so the result of a goal is a single branch you can review and merge.
+//     tandem/<goal id>, runs the project's tests on it, and either calls the goal done or adds one
+//     task to fix the failing tests (finish.ts).
 //
 //   npx tsx watch.ts [--repo <path>] [--budget 0.50] [--model haiku]
 //
@@ -9,12 +10,11 @@
 // Its login is saved, so this happens once.
 // Env: STDB_URI, STDB_DB, TANDEM_SESSION (default live), TANDEM_TOKEN_FILE
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { BrainClient, type Goal, type Task } from '../mcp/src/brain-client.js';
-import { mergeGoal, mergeNote } from './merge.js';
+import { BrainClient } from '../mcp/src/brain-client.js';
+import { finishGoal } from './finish.js';
 
 const { values: opt } = parseArgs({
   options: {
@@ -55,25 +55,6 @@ const plan = () => new Promise<number>(done => {
   child.on('close', code => done(code ?? 1));
 });
 
-// ---------- finishing a goal ----------
-async function finish(goal: Goal, tasks: Task[]) {
-  const branches = [...new Set(tasks.map(t => t.branch ?? '').filter(b => b.startsWith('task/')))];
-  if (branches.length === 0) {
-    const simulated = tasks.some(t => (t.branch ?? '').startsWith('sim/'));
-    await brain.finishGoal(goal.id, '', simulated ? '(Simulated workers: there is no code to merge.)' : '');
-    log(`goal ${goal.id} done (nothing to merge)`);
-    return;
-  }
-  if (!existsSync(join(REPO, '.git'))) {
-    await brain.finishGoal(goal.id, '', `The task branches are ${branches.join(', ')}; ${REPO} is not a git repo, so they were not merged.`);
-    return;
-  }
-  const r = mergeGoal(REPO, goal.id, goal.text, branches);
-  const note = mergeNote(r);
-  await brain.finishGoal(goal.id, r.merged.length ? r.target : '', note);
-  log(`goal ${goal.id} done: merged ${r.merged.length} branch(es) into ${r.target}${note ? ` (${note})` : ''}`);
-}
-
 // ---------- loop ----------
 for (;;) {
   // A goal that failed to plan twice is skipped, so one bad goal cannot burn quota forever.
@@ -88,7 +69,10 @@ for (;;) {
   for (const g of brain.listGoals().filter(x => x.status === 'planned')) {
     const mine = tasks.filter(t => t.goal_id === g.id);
     if (mine.length > 0 && mine.every(t => t.status === 'done')) {
-      try { await finish(g, mine); } catch (e) { log(`could not finish goal ${g.id}: ${(e as Error).message}`); }
+      try {
+        const outcome = await finishGoal(brain, REPO, g, mine);
+        log(outcome === 'done' ? `goal ${g.id} done` : `goal ${g.id}: tests fail after merging; added a task to fix them`);
+      } catch (e) { log(`could not finish goal ${g.id}: ${(e as Error).message}`); }
     }
   }
   await sleep(Number(opt.poll) * 1000);
