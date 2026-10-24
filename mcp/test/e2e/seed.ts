@@ -1,5 +1,9 @@
 // Creates the 3 e2e tasks. t1 and t2 touch the same file, so they must not overlap in time.
+// Env: TANDEM_SESSION (required), STDB_URI, STDB_DB
 import { DbConnection } from '../../../brain/bindings/index.js';
+
+const session = process.env.TANDEM_SESSION;
+if (!session) throw new Error('set TANDEM_SESSION');
 
 const conn = await new Promise<DbConnection>((resolve, reject) => {
   DbConnection.builder()
@@ -17,10 +21,10 @@ const tasks = [
 ];
 for (const t of tasks) {
   await conn.reducers.createTask({
-    ...t, jobId: undefined, kind: 'normal', title: t.id, difficulty: 'easy',
-    model: 'haiku', effort: 'default', dependsOn: [],
+    sessionId: session, kind: 'normal',
+    task: { ...t, title: t.id, difficulty: 'easy', model: 'haiku', effort: 'default', dependsOn: [] },
   });
 }
 conn.disconnect();
-console.log('seeded', tasks.map(t => t.id).join(','));
+console.log('seeded', tasks.map(t => t.id).join(','), 'in session', session);
 process.exit(0);

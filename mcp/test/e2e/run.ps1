@@ -16,7 +16,9 @@ New-Item -ItemType Directory -Force $Repo, $Work | Out-Null
 git -C $Repo init -q
 git -C $Repo -c user.name=e2e -c user.email=e2e@example.com commit -q --allow-empty -m init
 
-$cfg = @{ mcpServers = @{ tandem = @{ command = $node; args = @('--import', $tsxEsm, $server) } } } | ConvertTo-Json -Depth 6
+$session = "e2e-" + (Get-Date -Format 'HHmmss')
+$env:TANDEM_SESSION = $session
+$cfg = @{ mcpServers = @{ tandem = @{ command = $node; args = @('--import', $tsxEsm, $server); env = @{ TANDEM_SESSION = $session } } } } | ConvertTo-Json -Depth 6
 $cfgPath = "$Work\mcp.json"
 Set-Content -Path $cfgPath -Value $cfg -Encoding utf8
 

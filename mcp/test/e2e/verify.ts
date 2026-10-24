@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { DbConnection, tables } from '../../../brain/bindings/index.js';
 
 const repo = process.argv[2];
+const session = process.env.TANDEM_SESSION;
+if (!session) throw new Error('set TANDEM_SESSION');
 const conn = await new Promise<DbConnection>((resolve, reject) => {
   DbConnection.builder()
     .withUri(process.env.STDB_URI ?? 'ws://127.0.0.1:3001')
@@ -24,7 +26,7 @@ const check = (name: string, ok: boolean, detail: unknown = '') => {
 };
 const micros = (t: { microsSinceUnixEpoch: bigint }) => Number(t.microsSinceUnixEpoch);
 
-const events = [...conn.db.events.iter()].sort((a, b) => micros(a.timestamp) - micros(b.timestamp));
+const events = [...conn.db.events.iter()].filter(e => e.sessionId === session).sort((a, b) => micros(a.timestamp) - micros(b.timestamp));
 const t0 = events.length ? micros(events[0].timestamp) : 0;
 console.log('\nTimeline:');
 for (const e of events) {
@@ -32,10 +34,10 @@ for (const e of events) {
 }
 console.log('');
 
-const tasks = new Map([...conn.db.tasks.iter()].map(t => [t.id, t]));
+const tasks = new Map([...conn.db.tasks.iter()].filter(t => t.sessionId === session).map(t => [t.id, t]));
 check('all 3 tasks are done', ['t1', 't2', 't3'].every(id => tasks.get(id)?.status === 'done'),
   [...tasks.values()].map(t => `${t.id}:${t.status}`));
-check('no locks left behind', [...conn.db.locks.iter()].length === 0);
+check('no locks left behind', [...conn.db.locks.iter()].filter(l => l.sessionId === session).length === 0);
 const workersUsed = new Set([...tasks.values()].map(t => t.assignee));
 check('both workers did work', workersUsed.size === 2, [...workersUsed]);
 

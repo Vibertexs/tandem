@@ -1,7 +1,7 @@
-// Calls every tool through the real MCP protocol (stdio), with two server
-// processes standing in for two Claude sessions.
-// Needs the local server on dev3001 and an EMPTY bilal-dev database:
-//   spacetime publish bilal-dev --server dev3001 --no-config --module-path ./brain/spacetimedb --delete-data=always --yes
+// Calls every tool through the real MCP protocol (stdio), with separate server
+// processes standing in for separate Claude sessions. Uses a fresh session id each run.
+// Needs the local server on dev3001 with bilal-dev published:
+//   spacetime publish bilal-dev --server dev3001 --no-config --module-path ./brain/spacetimedb --yes
 // Env: STDB_URI (default ws://127.0.0.1:3001), STDB_DB (default bilal-dev)
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
@@ -9,19 +9,21 @@ import { DbConnection, tables } from '../../brain/bindings/index.js';
 
 const URI = process.env.STDB_URI ?? 'ws://127.0.0.1:3001';
 const DB = process.env.STDB_DB ?? 'bilal-dev';
+const S = `m-${Date.now().toString(36)}`;
 
 let failures = 0;
 function check(name: string, ok: boolean, detail: unknown = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  ' + JSON.stringify(detail)}`);
   if (!ok) failures++;
 }
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 async function session(name: string) {
   const client = new Client({ name, version: '1.0.0' });
   await client.connect(new StdioClientTransport({
     command: process.execPath,
     args: ['--import', 'tsx', 'src/server.ts'],
-    env: { ...(process.env as Record<string, string>), STDB_URI: URI, STDB_DB: DB, HEARTBEAT_MS: '300' },
+    env: { ...(process.env as Record<string, string>), STDB_URI: URI, STDB_DB: DB, TANDEM_SESSION: S, HEARTBEAT_MS: '300' },
   }));
   const call = async (tool: string, args: Record<string, unknown> = {}) => {
     const r = await client.callTool({ name: tool, arguments: args });
@@ -31,7 +33,7 @@ async function session(name: string) {
   return { client, call };
 }
 
-// Test-only seeding. The 6 POC tools cannot create tasks (assign_task is a manager tool).
+// Test-only seeding of tasks with known ids and files.
 const seed = await new Promise<DbConnection>((resolve, reject) => {
   DbConnection.builder().withUri(URI).withDatabaseName(DB)
     .onConnect(c => {
@@ -39,25 +41,20 @@ const seed = await new Promise<DbConnection>((resolve, reject) => {
     })
     .onConnectError((_c, e) => reject(e)).build();
 });
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-const newTask = (id: string, files: string[]) => ({
-  id, jobId: undefined, kind: 'normal', title: id, description: '', files,
-  difficulty: 'normal', model: 'sonnet', effort: 'default', dependsOn: [],
+const newTask = (id: string, files: string[]) => seed.reducers.createTask({
+  sessionId: S, kind: 'normal',
+  task: { id, title: id, description: '', files, difficulty: 'normal', model: 'sonnet', effort: 'default', dependsOn: [] },
 });
-for (const [id, files] of [['t1', ['a.txt']], ['t2', ['a.txt']], ['t3', ['c.txt']]] as const) {
-  await seed.reducers.createTask({
-    id, jobId: undefined, kind: 'normal', title: id, description: '', files: [...files],
-    difficulty: 'normal', model: 'sonnet', effort: 'default', dependsOn: [],
-  });
-}
+for (const [id, files] of [['t1', ['a.txt']], ['t2', ['a.txt']], ['t3', ['c.txt']]] as const) await newTask(id, [...files]);
 
 const A = await session('alice');
 const B = await session('bob');
-const C = await session('nobody');
+const C = await session('manager'); // never registers: uses manager tools only
 
 const tools = (await A.client.listTools()).tools.map(t => t.name).sort();
-check('tools: exactly the 6 POC tools are listed',
-  tools.join(',') === 'claim_task,complete_task,get_status,lock_files,register_worker,release_files', tools);
+const all14 = ['assign_task', 'claim_task', 'complete_task', 'create_job', 'get_capacity', 'get_context', 'get_job_results',
+  'get_status', 'lock_files', 'register_worker', 'release_files', 'report_capacity', 'report_progress', 'set_context'];
+check('tools: all 14 tools from contract/tools.json are listed', tools.join() === all14.join(), tools);
 
 const noReg = await C.call('claim_task');
 check('claim_task: error before register_worker', noReg.isError && /register_worker/.test(noReg.text), noReg.text);
@@ -103,28 +100,84 @@ check('complete_task: cannot complete another worker\'s task', wrong.isError, wr
 const c2 = await A.call('claim_task');
 check('claim_task: t2 is claimable once a.txt is free', c2.data?.task?.id === 't2', c2.text);
 
-// Heartbeat: the server keeps its worker's last_seen fresh without any tool call.
-const seen = (id: string) => [...seed.db.workers.iter()].find(w => w.id === id)!.lastSeen.microsSinceUnixEpoch;
+// ---- the other 8 tools ----
+const prog = await A.call('report_progress', { task_id: 't2', message: 'halfway there' });
+check('report_progress', prog.data?.ok === true, prog.text);
+
+await C.call('set_context', { key: 'decisions', value: 'use tabs' });
+await C.call('set_context', { key: 'interfaces', value: 'POST /login' });
+await sleep(300);
+const ctx = await A.call('get_context');
+check('set_context + get_context', ctx.data?.context?.decisions === 'use tabs' && ctx.data.context.interfaces === 'POST /login', ctx.text);
+
+const cap = await B.call('report_capacity', { usage_5h: 55, usage_week: 20, reset_at: '2030-01-01T00:00:00.000Z' });
+await sleep(300);
+const gc = await C.call('get_capacity');
+const bob = gc.data?.workers.find((w: { id: string }) => w.id === 'w-bob');
+check('report_capacity + get_capacity', cap.data?.ok === true && bob?.usage_5h_pct === 55 && bob.usage_week_pct === 20 &&
+  bob.reset_at === '2030-01-01T00:00:00.000Z' && gc.data.workers.length === 2, gc.text);
+
+const job = await C.call('create_job', {
+  goal: 'review', map_tasks: [{ title: 'review x', files: ['x.py'] }, { title: 'review y', files: ['y.py'] }],
+  merge_task: { title: 'merge reviews', files: ['report.md'], difficulty: 'hard' },
+});
+await sleep(300);
+st = await C.call('get_status');
+const jobTasks = st.data.tasks.filter((t: { job_id: string | null }) => t.job_id === job.data?.job_id);
+const merge = jobTasks.find((t: { kind: string }) => t.kind === 'reduce');
+check('create_job: 2 open map tasks and a merge task blocked on both',
+  jobTasks.length === 3 && jobTasks.filter((t: { kind: string; status: string }) => t.kind === 'map' && t.status === 'open').length === 2 &&
+  merge?.status === 'blocked' && merge.depends_on.length === 2, st.text);
+
+// Bob works through t3, then the job: each claim takes the next open task.
+await B.call('complete_task', { task_id: 't3', branch: 'b', summary: 'c' });
+for (let i = 0; i < 2; i++) {
+  const c = await B.call('claim_task');
+  const id = c.data?.task?.id;
+  if (c.data?.task?.kind === 'map') {
+    await B.call('complete_task', { task_id: id, branch: 'b', summary: 's', result: { status: 'ok', files_touched: [c.data.task.files[0]], findings: [], notes: id } });
+  } else {
+    await B.call('complete_task', { task_id: id, branch: 'b', summary: 's' });
+  }
+}
+await sleep(400);
+const jr = await A.call('get_job_results', { job_id: job.data?.job_id });
+st = await A.call('get_status');
+const mergeNow = st.data.tasks.find((t: { id: string }) => t.id === merge?.id);
+check('get_job_results: returns both map results, parsed', jr.data?.results?.length === 2 && jr.data.results.every((r: { status: string }) => r.status === 'ok'), jr.text);
+check('create_job: merge task opened after the last map task', mergeNow?.status === 'open', mergeNow);
+
+const as = await C.call('assign_task', { task: { title: 'reserved', files: ['r.txt'], difficulty: 'easy' }, assignee: 'w-bob' });
+await sleep(300);
+st = await C.call('get_status');
+const reserved = st.data.tasks.find((t: { id: string }) => t.id === as.data?.task_id);
+check('assign_task: creates an open task reserved for the assignee', reserved?.status === 'open' && reserved.assignee === 'w-bob' && reserved.model === '', reserved);
+
+// ---- heartbeat and crash ----
+const seen = (id: string) => [...seed.db.workers.iter()].find(w => w.sessionId === S && w.id === id)!.lastSeen.microsSinceUnixEpoch;
 const before = seen('w-bob');
 await sleep(1000);
 check('heartbeat: last_seen advances while the session is idle', seen('w-bob') > before, [before, seen('w-bob')]);
 
-// Crash: Dan claims a task, then his server process is killed without releasing anything.
 const D = await session('dan');
 await D.call('register_worker', { name: 'Dan', plan: 'pro' });
-await seed.reducers.createTask(newTask('t4', ['d.txt']));
+await newTask('t4', ['d.txt']);
+await seed.reducers.createTask({
+  sessionId: S, kind: 'normal', assignee: 'w-dan',
+  task: { id: 't5', title: 't5', description: '', files: ['e.txt'], difficulty: 'normal', model: '', effort: 'default', dependsOn: [] },
+});
 await sleep(300);
 const cd = await D.call('claim_task');
-check('crash: setup, Dan holds t4 and d.txt', cd.data?.task?.id === 't4', cd.text);
+check('crash: setup, Dan holds t5 (reserved for him) and e.txt', cd.data?.task?.id === 't5', cd.text);
 await D.client.close();
 await sleep(2500); // Dan is gone and silent; Alice and Bob keep heartbeating
-await seed.reducers.reapStale({ ttlSeconds: 2 });
+await seed.reducers.reapStale({ sessionId: S, ttlSeconds: 2 });
 await sleep(500);
 st = await A.call('get_status');
-const t4 = st.data.tasks.find((t: { id: string }) => t.id === 't4');
+const t5 = st.data.tasks.find((t: { id: string }) => t.id === 't5');
 const t2now = st.data.tasks.find((t: { id: string }) => t.id === 't2');
-check('crash: Dan\'s task is open again and d.txt is free',
-  t4.status === 'open' && t4.assignee === null && !st.data.locks.some((l: { path: string }) => l.path === 'd.txt'), t4);
+check('crash: Dan\'s task is open again and e.txt is free',
+  t5.status === 'open' && !st.data.locks.some((l: { path: string }) => l.path === 'e.txt'), t5);
 check('crash: Alice (alive) keeps her task', t2now.status === 'claimed' && t2now.assignee === 'w-alice', t2now);
 
 for (const s of [A, B, C]) await s.client.close();
