@@ -1,6 +1,5 @@
 // Goals, Team, Shared memory, Activity and Settings.
 import { useState } from 'react';
-import QRCode from 'qrcode';
 import type { Api, Snapshot } from './brain';
 import { shareable, type Team } from './config';
 import { GoalChip } from './Board';
@@ -298,7 +297,7 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
         </dl>
         {!share && <p className="small muted">Only this computer can open this team. Start it with <code className="mono">{sh('.\\start.ps1 -Lan', './start.sh --lan')}</code> to share the link.</p>}
         <div className="row-actions">
-          <button type="button" className="btn" onClick={async () => { try { setQr(await QRCode.toDataURL(pageUrl, { margin: 1, width: 220 })); } catch { setQr(''); } }}>Show QR code</button>
+          <button type="button" className="btn" onClick={async () => { try { const QRCode = (await import('qrcode')).default; setQr(await QRCode.toDataURL(pageUrl, { margin: 1, width: 220 })); } catch { setQr(''); } }}>Show QR code</button>
           <button type="button" className="btn" onClick={() => copy(pageUrl, say, 'Link copied')}>Copy link</button>
           <button type="button" className="btn" onClick={onLeave}>Switch team</button>
         </div>

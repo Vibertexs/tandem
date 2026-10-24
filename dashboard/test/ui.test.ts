@@ -217,6 +217,8 @@ try {
   await A.goto(URL_);
   check('remember: opening the page again goes straight to your team', await until(() => prompt(A).isEnabled(), 10_000));
   await nav(A, 'Settings');
+  await A.getByRole('button', { name: 'Show QR code' }).click();
+  check('settings: Show QR code shows a QR code for the team\'s page', await A.locator('img.qr').waitFor({ timeout: 5000 }).then(() => true, () => false));
   await A.getByRole('button', { name: 'Clear the board…' }).click();
   await A.getByRole('button', { name: 'Yes, clear everything' }).click();
   await nav(A, 'Board');
