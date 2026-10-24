@@ -50,5 +50,8 @@ export const config = {
   team: initialTeam(),
   mock: q.get('mock') === '1',
   present: q.get('view') === 'present',
+  // The localhost page `tandem start` opens carries host=1: the person who started Tandem is the
+  // controller. Invite links never carry it, so teammates open the board as viewers.
+  host: q.get('host') === '1',
   local: ['localhost', '127.0.0.1', ''].includes(location.hostname),
 };

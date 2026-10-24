@@ -3,7 +3,7 @@
 ## In one line
 **You run `tandem start` in your project, and the board opens with an invite link others can join.**
 1. In your project's folder: `tandem start`. It starts the brain, the board, the manager and a Claude worker, open to your network, and prints the invite link.
-2. On the board, click **Control this team**. That gives this browser controller permission and also approves the manager.
+2. The board opens with you in control: the page `tandem start` opens takes control by itself and approves the manager.
 3. Type a goal. It gets its own lane on the board, and the manager splits it into tasks with exact file lists.
 4. The workers (real Claude runs, or simulated) do them without colliding. Teammates who opened the invite watch live. To add their computer's workers, they paste the Invite box's full clone-and-join block; `tandem join <invite>` copies the project host's project and starts their workers.
 5. The goal's work is merged into one `tandem/<goal>` branch, your tests run on it, and the lane shows the result and what it cost.
@@ -21,8 +21,7 @@ Then, while still in that project, run Tandem by its path (no PATH setup is need
 & "C:\path\to\tandem\tandem.cmd" start
 ```
 It uses that project, and the workers fake the coding. On the board:
-1. Click **Control this team**.
-2. Type a small goal, then click **Send**.
+1. Type a small goal, then click **Send**.
 3. Watch the goal's lane fill up. Click a card to see why it went to that worker.
 
 For real work, go to your own project's folder and run `tandem start`. `tandem stop` stops it. `tandem` shows what is running. `.\test.ps1` runs every test.

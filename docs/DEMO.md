@@ -11,7 +11,7 @@ The product is the demo: one command starts it, and the page shows real Claude C
 
 ## Presenter script (about 3 minutes)
 1. Pitch line: your team's Claude Codes working as one, with no collisions and no idle quota.
-2. Open the page. Click **Control this team** (it gives this browser controller permission and also approves the manager).
+2. Open the page with `tandem -d`. You already control the team and the manager is approved; nothing to click.
 3. Type a goal, for example: *Create a tiny Python calculator: calc.py with add and sub, test_calc.py with unittest tests, and a README.md.*
 4. The manager plans it (about 30 seconds). The goal gets its own lane on the board, with its tasks and their files.
 5. Two workers pick them up. Click a card: why it went to that worker, which files it holds, its timeline.

@@ -385,7 +385,8 @@ async function start(argv: string[]) {
     done('workers', `${names.join(', ')}${SIMULATE ? ' (test mode: fake coding)' : accts.length ? '' : o.model === 'auto' ? ' (Claude, model by difficulty)' : ` (Claude, ${o.model})`}`);
   }
 
-  const page = `http://localhost:${PAGE_PORT}/?db=${team}${shared ? `&lan=${ip}` : ''}`;
+  // host=1 makes this browser the controller by itself; the invite link never carries it
+  const page = `http://localhost:${PAGE_PORT}/?db=${team}${shared ? `&lan=${ip}` : ''}&host=1`;
   const invite = shared ? `http://${ip}:${PAGE_PORT}/?db=${team}` : null;
   remember(team, { page, repo, invite, gitPort: sharePort });
   say();
@@ -404,7 +405,7 @@ async function start(argv: string[]) {
   } else say(`  ${bold('Invite')}   ${dim('only this computer can join (--local)')}`);
   say(`  ${bold('Stop')}     tandem stop`);
   say();
-  say(dim('  First time: click "Control this team" on the page. It also approves the manager.'));
+  say(dim('  You control this team from that page. Open it with: tandem -d'));
   if (invite && WIN) say(dim('  If Windows asks whether node and spacetime may use the network, allow private networks.'));
   if (!o['no-browser']) openBrowser(page);
 }

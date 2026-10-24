@@ -33,8 +33,7 @@ const launcher = spawn(process.execPath, ['--import', 'file:///' + fileURLToPath
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
 try {
   const page = await (await browser.newContext()).newPage();
-  await page.goto(URL_);
-  await page.getByRole('button', { name: 'Control this team' }).click();
+  await page.goto(`${URL_}&host=1`);
   await page.getByLabel('Describe what you want built').waitFor({ timeout: 10_000 });
   check('setup: the page is connected and the worker is online', await page.getByText('1 worker online').waitFor({ timeout: 15_000 }).then(() => true, () => false));
 
