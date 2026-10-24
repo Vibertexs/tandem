@@ -64,7 +64,7 @@ Every table has `session_id` (string). Judge mode uses one session per judge. Li
 |---|---|---|
 | id | string | |
 | text | string | what the operator asked for, in plain words |
-| status | `new`, `planning`, `planned`, `done`, `failed` | the manager moves it along; one goal is `planning` at a time. `failed`: two planning runs failed, `note` says why; setting it back to `new` tries again |
+| status | `new`, `planning`, `planned`, `done`, `failed`, `cancelled` | the manager moves it along; one goal is `planning` at a time. `failed`: two planning runs failed, `note` says why; setting it back to `new` tries again. `cancelled`: an operator cancelled it; its tasks that had not started were removed |
 | created_at | timestamp | |
 | branch | string | when done: the branch with all of the goal's work merged (`tandem/<goal id>`) |
 

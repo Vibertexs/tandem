@@ -142,7 +142,7 @@ function Prompt({ snap, api, isOp, say }: Props) {
 
 export function GoalChip({ status }: { status: string }) {
   const text = status === 'new' ? '⏳ Waiting for the manager' : status === 'planning' ? '✎ Being planned'
-    : status === 'done' ? '✓ Done' : status === 'failed' ? '✕ Could not plan' : '▶ Planned';
+    : status === 'done' ? '✓ Done' : status === 'failed' ? '✕ Could not plan' : status === 'cancelled' ? 'Cancelled' : '▶ Planned';
   return <span className={`chip goal-${status}`}>{text}</span>;
 }
 

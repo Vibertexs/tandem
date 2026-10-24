@@ -292,6 +292,19 @@ check('fail goal: a goal the manager could not plan is failed, with the reason',
 await admin.reducers.setGoalStatus({ sessionId: H, id: 'g2', status: 'new' });
 await sleep(300);
 check('fail goal: sending it again makes it new and forgets the reason', goalRow('g2').status === 'new' && goalRow('g2').note === '');
+// cancel: g3 has a running task and a waiting one
+await admin.reducers.postGoal({ sessionId: H, id: 'g3', text: 'Something else' });
+await admin.reducers.setGoalStatus({ sessionId: H, id: 'g3', status: 'planning' });
+await newTask(H, 'x1', ['x1.py']);
+await newTask(H, 'x2', ['x2.py'], { dependsOn: ['x1'] });
+await admin.reducers.setGoalStatus({ sessionId: H, id: 'g3', status: 'planned' });
+await admin.reducers.registerWorker({ sessionId: H, id: 'w-h', name: 'H', plan: 'pro' });
+await admin.reducers.claimTask({ sessionId: H, workerId: 'w-h' }); // takes c1 (first open)
+await admin.reducers.cancelGoal({ sessionId: H, id: 'g3' });
+await sleep(300);
+check('cancel: the goal is cancelled and its tasks that had not started are removed', goalRow('g3').status === 'cancelled' && !hv.tasks().has('x1') && !hv.tasks().has('x2'), [goalRow('g3').status, [...hv.tasks().keys()]]);
+check('cancel: other goals keep their tasks', hv.tasks().has('c1') && hv.tasks().has('c2'));
+check('cancel: a goal that is done cannot be cancelled', await rejects(admin.reducers.cancelGoal({ sessionId: H, id: 'g1' })));
 await clients[0].reducers.ping({ sessionId: H, name: 'Manager Claude', kind: 'manager' });
 await sleep(200);
 const first = [...admin.db.presence.iter()].filter(p => p.sessionId === H);

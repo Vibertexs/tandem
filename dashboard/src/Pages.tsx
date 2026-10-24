@@ -25,7 +25,9 @@ const list = (text: string) => text.split(/[,\n]/).map(x => x.trim()).filter(Boo
 
 // ---------- Goals ----------
 const STAGE_ICON = { waiting: '○', todo: '○', doing: '▶', done: '✓' } as const;
-export function GoalsPage({ snap, now, say }: Common) {
+export function GoalsPage({ snap, now, say, api, isOp }: Common) {
+  const { busy, act } = useAct(say);
+  const [confirm, setConfirm] = useState<string | null>(null);
   return (
     <div className="page">
       <p className="muted lead">Everything you asked for, newest first. The manager turns each goal into tasks; when they are all done, their work is merged into one branch.</p>
@@ -55,6 +57,13 @@ export function GoalsPage({ snap, now, say }: Common) {
               )}
               {g.status === 'new' && <p className="small muted">The manager has not picked this up yet.</p>}
               {(g.status === 'done' || g.status === 'failed') && g.note && <p className={`small goal-note ${g.status === 'failed' || /fail|could not|not on this/i.test(g.note) ? 'warn' : 'ok-note'}`}>{g.note}</p>}
+              {isOp && api && !['done', 'cancelled'].includes(g.status) && (
+                confirm === g.id
+                  ? <p className="small row-actions">Cancel it? Tasks not started yet are removed.
+                      <button type="button" className="btn danger" disabled={busy} onClick={() => act(() => api.cancelGoal(g.id), 'Goal cancelled.').then(() => setConfirm(null))}>Yes, cancel it</button>
+                      <button type="button" className="btn" onClick={() => setConfirm(null)}>Keep it</button></p>
+                  : <button type="button" className="link small cancel-goal" onClick={() => setConfirm(g.id)}>Cancel goal</button>
+              )}
               {g.branch && (
                 <div className="branch-box">
                   <span className="small">All of its work is on <code className="mono">{g.branch}</code></span>

@@ -142,6 +142,7 @@ export function makeApi(conn: DbConnection) {
     clearBoard: () => conn.reducers.clearBoard({ sessionId }),
     retryTask: (taskId: string) => conn.reducers.retryTask({ sessionId, taskId }),
     retryGoal: (id: string) => conn.reducers.setGoalStatus({ sessionId, id, status: 'new' }),
+    cancelGoal: (id: string) => conn.reducers.cancelGoal({ sessionId, id }),
   };
 }
 export type Api = ReturnType<typeof makeApi>;

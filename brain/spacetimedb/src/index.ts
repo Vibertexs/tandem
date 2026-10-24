@@ -94,7 +94,7 @@ const goals = table(
     session_id: t.string().index('btree'),
     id: t.string(),
     text: t.string(),
-    status: t.string(), // new | planning | planned | done | failed (could not be planned)
+    status: t.string(), // new | planning | planned | done | failed (could not be planned) | cancelled
     created_at: t.timestamp(),
     branch: t.string().default(''), // when done: the branch with all of its work merged
     note: t.string().default(''), // when done: how it went ("Tests pass", what could not be merged)
@@ -662,6 +662,26 @@ export const setGoalStatus = spacetimedb.reducer(
     if (!goal) throw new SenderError('unknown goal');
     // back to `new` (Try again): forget why it failed last time
     ctx.db.goals.pk.update({ ...goal, status, note: status === 'new' ? '' : goal.note });
+  }
+);
+
+// The owner changed their mind. Tasks not started yet are removed; one a worker is on finishes,
+// but the goal is not merged (the manager only finishes `planned` goals).
+export const cancelGoal = spacetimedb.reducer(
+  { session_id: t.string(), id: t.string() },
+  (ctx, { session_id, id }) => {
+    requireOperator(ctx, session_id);
+    const goal = ctx.db.goals.pk.find(pk(session_id, id));
+    if (!goal) throw new SenderError('unknown goal');
+    if (goal.status === 'done') throw new SenderError('this goal is already done');
+    let removed = 0;
+    for (const task of [...ctx.db.tasks.session_id.filter(session_id)]) {
+      if (task.goal_id !== id || !['open', 'blocked', 'failed'].includes(task.status)) continue;
+      ctx.db.tasks.pk.delete(task.pk);
+      removed++;
+    }
+    ctx.db.goals.pk.update({ ...goal, status: 'cancelled' });
+    addEvent(ctx, session_id, undefined, 'task_failed', `Goal cancelled: ${goal.text.slice(0, 80)}${removed ? ` (${removed} task${removed === 1 ? '' : 's'} removed)` : ''}`);
   }
 );
 

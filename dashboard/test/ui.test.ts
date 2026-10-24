@@ -240,6 +240,14 @@ try {
   await A.locator('.next').getByRole('button', { name: 'Try again' }).click();
   check('could not plan: Try again sends it to the manager again', await seen(A, 'Sent to the manager again.', 4000) &&
     await until(async () => [...manager.db.goals.iter()].find(g => g.id === 'g-bad')?.status === 'new', 4000));
+  // cancelling that goal
+  await nav(A, 'Goals');
+  const bad = A.locator('.goal-card', { hasText: 'Something the manager cannot plan' });
+  await bad.getByRole('button', { name: 'Cancel goal' }).click();
+  await bad.getByRole('button', { name: 'Yes, cancel it' }).click();
+  check('cancel: the owner can cancel a goal (with a confirm), and it says Cancelled', await seen(A, 'Goal cancelled.', 4000) &&
+    await until(async () => (await bad.innerText()).includes('Cancelled'), 4000) && await bad.getByRole('button', { name: 'Cancel goal' }).count() === 0);
+  await nav(A, 'Board');
   // a worker that hit its usage limit says until when
   await x1.reducers.updateCapacity({ sessionId: 'live', workerId: 'w-kim', usage5H: 100, usageWeek: undefined, resetAt: Timestamp.fromDate(new Date(Date.now() + 3600_000)), status: undefined });
   await nav(A, 'Team');

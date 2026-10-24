@@ -37,6 +37,7 @@ import {
 import AddGoalCostReducer from "./add_goal_cost_reducer";
 import AddOperatorReducer from "./add_operator_reducer";
 import ApproveOperatorReducer from "./approve_operator_reducer";
+import CancelGoalReducer from "./cancel_goal_reducer";
 import ClaimOperatorReducer from "./claim_operator_reducer";
 import ClaimTaskReducer from "./claim_task_reducer";
 import ClearBoardReducer from "./clear_board_reducer";
@@ -209,6 +210,7 @@ const reducersSchema = __reducers(
   __reducerSchema("add_goal_cost", AddGoalCostReducer),
   __reducerSchema("add_operator", AddOperatorReducer),
   __reducerSchema("approve_operator", ApproveOperatorReducer),
+  __reducerSchema("cancel_goal", CancelGoalReducer),
   __reducerSchema("claim_operator", ClaimOperatorReducer),
   __reducerSchema("claim_task", ClaimTaskReducer),
   __reducerSchema("clear_board", ClearBoardReducer),
