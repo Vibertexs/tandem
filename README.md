@@ -17,9 +17,9 @@ When a few people each run an AI coding agent on the same repo:
 - **One checked branch per goal.** When a goal's tasks are done, the manager merges them into one branch, `tandem/<goal>`, and runs your tests on it. If they fail, it adds a task to fix them before calling the goal done.
 - **A live board.** Waiting → To do → In progress → Done, per goal or all together. You see who is on what, for how long, their latest note, and why each task is where it is.
 
-| Start | Approve the manager | A task's details |
+| Start | Goals, each ending as one branch | A task's details |
 |---|---|---|
-| ![Host or join](docs/img/start.png) | ![One click](docs/img/approve.png) | ![Task details](docs/img/task.png) |
+| ![Host or join](docs/img/start.png) | ![Goals](docs/img/goals.png) | ![Task details](docs/img/task.png) |
 
 ## Quick start
 You need [Node.js](https://nodejs.org) 20+, Git, [Claude Code](https://claude.com/claude-code), and the [SpacetimeDB CLI](https://spacetimedb.com/install).
@@ -39,9 +39,8 @@ That starts everything and opens the page:
 `-Simulate` makes the workers fake the coding, so the demo costs no Claude usage, except one small planning run per goal.
 
 On the page:
-1. Click **Make me the owner**.
-2. Click **Approve** on "Manager Claude".
-3. Describe what you want built, for example *"A tiny Python calculator with add and sub, tests, and a README"*. Watch the board.
+1. Click **Make me the owner** (it also approves the manager that `start.ps1` started).
+2. Describe what you want built, for example *"A tiny Python calculator with add and sub, tests, and a README"*. Watch the board.
 
 For real work, drop `-Simulate`. Each task becomes a real headless Claude Code run in its own git worktree and branch. When the goal is done, its work is on one branch (the page shows it, with a copy-able `git checkout`). Stop everything with `.\stop.ps1`.
 

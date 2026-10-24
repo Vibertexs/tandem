@@ -142,7 +142,7 @@ if ($hosting -and -not $NoManager -and (Running 'manager')) {
   $managerArgs = @('--import', (Tsx 'manager'), (Join-Path $root 'manager\watch.ts'), '--repo', $Repo, '--model', $ManagerModel, '--budget', $Budget)
   if ($Push) { $managerArgs += '--push' }
   Spawn 'manager' 'node' $managerArgs 'manager'
-  Write-Host '  started. The first time, the page asks you to approve "Manager Claude".'
+  Write-Host '  started. The first time, "Make me the owner" on the page approves it too.'
 }
 
 if ($Workers -gt 0) {
@@ -168,7 +168,7 @@ ConvertTo-Json -InputObject @(@($old) + $pids) -Depth 3 | Set-Content -Path $pid
 Step 'Ready'
 Write-Host "  Open $url"
 if ($hosting) {
-  Write-Host '  First time: click "Make me the owner", then approve "Manager Claude". Then describe what you want built.'
+  Write-Host '  First time: click "Make me the owner" (it also approves the manager). Then describe what you want built.'
   if ($Lan) {
     $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254*' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
     Write-Host "  Others can open http://${ip}:5173/?db=$Db and join workers with: .\start.ps1 -Join ws://${ip}:3001 -Db $Db"

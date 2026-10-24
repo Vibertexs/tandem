@@ -159,9 +159,13 @@ function Card({ t, snap, now, selected, flash, onOpen }: { t: Task; snap: Snapsh
   const stage = stageOf(t);
   const info = stage === 'doing' ? liveInfo(t, snap.events) : null;
   const lock = lockBlocking(t, snap);
+  const waitsFor = stage === 'waiting'
+    ? t.dependsOn.map(d => snap.tasks.find(x => x.id === d)).filter((x): x is Task => !!x && x.status !== 'done')
+    : [];
   return (
     <button type="button" className={`card task stage-${stage} ${selected ? 'selected' : ''} ${flash ? 'flash' : ''}`} onClick={onOpen} aria-pressed={selected}>
       <span className="task-title">{t.title}</span>
+      {waitsFor.length > 0 && <span className="small muted">after {waitsFor.slice(0, 2).map(x => x.title).join(', ')}{waitsFor.length > 2 ? ` +${waitsFor.length - 2}` : ''}</span>}
       {stage === 'doing' && (
         <span className="working">
           <span className="work-bar" aria-hidden="true"><i /></span>

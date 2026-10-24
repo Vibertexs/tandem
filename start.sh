@@ -101,7 +101,7 @@ if [ $HOSTING = 1 ] && [ $NOMGR = 0 ]; then
     TANDEM_TOKEN_FILE="$ROOT/mcp/.tandem/manager-token-$DB" spawn manager manager "$ROOT" \
       node --import "$(fileurl "$ROOT/manager/node_modules/tsx/dist/esm/index.mjs")" "$ROOT/manager/watch.ts" \
       --repo "$REPO" --model "$MGRMODEL" --budget "$BUDGET" $pushflag
-    echo '  started. The first time, the page asks you to approve "Manager Claude".'
+    echo '  started. The first time, "Make me the owner" on the page approves it too.'
   fi
 fi
 
@@ -123,7 +123,7 @@ fi
 
 step 'Ready'
 echo "  Open $URL"
-[ $HOSTING = 1 ] && echo '  First time: click "Make me the owner", then approve "Manager Claude". Then describe what you want built.'
+[ $HOSTING = 1 ] && echo '  First time: click "Make me the owner" (it also approves the manager). Then describe what you want built.'
 echo '  Logs: .tandem/logs   Stop: ./stop.sh'
 if [ $NOBROWSER = 0 ]; then
   { command -v open >/dev/null && open "$URL"; } || { command -v xdg-open >/dev/null && xdg-open "$URL"; } || { command -v cmd.exe >/dev/null && cmd.exe /c start "" "$URL"; } || true
