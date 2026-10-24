@@ -26,24 +26,26 @@ For real work, go to your own project's folder and run `tandem start`. `tandem s
 | Starting | `tandem start` in your project, not in the Tandem folder. Open to your network by default (`--local` keeps it on this computer). One line per piece, then Open, Invite, Stop. Safe to run twice: what runs is kept. `tandem join <invite>`, `tandem stop`, `tandem status`, `tandem open`, `tandem logs`. One cross-platform TypeScript file (`cli/tandem.ts`, Node 22.18+); `start.ps1`, `start.sh`, `stop.ps1` and `stop.sh` are gone. |
 | One board | Each goal is a swimlane: what you asked for, its status and progress, cost, time, branch and note, then its tasks in Waiting, To do, In progress and Done. Finished goals move down and start folded; done cards take one line. Work added by hand gets an "Other tasks" lane. The Goals tab is gone. |
 | Invite | Top right of every page: **Invite** shows the link and the `tandem join` line, or "This computer only" says why there is none. The start page takes a pasted invite. |
+| Accounts and agents | `tandem account add <label> [--agent codex]` gives a worker its own Claude Code or Codex login (a folder inside the Tandem folder; your own login is untouched). `tandem start --accounts all` runs one worker per account. The brain knows each worker's agent and account, and the Team page shows them. Codex workers run `codex exec`. Tested with a stand-in for Codex; real Codex is untried (the CLI is not installed here). |
 | Joining | `tandem join <invite>` checks the host is reachable, finds the team's repo (the manager publishes its origin), says what to clone if you are not in it, and starts workers that push their branches. |
 
 Everything from the night before still holds: failure handling (giving back, conflicts as tasks, usage limits, goals that could not be planned), costs, worker ownership, `--review`, `--notify`, dependent tasks starting from their dependencies' work.
 
 ## Tested
-`.\test.ps1` on the final code: **9 suites, 324 checks, all pass** (no Claude calls).
+`.\test.ps1` on the final code: **10 suites, 343 checks, all pass** (no Claude calls).
 
 | Suite | Checks |
 |---|---|
-| brain (atomic rules, sessions, goals, presence, costs, giving back, limits, cancel) | 75 |
+| brain (atomic rules, sessions, goals, presence, costs, giving back, limits, cancel, agents) | 78 |
 | brain: who may do what (owner, requests, worker ownership) | 33 |
 | mcp: mock mode | 17 |
 | mcp: 17 tools, real brain | 32 |
 | mcp: manager identity | 13 |
 | mcp: lock-check hook | 13 |
-| launcher: routing, limit parsing, simulate (a limit, a restart while capped) | 32 |
+| launcher: routing, limit parsing, simulate (a limit, a restart while capped), a Codex worker with a stand-in | 38 |
 | manager: merge, conflicts, dependencies, test, finish, push, notify, planning failures, review | 47 |
-| page in Chrome (the start page, the board's lanes, invite, failures, desktop and phone) | 62 |
+| page in Chrome (the start page, the board's lanes, invite, failures, desktop and phone) | 63 |
+| the tandem command: accounts, start with accounts, status, stop | 9 |
 
 Also passing:
 - The product end to end through the new command (`dashboard/test/start-flow.ts`): `tandem start --simulate` run in a test project, make me the owner, a goal planned by the real manager (1 haiku run), simulated workers finish it on the board's lane, `tandem stop` leaves nothing running.

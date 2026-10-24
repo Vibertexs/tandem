@@ -62,12 +62,25 @@ Just trying it out? `tandem start --demo --simulate` uses a sample project, and 
 | `tandem start --review` | Before a goal is done, a worker Claude reviews its merged branch (read only); the findings go on the board and in the PR |
 | `tandem start --push` | Push each goal's branch to origin, and open a PR if the GitHub CLI is set up |
 | `tandem start --notify <webhook url>` | Post "goal done" (branch, test result, cost) to a Slack or Discord channel |
+| `tandem start --accounts all` | One worker per saved account (see below) |
 | `tandem join <invite>` | In your clone of the project: add this computer's workers to that team |
+| `tandem account add <label> [--agent codex]` | A separate Claude Code or Codex login for a worker |
 | `tandem` or `tandem status` | What is running, with each team's links |
 | `tandem open` / `tandem logs` | Open this project's board / show the latest log lines |
 | `tandem stop` | Stop what this computer started (`--all` stops the brain too) |
 
 The board also works on a phone.
+
+### Several accounts, Claude and Codex
+Each worker can run under its own login, Claude Code or Codex:
+```
+tandem account add work1                  # opens Claude Code: /login, sign in, /exit
+tandem account add school --agent codex   # opens codex login
+tandem start --accounts all               # one worker per account (or --accounts work1,school)
+```
+Each account gets its own login folder inside the Tandem folder (`CLAUDE_CONFIG_DIR` for Claude Code, `CODEX_HOME` for Codex), so your own login is not touched. The Team page shows which agent and account each worker runs. `tandem account list` and `tandem account remove <label>` manage them. The manager plans with Claude (`--manager-account <label>` picks which).
+
+Codex workers run `codex exec` in the task's worktree with the tandem tools. Claude Code's lock-check hook has no Codex equivalent, so a Codex worker keeps to its files because the rules tell it to. Use each account the way its plan allows: a work account belongs to work.
 
 ### Teammates on other computers
 1. The host runs `tandem start` in the project (a clone of your GitHub repo) and sends the **invite link** (it is also under **Invite**, top right of the board).

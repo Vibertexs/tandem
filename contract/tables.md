@@ -14,6 +14,8 @@ Every table has `session_id` (string). The team and the page use `live`; the tes
 | reset_at | timestamp or null | when the cap lifts |
 | last_seen | timestamp | treat old values as unknown |
 | owner | identity (hex) | who registered it; only they (or an operator) may act for it. '' = anyone (sample rows) |
+| agent | `claude` or `codex` | the coding agent it runs (set by `describe_worker`) |
+| account | string | a label for the login it uses, like `work1`; '' = the default login |
 
 ## tasks
 | Column | Type | Notes |

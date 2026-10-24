@@ -40,7 +40,7 @@ You run `tandem start` in your project and type a goal on the board it opens. A 
   - `docs/SPEC.md` is the original plan, and `docs/DEMO.md` is the presenter script.
 
 ## Test plan
-- [x] `.\test.ps1`: 9 suites, 324 checks, all pass. It covers:
+- [x] `.\test.ps1`: 10 suites, 343 checks, all pass. It covers:
   - the brain, access and worker ownership
   - MCP in mock mode, MCP against the real brain, and the manager identity
   - the hook, and the launcher with a usage limit and a restart while capped
