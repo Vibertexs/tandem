@@ -139,8 +139,11 @@ Run the start command in each project's folder. Each project is its own team wit
 | `tandem start --notify <url>` | Post "goal done" (branch, tests, cost) to Slack or Discord |
 | `tandem join <invite>` | Copy the project host's project into Tandem's private work folder and add this computer's workers |
 | `tandem account add <label> [--agent codex]` | A separate Claude Code or Codex login for a worker |
-| `tandem` / `tandem status` | What is running, with each team's links |
-| `tandem open` / `tandem logs` | Open the board / show the latest log lines |
+| `tandem` | Show what is running and open the dashboard |
+| `tandem -d` | Open the dashboard (also `tandem dashboard`, `tandem open`) |
+| `tandem status` | What is running, with each team's links |
+| `tandem logs` | Show the latest log lines |
+| `tandem --help` | List every command (also `tandem help`, `tandem -h`); `tandem --version` |
 | `tandem stop` | Stop what this computer started (`--all` stops the brain too) |
 
 ### Several accounts, Claude and Codex

@@ -32,6 +32,8 @@ const SIM_LIMIT = Number(process.env.TANDEM_SIM_LIMIT ?? 0);
 
 const HELP = `tandem: your team's Claude Codes, working as one.
 
+  Quick: "tandem start" in your project, then "tandem -d" any time to open the dashboard.
+
   tandem start              Start a team for the git repo you are in. Prints the invite address.
     --workers N             workers on this computer (default 1, one Claude per person; 0 = none)
     --local                 only this computer can join (default: your network can)
@@ -56,9 +58,12 @@ const HELP = `tandem: your team's Claude Codes, working as one.
   tandem stop               Stop what this computer started (the brain keeps running).
     --all                   also stop the brain
 
-  tandem status             What is running, with each team's links. (Just "tandem" does this too.)
-  tandem open               Open this project's board in the browser.
+  tandem                    On its own: shows what is running and opens the dashboard.
+  tandem -d                 Open the dashboard (also: tandem dashboard, tandem open, tandem --dashboard).
+  tandem status             What is running, with each team's links.
   tandem logs [part]        The latest log lines: all, or one part (manager, alex, brain, page).
+  tandem --version          Which version this is.
+  tandem --help             This list (also: tandem help, tandem -h).
 `;
 
 // ---------- small helpers ----------
@@ -184,6 +189,7 @@ function installPackages(dirs: string[]) {
 }
 
 function openBrowser(url: string) {
+  if (process.env.TANDEM_NO_BROWSER === '1') return; // (the automated tests never open a window)
   if (WIN) spawn('rundll32', ['url.dll,FileProtocolHandler', url], { detached: true, stdio: 'ignore' }).unref();
   else spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
 }
@@ -561,12 +567,19 @@ async function status() {
   say();
 }
 
-function openPage(argv: string[]) {
+// Opens the dashboard: this project's board if there is one, else the page's start screen, which
+// lists nothing but lets you open a team. Fails only when nothing is running at all.
+async function openPage(argv: string[]) {
   const team = currentTeam(argv);
   const info = team ? teams()[team] : undefined;
-  if (!team || !info) fail('Which team? Run tandem open in the project\'s folder, or tandem open --team NAME. (tandem status lists them.)');
-  say(`  ${cyan(info!.page)}`);
-  openBrowser(info!.page);
+  if (info) { say(`  ${cyan(info.page)}`); openBrowser(info.page); return; }
+  if (await reachable('127.0.0.1', PAGE_PORT)) {
+    const url = `http://localhost:${PAGE_PORT}/`;
+    say(`  ${cyan(url)}`);
+    openBrowser(url);
+    return;
+  }
+  fail('The dashboard is not running. In your project\'s folder, start it with: tandem start');
 }
 
 function logs(argv: string[]) {
@@ -588,10 +601,11 @@ try {
   else if (cmd === 'join') await joinTeam(rest);
   else if (cmd === 'stop') await stop(rest);
   else if (cmd === 'status') await status();
-  else if (cmd === 'open') openPage(rest);
+  else if (cmd === 'open' || cmd === 'dashboard' || cmd === '-d' || cmd === '--dashboard') await openPage(rest);
+  else if (cmd === '--version' || cmd === '-v' || cmd === 'version') say(JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version);
   else if (cmd === 'logs') logs(rest);
   else if (cmd === 'account' || cmd === 'accounts') await accountCmd(rest);
-  else if (!cmd && loadProcs().some(p => p.team)) await status(); // just `tandem`: what is running
+  else if (!cmd && loadProcs().some(p => p.team)) { await status(); await openPage([]); } // just `tandem`: what is running, and open the dashboard
   else { say(HELP); if (cmd && cmd !== 'help' && cmd !== '--help' && cmd !== '-h') process.exit(2); }
 } catch (e) {
   // a mistyped option: say so in one line, not a stack trace
