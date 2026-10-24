@@ -110,6 +110,7 @@ export class BrainClient implements Brain {
               tables.locks.where(r => r.sessionId.eq(session)),
               tables.context.where(r => r.sessionId.eq(session)),
               tables.goals.where(r => r.sessionId.eq(session)),
+              tables.operators,
             ]);
         })
         .onConnectError((_c, e) => reject(e))
@@ -217,6 +218,15 @@ export class BrainClient implements Brain {
       .filter(r => r.sessionId === this.session && r.status === 'new')
       .sort((a, b) => Number(a.createdAt.microsSinceUnixEpoch - b.createdAt.microsSinceUnixEpoch))
       .map(r => ({ id: r.id, text: r.text, status: r.status, created_at: iso(r.createdAt) }));
+  }
+
+  // Not part of the tools: used by the manager watcher to get itself approved.
+  isOperator(): boolean {
+    return [...this.conn.db.operators.iter()].some(o => o.identity.toHexString() === this.identity);
+  }
+
+  async requestOperator(name: string) {
+    await this.conn.reducers.requestOperator({ name });
   }
 
   async markGoal(goalId: string, status: string) {

@@ -101,10 +101,22 @@ const operators = table(
   {
     identity: t.identity().primaryKey(),
     added_at: t.timestamp(),
+    name: t.string().default(''), // appended later, so it needs a default for old rows
   }
 );
 
-const spacetimedb = schema({ workers, tasks, locks, events, context, goals, operators });
+// Someone (a teammate's browser, the manager Claude) asking to become an operator.
+// An operator approves or dismisses it on the dashboard. No hex identities to copy around.
+const operatorRequests = table(
+  { name: 'operator_requests', public: true },
+  {
+    identity: t.identity().primaryKey(),
+    name: t.string(),
+    created_at: t.timestamp(),
+  }
+);
+
+const spacetimedb = schema({ workers, tasks, locks, events, context, goals, operators, operatorRequests });
 export default spacetimedb;
 
 type Ctx = ReducerCtx<InferSchema<typeof spacetimedb>>;
@@ -510,14 +522,15 @@ export const seedTasks = spacetimedb.reducer(
 // The first caller becomes the operator. After that, only operators can add or remove operators.
 export const claimOperator = spacetimedb.reducer(ctx => {
   if ([...ctx.db.operators.iter()].length > 0) throw new SenderError('an operator already exists');
-  ctx.db.operators.insert({ identity: ctx.sender, added_at: ctx.timestamp });
+  ctx.db.operators.insert({ identity: ctx.sender, added_at: ctx.timestamp, name: 'Owner' });
+  ctx.db.operatorRequests.identity.delete(ctx.sender);
 });
 
 export const addOperator = spacetimedb.reducer(
   { identity: t.identity() },
   (ctx, { identity }) => {
     if (!ctx.db.operators.identity.find(ctx.sender)) throw new SenderError('operator only');
-    if (!ctx.db.operators.identity.find(identity)) ctx.db.operators.insert({ identity, added_at: ctx.timestamp });
+    if (!ctx.db.operators.identity.find(identity)) ctx.db.operators.insert({ identity, added_at: ctx.timestamp, name: '' });
   }
 );
 
@@ -552,5 +565,56 @@ export const setGoalStatus = spacetimedb.reducer(
     const goal = ctx.db.goals.pk.find(pk(session_id, id));
     if (!goal) throw new SenderError('unknown goal');
     ctx.db.goals.pk.update({ ...goal, status });
+  }
+);
+
+const cleanName = (name: string) => name.trim().slice(0, 60) || 'Someone';
+
+// Ask to become an operator. Asking again just updates the name.
+export const requestOperator = spacetimedb.reducer(
+  { name: t.string() },
+  (ctx, { name }) => {
+    if (ctx.db.operators.identity.find(ctx.sender)) return; // already one
+    const row = { identity: ctx.sender, name: cleanName(name), created_at: ctx.timestamp };
+    if (ctx.db.operatorRequests.identity.find(ctx.sender)) ctx.db.operatorRequests.identity.update(row);
+    else ctx.db.operatorRequests.insert(row);
+  }
+);
+
+export const approveOperator = spacetimedb.reducer(
+  { identity: t.identity() },
+  (ctx, { identity }) => {
+    if (!ctx.db.operators.identity.find(ctx.sender)) throw new SenderError('operator only');
+    const req = ctx.db.operatorRequests.identity.find(identity);
+    if (!req) throw new SenderError('no such request');
+    if (!ctx.db.operators.identity.find(identity)) {
+      ctx.db.operators.insert({ identity, added_at: ctx.timestamp, name: req.name });
+    }
+    ctx.db.operatorRequests.identity.delete(identity);
+  }
+);
+
+export const dismissRequest = spacetimedb.reducer(
+  { identity: t.identity() },
+  (ctx, { identity }) => {
+    if (!ctx.db.operators.identity.find(ctx.sender)) throw new SenderError('operator only');
+    ctx.db.operatorRequests.identity.delete(identity);
+  }
+);
+
+// Start over: clears the board (tasks, locks, goals, the log) but keeps the team and the notes.
+export const clearBoard = spacetimedb.reducer(
+  { session_id: t.string() },
+  (ctx, { session_id }) => {
+    checkSession(session_id);
+    requireOperator(ctx, session_id);
+    for (const r of [...ctx.db.tasks.session_id.filter(session_id)]) ctx.db.tasks.pk.delete(r.pk);
+    for (const r of [...ctx.db.locks.session_id.filter(session_id)]) ctx.db.locks.pk.delete(r.pk);
+    for (const r of [...ctx.db.goals.session_id.filter(session_id)]) ctx.db.goals.pk.delete(r.pk);
+    for (const r of [...ctx.db.events.session_id.filter(session_id)]) ctx.db.events.id.delete(r.id);
+    for (const w of [...ctx.db.workers.session_id.filter(session_id)]) {
+      if (w.status === 'busy') ctx.db.workers.pk.update({ ...w, status: 'idle' });
+    }
+    addEvent(ctx, session_id, undefined, 'task_created', 'The board was cleared. Ready for a new goal.');
   }
 );

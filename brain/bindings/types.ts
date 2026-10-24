@@ -48,9 +48,17 @@ export const Locks = __t.object("Locks", {
 });
 export type Locks = __Infer<typeof Locks>;
 
+export const OperatorRequests = __t.object("OperatorRequests", {
+  identity: __t.identity(),
+  name: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type OperatorRequests = __Infer<typeof OperatorRequests>;
+
 export const Operators = __t.object("Operators", {
   identity: __t.identity(),
   addedAt: __t.timestamp(),
+  name: __t.string(),
 });
 export type Operators = __Infer<typeof Operators>;
 

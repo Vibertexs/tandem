@@ -13,4 +13,5 @@ import {
 export default __t.row({
   identity: __t.identity().primaryKey(),
   addedAt: __t.timestamp().name("added_at"),
+  name: __t.string(),
 });

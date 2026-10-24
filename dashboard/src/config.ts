@@ -1,31 +1,40 @@
-// Everything the page reads from its URL and environment.
-//   (default)     Demo: your own private sandbox with simulated workers
-//   ?mode=team    My team: the real "live" session, no simulation (?mode=live also works)
-//   ?view=present big type, no controls
-//   ?mock=1       static data from contract/seed.json, no brain
-//   ?uri= &db=    point at another SpacetimeDB
+// Which team this page shows, and how. A "team" is a brain address plus a team name (the database).
+//   ?db=<team>&uri=<ws://host:3001>   open a team (start.ps1 opens the page this way); remembered
+//   ?view=present                       big type, no controls
+//   ?mock=1                             a still picture from contract/seed.json, no brain
+// Without ?db, the last team you opened is used. With none, the page asks: host or join?
 const q = new URLSearchParams(location.search);
+const KEY = 'tandem-team';
 
-function sandboxSession(): string {
-  try {
-    const saved = sessionStorage.getItem('tandem-session');
-    if (saved) return saved;
-    const fresh = 'j-' + Math.random().toString(36).slice(2, 8);
-    sessionStorage.setItem('tandem-session', fresh);
-    return fresh;
-  } catch {
-    return 'j-' + Math.random().toString(36).slice(2, 8);
-  }
+export type Team = { uri: string; db: string };
+
+// Opened from another machine (http://192.168.1.5:5173), the brain is on that machine too.
+export const defaultUri = () =>
+  `ws://${location.hostname && location.hostname !== 'localhost' ? location.hostname : '127.0.0.1'}:3001`;
+
+function load(): Team | null {
+  try { const t = JSON.parse(localStorage.getItem(KEY) ?? 'null'); return t?.db ? t : null; } catch { return null; }
+}
+export function rememberTeam(t: Team) {
+  try { localStorage.setItem(KEY, JSON.stringify(t)); } catch { /* not remembered */ }
+}
+export function forgetTeam() {
+  try { localStorage.removeItem(KEY); } catch { /* nothing to forget */ }
 }
 
-const mode = q.get('mode');
-const team = mode === 'team' || mode === 'live';
+function initialTeam(): Team | null {
+  const db = q.get('db');
+  if (db) {
+    const t = { db, uri: q.get('uri') ?? import.meta.env.VITE_STDB_URI ?? defaultUri() };
+    rememberTeam(t);
+    return t;
+  }
+  return load();
+}
+
 export const config = {
-  team,
-  demo: !team,
+  team: initialTeam(),
   mock: q.get('mock') === '1',
   present: q.get('view') === 'present',
-  uri: q.get('uri') ?? import.meta.env.VITE_STDB_URI ?? 'ws://127.0.0.1:3001',
-  db: q.get('db') ?? import.meta.env.VITE_STDB_DB ?? 'bilal-dev',
-  session: team ? 'live' : sandboxSession(),
+  local: ['localhost', '127.0.0.1', ''].includes(location.hostname),
 };

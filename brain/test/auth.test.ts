@@ -22,7 +22,7 @@ function client() {
     DbConnection.builder().withUri(URI).withDatabaseName(DB)
       .onConnect((c, identity) => {
         c.subscriptionBuilder().onApplied(() => resolve({ conn: c, identity }))
-          .subscribe([tables.operators, tables.tasks, tables.context, tables.goals]);
+          .subscribe([tables.operators, tables.tasks, tables.context, tables.goals, tables.operatorRequests, tables.workers]);
       })
       .onConnectError((_c, e) => reject(e)).build();
   });
@@ -69,6 +69,45 @@ await sleep(300);
 check('remove_operator: access is withdrawn', await rejects(create(b.conn, 'live', 'x5')));
 check('remove_operator: the last operator cannot be removed', await rejects(a.conn.reducers.removeOperator({ identity: a.identity })));
 
+// Ask to operate, approve, dismiss: no identities to copy around.
+const c = await client();
+const requests = () => [...a.conn.db.operatorRequests.iter()];
+await b.conn.reducers.requestOperator({ name: 'Bob laptop' });
+await b.conn.reducers.requestOperator({ name: '  Bob laptop (2)  ' });
+await sleep(300);
+check('request: asking twice keeps one request with the latest name', requests().length === 1 && requests()[0].name === 'Bob laptop (2)', requests().map(r => r.name));
+check('request: a non-operator cannot approve itself', await rejects(b.conn.reducers.approveOperator({ identity: b.identity })));
+await a.conn.reducers.approveOperator({ identity: b.identity });
+await sleep(300);
+const bRow = [...a.conn.db.operators.iter()].find(o => o.identity.isEqual(b.identity));
+check('approve: the requester becomes an operator with its name, and the request is gone', bRow?.name === 'Bob laptop (2)' && requests().length === 0, bRow?.name);
+check('approve: a missing request is an error', await rejects(a.conn.reducers.approveOperator({ identity: c.identity })));
+await c.conn.reducers.requestOperator({ name: 'Stranger' });
+await sleep(300);
+check('dismiss: a non-operator cannot dismiss', await rejects(c.conn.reducers.dismissRequest({ identity: c.identity })));
+await a.conn.reducers.dismissRequest({ identity: c.identity });
+await sleep(300);
+check('dismiss: the request is gone and they are not an operator', requests().length === 0 && ![...a.conn.db.operators.iter()].some(o => o.identity.isEqual(c.identity)));
+await a.conn.reducers.requestOperator({ name: 'already' });
+await sleep(200);
+check('request: an operator asking is a no-op', requests().length === 0);
+const owner = [...a.conn.db.operators.iter()].find(o => o.identity.isEqual(a.identity));
+check('claim: the first operator is named Owner', owner?.name === 'Owner', owner?.name);
+
+// Start over
+await create(a.conn, 'live', 'x9');
+await a.conn.reducers.postGoal({ sessionId: 'live', id: 'g9', text: 'again' });
+await sleep(300);
+const liveWorkers = () => [...a.conn.db.workers.iter()].filter(w => w.sessionId === 'live').length;
+const workersBefore = liveWorkers();
+check('clear: a non-operator cannot clear the board', await rejects(c.conn.reducers.clearBoard({ sessionId: 'live' })));
+await a.conn.reducers.clearBoard({ sessionId: 'live' });
+await sleep(400);
+check('clear: tasks and goals are gone, the team stays',
+  [...a.conn.db.tasks.iter()].filter(t => t.sessionId === 'live').length === 0 &&
+  [...a.conn.db.goals.iter()].filter(g => g.sessionId === 'live').length === 0 && liveWorkers() === workersBefore && workersBefore > 0, workersBefore);
+
+c.conn.disconnect();
 a.conn.disconnect();
 b.conn.disconnect();
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);

@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "tsx test/scenarios.test.ts",
     "test:ui": "tsx test/ui.test.ts"
   },
   "dependencies": {

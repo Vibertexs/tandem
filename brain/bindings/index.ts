@@ -35,11 +35,14 @@ import {
 
 // Import all reducer arg schemas
 import AddOperatorReducer from "./add_operator_reducer";
+import ApproveOperatorReducer from "./approve_operator_reducer";
 import ClaimOperatorReducer from "./claim_operator_reducer";
 import ClaimTaskReducer from "./claim_task_reducer";
+import ClearBoardReducer from "./clear_board_reducer";
 import CompleteTaskReducer from "./complete_task_reducer";
 import CreateJobReducer from "./create_job_reducer";
 import CreateTaskReducer from "./create_task_reducer";
+import DismissRequestReducer from "./dismiss_request_reducer";
 import HeartbeatReducer from "./heartbeat_reducer";
 import PostGoalReducer from "./post_goal_reducer";
 import ReapStaleReducer from "./reap_stale_reducer";
@@ -47,6 +50,7 @@ import RegisterWorkerReducer from "./register_worker_reducer";
 import ReleaseLocksReducer from "./release_locks_reducer";
 import RemoveOperatorReducer from "./remove_operator_reducer";
 import ReportProgressReducer from "./report_progress_reducer";
+import RequestOperatorReducer from "./request_operator_reducer";
 import ResetSessionReducer from "./reset_session_reducer";
 import SeedTasksReducer from "./seed_tasks_reducer";
 import SetContextReducer from "./set_context_reducer";
@@ -61,6 +65,7 @@ import ContextRow from "./context_table";
 import EventsRow from "./events_table";
 import GoalsRow from "./goals_table";
 import LocksRow from "./locks_table";
+import OperatorRequestsRow from "./operator_requests_table";
 import OperatorsRow from "./operators_table";
 import TasksRow from "./tasks_table";
 import WorkersRow from "./workers_table";
@@ -128,6 +133,17 @@ const tablesSchema = __schema({
       { name: 'locks_pk_key', constraint: 'unique', columns: ['pk'] },
     ],
   }, LocksRow),
+  operatorRequests: __table({
+    name: 'operator_requests',
+    indexes: [
+      { accessor: 'identity', name: 'operator_requests_identity_idx_btree', algorithm: 'btree', columns: [
+        'identity',
+      ] },
+    ],
+    constraints: [
+      { name: 'operator_requests_identity_key', constraint: 'unique', columns: ['identity'] },
+    ],
+  }, OperatorRequestsRow),
   operators: __table({
     name: 'operators',
     indexes: [
@@ -172,11 +188,14 @@ const tablesSchema = __schema({
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("add_operator", AddOperatorReducer),
+  __reducerSchema("approve_operator", ApproveOperatorReducer),
   __reducerSchema("claim_operator", ClaimOperatorReducer),
   __reducerSchema("claim_task", ClaimTaskReducer),
+  __reducerSchema("clear_board", ClearBoardReducer),
   __reducerSchema("complete_task", CompleteTaskReducer),
   __reducerSchema("create_job", CreateJobReducer),
   __reducerSchema("create_task", CreateTaskReducer),
+  __reducerSchema("dismiss_request", DismissRequestReducer),
   __reducerSchema("heartbeat", HeartbeatReducer),
   __reducerSchema("post_goal", PostGoalReducer),
   __reducerSchema("reap_stale", ReapStaleReducer),
@@ -184,6 +203,7 @@ const reducersSchema = __reducers(
   __reducerSchema("release_locks", ReleaseLocksReducer),
   __reducerSchema("remove_operator", RemoveOperatorReducer),
   __reducerSchema("report_progress", ReportProgressReducer),
+  __reducerSchema("request_operator", RequestOperatorReducer),
   __reducerSchema("reset_session", ResetSessionReducer),
   __reducerSchema("seed_tasks", SeedTasksReducer),
   __reducerSchema("set_context", SetContextReducer),
