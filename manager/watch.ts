@@ -1,5 +1,5 @@
 // The manager, always on:
-//  1. waits for goals and plans each batch with one headless Claude run (manager/run.ps1);
+//  1. waits for goals and plans each batch with one headless Claude run (plan.ts);
 //  2. when every task of a goal is done, merges the goal's task branches into one branch,
 //     tandem/<goal id>, runs the project's tests on it, and either calls the goal done or adds one
 //     task to fix the failing tests (finish.ts).
@@ -12,7 +12,7 @@
 // Env: STDB_URI, STDB_DB, TANDEM_SESSION (default live), TANDEM_TOKEN_FILE
 import { spawn } from 'node:child_process';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { BrainClient } from '../mcp/src/brain-client.js';
 import { finishGoal } from './finish.js';
@@ -50,10 +50,11 @@ if (!brain.isOperator()) {
 
 // ---------- planning ----------
 const tries = new Map<string, number>();
+const tsx = pathToFileURL(join(here, 'node_modules', 'tsx', 'dist', 'esm', 'index.mjs')).href;
 const plan = () => new Promise<number>(done => {
-  const child = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(here, 'run.ps1'),
-    '-Uri', URI, '-Db', DB, '-Session', SESSION, '-TokenFile', process.env.TANDEM_TOKEN_FILE!,
-    '-WorkDir', REPO, '-Model', opt.model!, '-MaxBudgetUsd', opt.budget!], { stdio: 'inherit' });
+  const child = spawn(process.execPath, ['--import', tsx, join(here, 'plan.ts'),
+    '--uri', URI, '--db', DB, '--session', SESSION, '--token-file', process.env.TANDEM_TOKEN_FILE!,
+    '--workdir', REPO, '--model', opt.model!, '--budget', opt.budget!], { stdio: 'inherit' });
   child.on('close', code => done(code ?? 1));
 });
 

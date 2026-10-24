@@ -21,15 +21,15 @@ When a few people each run an AI coding agent on the same repo:
 |---|---|---|
 | ![Host or join](docs/img/start.png) | ![One click](docs/img/approve.png) | ![Task details](docs/img/task.png) |
 
-## Quick start (Windows)
-You need [Node.js](https://nodejs.org) 20+, Git, [Claude Code](https://claude.com/claude-code), and the SpacetimeDB CLI. In PowerShell:
-```
-iwr https://windows.spacetimedb.com -useb | iex
-```
-Then, in this folder:
-```
-.\start.ps1 -Simulate
-```
+## Quick start
+You need [Node.js](https://nodejs.org) 20+, Git, [Claude Code](https://claude.com/claude-code), and the [SpacetimeDB CLI](https://spacetimedb.com/install).
+
+| | Install SpacetimeDB | Start Tandem |
+|---|---|---|
+| Windows (PowerShell) | `iwr https://windows.spacetimedb.com -useb \| iex` | `.\start.ps1 -Simulate` |
+| macOS / Linux | `curl -sSf https://install.spacetimedb.com \| sh` | `./start.sh --simulate` |
+
+The two scripts take the same options (`-Simulate` / `--simulate`, and so on). The rest of this README uses the Windows spelling.
 That starts everything and opens the page:
 - the brain (a local database)
 - the page (http://localhost:5173)
@@ -93,7 +93,7 @@ Every suite passes on the final commit. See [docs/STATUS.md](docs/STATUS.md) for
   - `start.ps1` with real workers: a goal typed on the page, planned, built by two Claudes, merged into one branch, and its tests passing.
 
 ## Limits
-- The scripts are PowerShell (Windows). On macOS or Linux, run the same steps by hand (see each folder's README).
+- `start.ps1` is tested end to end on Windows. `start.sh` (macOS, Linux) does the same steps and was checked in Git Bash, but not yet on a Mac.
 - Anyone who can reach the brain can act as any worker. Only managing the team (goals, approvals, clearing) is restricted to approved people.
 - Hosting is local or on your network. Putting the brain on SpacetimeDB's hosted Maincloud needs `spacetime login`.
 
