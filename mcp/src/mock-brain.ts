@@ -88,6 +88,16 @@ export class MockBrain implements Brain {
     }
   }
 
+  // Simpler than the real brain: the task just goes back to open.
+  async giveBackTask(workerId: string, taskId: string) {
+    const t = this.task(taskId);
+    if (t.status !== 'claimed' || t.assignee !== workerId) throw new Error('task is not claimed by this worker');
+    t.status = 'open'; t.assignee = null;
+    this.locks = this.locks.filter(l => l.task_id !== taskId);
+    const w = this.worker(workerId);
+    if (w.status === 'busy') w.status = 'idle';
+  }
+
   getContext() { return { ...this.context }; }
   getJobResults(jobId: string) {
     return this.tasks.filter(t => t.job_id === jobId && t.kind === 'map' && t.status === 'done' && t.result != null)

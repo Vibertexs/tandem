@@ -1,4 +1,4 @@
-// Tandem MCP server (stdio). All 16 tools from contract/tools.json. Env:
+// Tandem MCP server (stdio). All 17 tools from contract/tools.json. Env:
 //   STDB_URI          default ws://127.0.0.1:3001
 //   STDB_DB           default bilal-dev
 //   TANDEM_SESSION    default "live"
@@ -123,6 +123,14 @@ const handle = serveStdio(() => {
     }),
   }, tool(async (brain, { task_id, branch, summary, result }) => {
     await brain.completeTask(me(), task_id, branch, summary, result);
+    return { ok: true };
+  }));
+
+  server.registerTool('give_back_task', {
+    description: 'Hands your task back when you cannot finish it (say why). Frees its locks; a different worker gets it next.',
+    inputSchema: z.object({ task_id: z.string(), reason: z.string().describe('What went wrong, in one line') }),
+  }, tool(async (brain, { task_id, reason }) => {
+    await brain.giveBackTask(me(), task_id, reason);
     return { ok: true };
   }));
 

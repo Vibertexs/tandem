@@ -118,10 +118,13 @@ async function realRun(t: Task) {
     `task_id: ${t.id}\ntitle: ${t.title}\ndescription: ${t.description || '(none)'}\nfiles: ${t.files.join(', ')}\n` +
     `You are in a git worktree of the repo; paths are relative to it. When finished, reply with one line saying what you did.`;
 
+  let lastError = '';
   for (let attempt = 1; attempt <= 2; attempt++) {
     log(`running ${t.id} with ${model}${effort !== 'default' ? `/${effort}` : ''} (attempt ${attempt})`);
     await brain.reportProgress(workerId, t.id, `started (${model})`);
     const { code, out, result, cost, isError } = await runClaude(tree, prompt, model, effort, {});
+    // Claude may have given the task back itself (give_back_task): then it is no longer ours.
+    if (brain.getStatus().tasks.find(x => x.id === t.id)?.assignee !== workerId) return 'given back';
     if (cost > 0) await brain.recordCost(workerId, t.id, cost).catch(() => {});
     if (/rate.?limit|usage limit|limit reached|try again later/i.test(out) && (code !== 0 || isError)) {
       // cap this worker: the brain puts the task back in the queue for someone with headroom
@@ -142,11 +145,12 @@ async function realRun(t: Task) {
       await brain.completeTask(workerId, t.id, branch, summary, t.kind === 'map' ? { status: 'ok', files_touched: t.files, findings: [], notes: summary } : undefined);
       return 'done';
     }
+    lastError = (result || out).trim().split('\n').filter(Boolean).pop()?.slice(0, 200) ?? '';
     effort = routing.retry_effort; // retry once at higher effort
   }
-  // No fail tool yet: stop heartbeating this task so the brain reopens it after 2 minutes.
-  await brain.reportProgress(workerId, t.id, 'failed twice; leaving it for someone else');
-  return 'failed';
+  // Hand it back: a different worker gets it, and after two workers it waits for a person.
+  await brain.giveBackTask(workerId, t.id, `failed twice${lastError ? `: ${lastError}` : ''}`);
+  return 'given back';
 }
 
 // ---------- main loop ----------
@@ -166,7 +170,7 @@ for (;;) {
   const outcome = opt.simulate ? (await simulate(task), 'done') : await realRun(task);
   log(`${task.id}: ${outcome}`);
   if (outcome === 'done') done++;
-  if (outcome === 'capped' || outcome === 'failed') break;
+  if (outcome === 'capped') break;
   if (max > 0 && done >= max) break;
 }
 clearInterval(beat);

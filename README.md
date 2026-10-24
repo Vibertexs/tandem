@@ -73,7 +73,7 @@ Nothing talks to anything else directly. Every part reads and writes the brain, 
 | Folder | What is in it |
 |---|---|
 | `brain/` | The SpacetimeDB module (TypeScript): tables and the atomic rules |
-| `mcp/` | The MCP server: the 16 tools every Claude uses (`contract/tools.json`), the worker rules skill, the lock-check hook |
+| `mcp/` | The MCP server: the 17 tools every Claude uses (`contract/tools.json`), the worker rules skill, the lock-check hook |
 | `manager/` | The manager's prompt, the watcher that plans each new goal, and the merge-and-test step that finishes it |
 | `launcher/` | The worker: claims tasks, runs `claude -p` in a worktree, routes model and effort by difficulty |
 | `dashboard/` | The web page (React) |

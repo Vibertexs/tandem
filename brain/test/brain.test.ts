@@ -291,6 +291,37 @@ const again = [...admin.db.presence.iter()].filter(p => p.sessionId === H);
 check('presence: a ping shows who is here, and pinging again updates the same row',
   first.length === 1 && again.length === 1 && again[0].kind === 'manager' && again[0].lastSeen.microsSinceUnixEpoch > first[0].lastSeen.microsSinceUnixEpoch);
 
+// 14. Giving a task back: a different worker gets it; after two give-backs it needs a person.
+const F = `gb-${run}`;
+const fv = view(F);
+const [fa, fb] = [clients[1], clients[2]];
+await fa.reducers.registerWorker({ sessionId: F, id: 'w-a', name: 'Ann', plan: 'pro' });
+await fb.reducers.registerWorker({ sessionId: F, id: 'w-b', name: 'Bo', plan: 'pro' });
+await newTask(F, 'hard', ['hard.py']);
+await fa.reducers.claimTask({ sessionId: F, workerId: 'w-a' });
+check('give back: only the worker that has the task can give it back', await rejects(fb.reducers.giveBackTask({ sessionId: F, workerId: 'w-b', taskId: 'hard', reason: 'x' })));
+await fa.reducers.giveBackTask({ sessionId: F, workerId: 'w-a', taskId: 'hard', reason: 'tests would not run' });
+await sleep(300);
+let hard = fv.tasks().get('hard')!;
+check('give back: the task is open again, its locks are free, and the worker is idle',
+  hard.status === 'open' && hard.assignee === undefined && fv.locks().length === 0 && fv.workers().get('w-a')!.status === 'idle', hard);
+check('give back: the log says who gave it back and why', fv.events().some(e => e.type === 'task_failed' && e.message.includes('Ann gave back hard: tests would not run')));
+await fa.reducers.claimTask({ sessionId: F, workerId: 'w-a' });
+await sleep(300);
+check('give back: the same worker does not get it again', fv.tasks().get('hard')!.status === 'open');
+await fb.reducers.claimTask({ sessionId: F, workerId: 'w-b' });
+await sleep(300);
+check('give back: a different worker does', fv.tasks().get('hard')!.assignee === 'w-b');
+await fb.reducers.giveBackTask({ sessionId: F, workerId: 'w-b', taskId: 'hard', reason: 'same problem' });
+await sleep(300);
+hard = fv.tasks().get('hard')!;
+check('give back: after two workers gave it back, it is failed with the reason', hard.status === 'failed' && hard.resultSummary === 'same problem' && hard.triedBy === 'w-a,w-b', hard);
+await admin.reducers.retryTask({ sessionId: F, taskId: 'hard' });
+await sleep(300);
+hard = fv.tasks().get('hard')!;
+check('retry: an operator puts it back for anyone', hard.status === 'open' && hard.triedBy === '' && hard.resultSummary === undefined, hard);
+check('retry: a task that did not fail cannot be retried', await rejects(admin.reducers.retryTask({ sessionId: F, taskId: 'hard' })));
+
 for (const c of [admin, ...clients]) c.disconnect();
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

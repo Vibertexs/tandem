@@ -27,7 +27,8 @@ You are one of several agents working on this repo at the same time. A shared br
    - `branch`: the git branch you worked on, or `"none"`,
    - `summary`: one line saying what you did,
    - `result`: only for a map task (`task.kind == "map"`): `{"status": "ok" | "failed", "files_touched": [...], "findings": [{"file", "severity": "low|medium|high", "note"}], "notes": ""}` (see `contract/result-format.json`).
-10. Go back to step 3.
+10. Can't finish it (the task is impossible as written, or something you need is broken)? Call `give_back_task(task_id, "<what went wrong, in one line>")` instead of `complete_task`. A different worker gets it next. Never mark a task done that isn't.
+11. Go back to step 3.
 
 ## Merge tasks
 If `task.kind == "reduce"`, call `get_job_results(task.job_id)` and combine those results into the task's files. Do not re-read the whole repo.

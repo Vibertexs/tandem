@@ -199,6 +199,35 @@ try {
   await A.getByRole('button', { name: 'Yes, clear everything' }).click();
   await nav(A, 'Board');
   check('start over: the board is empty again, the team stays', await seen(A, 'No tasks yet.', 5000) && !(await A.getByText('No workers are online.').isVisible()));
+
+  // ---- 8b. a task two workers cannot finish ----
+  for (const l of launchers) l.kill(); // so only the two test workers below can take it
+  const worker = () => new Promise<DbConnection>((res, rej) => {
+    DbConnection.builder().withUri('ws://127.0.0.1:3001').withDatabaseName(DB)
+      .onConnect(c => res(c)).onConnectError((_c, e) => rej(e)).build();
+  });
+  const [x1, x2] = await Promise.all([worker(), worker()]);
+  await x1.reducers.registerWorker({ sessionId: 'live', id: 'w-kim', name: 'Kim', plan: 'pro' });
+  await x2.reducers.registerWorker({ sessionId: 'live', id: 'w-lee', name: 'Lee', plan: 'pro' });
+  await manager.reducers.createTask({ sessionId: 'live', kind: 'normal', assignee: 'w-kim', task: { id: 't-hard', title: 'Port it to COBOL', description: '', files: ['calc.cob'], difficulty: 'hard', model: '', effort: 'default', dependsOn: [] } });
+  await x1.reducers.claimTask({ sessionId: 'live', workerId: 'w-kim' });
+  await x1.reducers.giveBackTask({ sessionId: 'live', workerId: 'w-kim', taskId: 't-hard', reason: 'no COBOL compiler here' });
+  check('give back: the card stays in To do, marked "given back"', await until(async () => (await col(A, 'To do').locator('.task', { hasText: 'Port it to COBOL' }).innerText().catch(() => '')).includes('given back'), 5000));
+  await x2.reducers.claimTask({ sessionId: 'live', workerId: 'w-lee' });
+  await x2.reducers.giveBackTask({ sessionId: 'live', workerId: 'w-lee', taskId: 't-hard', reason: 'no COBOL compiler here either' });
+  check('failed: after two workers, the next step says the task needs you, with the reason',
+    await seen(A, '"Port it to COBOL" needs you.', 5000) && await seen(A, 'no COBOL compiler here either', 1000));
+  check('failed: the card says "needs you"', (await col(A, 'To do').locator('.task.is-failed').innerText().catch(() => '')).includes('needs you'));
+  await A.waitForTimeout(600); // let the card's colour transition finish
+  await shot(A, '10-needs-you');
+  await A.getByRole('button', { name: 'Open it' }).click();
+  const why2 = await A.getByRole('dialog').innerText().catch(() => '');
+  check('failed: the details say who could not finish it and why', why2.includes('Kim and Lee could not finish it: no COBOL compiler here either'), why2);
+  await A.getByRole('dialog').getByRole('button', { name: /^Try again/ }).click();
+  check('retry: Try again puts it back for any worker', await seen(A, 'Back on the board for any worker.', 4000) &&
+    await until(() => A.getByText('needs you').count().then(n => n === 0), 4000));
+  await A.keyboard.press('Escape');
+  x1.disconnect(); x2.disconnect();
   check('no page errors', errs.length === 0, errs);
   manager.disconnect();
   await ctxA.close();

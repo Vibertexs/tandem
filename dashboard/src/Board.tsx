@@ -6,7 +6,7 @@ import { Avatar, EV_ICON, STAGES, ago, copy, isManager, liveInfo, lockBlocking, 
 type Props = { snap: Snapshot; api: Api | null; isOp: boolean; now: number; say: (m: string) => void; present: boolean; go: (page: string) => void };
 
 // One thing to do next, never a checklist. Highest priority first.
-function NextStep({ snap, api, isOp, now, say, go }: Props) {
+function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTask: (id: string) => void }) {
   const [busy, setBusy] = useState(false);
   if (!isOp) return null;
   const req = snap.requests[0];
@@ -26,6 +26,17 @@ function NextStep({ snap, api, isOp, now, say, go }: Props) {
           <button type="button" className="btn primary" disabled={busy || !api} onClick={() => act(() => api!.approve(req.identity), `${req.name} can now manage the team.`)}>Approve</button>
           <button type="button" className="btn" disabled={busy || !api} onClick={() => act(() => api!.dismiss(req.identity), 'Request dismissed.')}>Dismiss</button>
         </div>
+      </div>
+    );
+  }
+  const failed = snap.tasks.filter(t => t.status === 'failed');
+  if (failed.length > 0) {
+    return (
+      <div className="next card alert" role="status">
+        <span className="next-icon" aria-hidden="true">⚠</span>
+        <div><strong>{failed.length === 1 ? `"${failed[0].title}" needs you.` : `${failed.length} tasks need you.`}</strong>
+          <p className="small muted">Two workers could not finish {failed.length === 1 ? 'it' : 'them'}: {failed[0].resultSummary ?? 'no reason given'}. Open the task to read why, then try again.</p></div>
+        <button type="button" className="btn" onClick={() => openTask(failed[0].id)}>Open it</button>
       </div>
     );
   }
@@ -163,7 +174,7 @@ function Card({ t, snap, now, selected, flash, onOpen }: { t: Task; snap: Snapsh
     ? t.dependsOn.map(d => snap.tasks.find(x => x.id === d)).filter((x): x is Task => !!x && x.status !== 'done')
     : [];
   return (
-    <button type="button" className={`card task stage-${stage} ${selected ? 'selected' : ''} ${flash ? 'flash' : ''}`} onClick={onOpen} aria-pressed={selected}>
+    <button type="button" className={`card task stage-${stage} ${t.status === 'failed' ? 'is-failed' : ''} ${selected ? 'selected' : ''} ${flash ? 'flash' : ''}`} onClick={onOpen} aria-pressed={selected}>
       <span className="task-title">{t.title}</span>
       {waitsFor.length > 0 && <span className="small muted">after {waitsFor.slice(0, 2).map(x => x.title).join(', ')}{waitsFor.length > 2 ? ` +${waitsFor.length - 2}` : ''}</span>}
       {stage === 'doing' && (
@@ -176,6 +187,8 @@ function Card({ t, snap, now, selected, flash, onOpen }: { t: Task; snap: Snapsh
         <span className="mono small muted files" title={t.files.join(', ')}>{t.files.length === 1 ? t.files[0] : `${t.files.length} files`}</span>
         {t.kind === 'reduce' && <span className="chip">merge</span>}
         {lock && <span className="chip warn-chip" title={`Waiting for ${lock.path}`}>⏳ file busy</span>}
+        {t.status === 'failed' && <span className="chip fail-chip">needs you</span>}
+        {t.status === 'open' && t.triedBy.length > 0 && <span className="chip warn-chip" title="A worker gave it back">↩ given back</span>}
         {stage === 'doing' && info?.since && <span className="small muted">{took(info.since, now)}</span>}
         {stage === 'done' && <span className="small done-line">✓</span>}
         {who ? <Avatar name={who.name} size={24} /> : t.assignee && stage === 'todo' ? <span className="chip">reserved</span> : null}
@@ -184,7 +197,15 @@ function Card({ t, snap, now, selected, flash, onOpen }: { t: Task; snap: Snapsh
   );
 }
 
-function Drawer({ t, snap, now, onClose }: { t: Task; snap: Snapshot; now: number; onClose: () => void }) {
+function Drawer({ t, snap, now, onClose, api, isOp, say }: { t: Task; snap: Snapshot; now: number; onClose: () => void; api: Api | null; isOp: boolean; say: (m: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const canRetry = isOp && !!api && (t.status === 'failed' || (t.status === 'open' && t.triedBy.length > 0));
+  const retry = async () => {
+    setBusy(true);
+    try { await api!.retryTask(t.id); say('Back on the board for any worker.'); }
+    catch (e) { say('Could not do that: ' + (e as Error).message); }
+    finally { setBusy(false); }
+  };
   const who = snap.workers.find(w => w.id === t.assignee);
   const stage = STAGES.find(s => s.key === stageOf(t))!;
   const deps = t.dependsOn.map(d => snap.tasks.find(x => x.id === d)).filter((x): x is Task => !!x);
@@ -196,7 +217,7 @@ function Drawer({ t, snap, now, onClose }: { t: Task; snap: Snapshot; now: numbe
   return (
     <aside className="drawer" role="dialog" aria-label={`Task: ${t.title}`} onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <header>
-        <span className={`stage-chip stage-${stage.key}`}>{stage.title}</span>
+        <span className={`stage-chip stage-${stage.key} ${t.status === 'failed' ? 'is-failed' : ''}`}>{t.status === 'failed' ? 'Needs you' : stage.title}</span>
         <button ref={ref} type="button" className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
       </header>
       <h2>{t.title}</h2>
@@ -211,8 +232,10 @@ function Drawer({ t, snap, now, onClose }: { t: Task; snap: Snapshot; now: numbe
         {t.costUsd > 0 && <><dt>Cost</dt><dd>{money(t.costUsd)}</dd></>}
       </dl>
       {t.description && <section><h3>What to do</h3><p>{t.description}</p></section>}
-      <section><h3>Why it is here</h3><p>{why(t, snap)}</p></section>
-      {t.resultSummary && <section><h3>Result</h3><p>{t.resultSummary}</p>
+      <section><h3>Why it is here</h3><p>{why(t, snap)}</p>
+        {canRetry && <button type="button" className="btn primary" disabled={busy} onClick={retry}>Try again</button>}
+      </section>
+      {t.resultSummary && t.status === 'done' && <section><h3>Result</h3><p>{t.resultSummary}</p>
         {result?.findings?.length ? <ul className="plain findings">{result.findings.map((f, i) => <li key={i}><span className={`chip sev-${f.severity}`}>{f.severity}</span> <span className="mono small">{f.file}</span> {f.note}</li>)}</ul> : null}
       </section>}
       <section><h3>Timeline</h3>
@@ -252,7 +275,7 @@ export function BoardPage(p: Props) {
   const cols = useMemo(() => STAGES.map(s => ({ ...s, items: snap.tasks.filter(t => stageOf(t) === s.key) })), [snap.tasks]);
   return (
     <div className="page board-page">
-      {!present && <NextStep {...p} />}
+      {!present && <NextStep {...p} openTask={setOpen} />}
       {!present && <Prompt {...p} />}
       <GoalProgress snap={p.snap} filter={activeFilter} setFilter={setFilter} say={say} />
       {activeFilter && <p className="small filter-note">Showing one goal. <button type="button" className="link" onClick={() => setFilter(null)}>Show all tasks</button></p>}
@@ -275,7 +298,7 @@ export function BoardPage(p: Props) {
           ))}
         </div>
       )}
-      {task && <><div className="scrim" onClick={() => setOpen(null)} /><Drawer t={task} snap={p.snap} now={now} onClose={() => setOpen(null)} /></>}
+      {task && <><div className="scrim" onClick={() => setOpen(null)} /><Drawer t={task} snap={p.snap} now={now} onClose={() => setOpen(null)} api={p.api} isOp={p.isOp} say={say} /></>}
     </div>
   );
 }

@@ -46,6 +46,7 @@ const tasks = table(
     result_summary: t.option(t.string()),
     goal_id: t.string().default(''), // the goal this task was planned for, '' if none
     cost_usd: t.f64().default(0), // what its Claude runs cost, as reported by claude -p
+    tried_by: t.string().default(''), // comma-separated workers that gave it back; they do not get it again
   }
 );
 
@@ -274,7 +275,7 @@ function insertTask(
   // While the manager is planning exactly one goal, every task it creates belongs to that goal.
   const planning = [...ctx.db.goals.session_id.filter(session)].filter(g => g.status === 'planning');
   const goal_id = planning.length === 1 ? planning[0].id : '';
-  ctx.db.tasks.insert({ goal_id, cost_usd: 0,
+  ctx.db.tasks.insert({ goal_id, cost_usd: 0, tried_by: '',
     pk: pk(session, a.id), session_id: session, id: a.id, job_id: jobId, kind, title: a.title,
     description: a.description, files: a.files, difficulty: a.difficulty, model: a.model, effort: a.effort,
     status, assignee, branch: undefined, depends_on: a.depends_on, result: undefined, result_summary: undefined,
@@ -340,10 +341,11 @@ export const claimTask = spacetimedb.reducer(
 
     // "Best" task for the POC = a task reserved for this worker first, then the first
     // open task. Open tasks come out in insertion order. Files must all be free.
+    // A task this worker gave back waits for someone else.
     const candidates = [
       ...mine.filter(x => x.status === 'open' && x.assignee === worker_id),
       ...mine.filter(x => x.status === 'open' && x.assignee === undefined),
-    ];
+    ].filter(x => !triedBy(x).includes(worker_id));
     for (const task of candidates) {
       if (task.files.some(p => ctx.db.locks.pk.find(pk(session_id, p)))) continue;
       for (const path of task.files) {
@@ -404,6 +406,51 @@ export const completeTask = spacetimedb.reducer(
       const finished = maps.filter(x => doneIds.has(x.id)).length;
       addEvent(ctx, session_id, worker_id, 'job_progress', `Job progress: ${finished}/${maps.length}`);
     }
+  }
+);
+
+const triedBy = (task: { tried_by: string }) => task.tried_by.split(',').filter(Boolean);
+// Different workers that may give a task back before it is marked failed for a person to look at.
+const GIVE_BACKS_BEFORE_FAILED = 2;
+
+// give_back_task: the worker could not finish it. Its locks are freed and it goes back to To do
+// for a different worker. After two different workers gave it back, it is marked failed.
+export const giveBackTask = spacetimedb.reducer(
+  { session_id: t.string(), worker_id: t.string(), task_id: t.string(), reason: t.string() },
+  (ctx, { session_id, worker_id, task_id, reason }) => {
+    const worker = touchAndReap(ctx, session_id, worker_id);
+    const task = ctx.db.tasks.pk.find(pk(session_id, task_id));
+    if (!task || task.status !== 'claimed' || task.assignee !== worker_id) {
+      throw new SenderError('task is not claimed by this worker');
+    }
+    const why = reason.trim().slice(0, 300) || 'no reason given';
+    const tried = [...new Set([...triedBy(task), worker_id])];
+    const failed = tried.length >= GIVE_BACKS_BEFORE_FAILED;
+    freeLocksOf(ctx, session_id, task_id);
+    ctx.db.tasks.pk.update({
+      ...task, status: failed ? 'failed' : 'open', assignee: undefined, tried_by: tried.join(','),
+      result_summary: failed ? why : task.result_summary,
+    });
+    if (worker) ctx.db.workers.pk.update({ ...worker, status: worker.status === 'busy' ? 'idle' : worker.status });
+    const name = worker?.name ?? worker_id;
+    addEvent(ctx, session_id, worker_id, 'task_failed', failed
+      ? `${name} gave back ${task.title} too. It needs a person: ${why}`
+      : `${name} gave back ${task.title}: ${why}`);
+  }
+);
+
+// An operator puts a given-back or failed task back on the board for anyone, the same worker too.
+export const retryTask = spacetimedb.reducer(
+  { session_id: t.string(), task_id: t.string() },
+  (ctx, { session_id, task_id }) => {
+    requireOperator(ctx, session_id);
+    const task = ctx.db.tasks.pk.find(pk(session_id, task_id));
+    if (!task) throw new SenderError('unknown task');
+    if (task.status !== 'failed' && !(task.status === 'open' && task.tried_by)) {
+      throw new SenderError('only a failed or given-back task can be tried again');
+    }
+    ctx.db.tasks.pk.update({ ...task, status: 'open', assignee: undefined, tried_by: '', result_summary: undefined });
+    addEvent(ctx, session_id, undefined, 'task_created', `Trying again: ${task.title}`);
   }
 );
 

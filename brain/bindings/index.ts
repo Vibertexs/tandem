@@ -45,6 +45,7 @@ import CreateJobReducer from "./create_job_reducer";
 import CreateTaskReducer from "./create_task_reducer";
 import DismissRequestReducer from "./dismiss_request_reducer";
 import FinishGoalReducer from "./finish_goal_reducer";
+import GiveBackTaskReducer from "./give_back_task_reducer";
 import HeartbeatReducer from "./heartbeat_reducer";
 import PingReducer from "./ping_reducer";
 import PostGoalReducer from "./post_goal_reducer";
@@ -56,6 +57,7 @@ import RemoveOperatorReducer from "./remove_operator_reducer";
 import ReportProgressReducer from "./report_progress_reducer";
 import RequestOperatorReducer from "./request_operator_reducer";
 import ResetSessionReducer from "./reset_session_reducer";
+import RetryTaskReducer from "./retry_task_reducer";
 import SeedTasksReducer from "./seed_tasks_reducer";
 import SetContextReducer from "./set_context_reducer";
 import SetGoalStatusReducer from "./set_goal_status_reducer";
@@ -214,6 +216,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_task", CreateTaskReducer),
   __reducerSchema("dismiss_request", DismissRequestReducer),
   __reducerSchema("finish_goal", FinishGoalReducer),
+  __reducerSchema("give_back_task", GiveBackTaskReducer),
   __reducerSchema("heartbeat", HeartbeatReducer),
   __reducerSchema("ping", PingReducer),
   __reducerSchema("post_goal", PostGoalReducer),
@@ -225,6 +228,7 @@ const reducersSchema = __reducers(
   __reducerSchema("report_progress", ReportProgressReducer),
   __reducerSchema("request_operator", RequestOperatorReducer),
   __reducerSchema("reset_session", ResetSessionReducer),
+  __reducerSchema("retry_task", RetryTaskReducer),
   __reducerSchema("seed_tasks", SeedTasksReducer),
   __reducerSchema("set_context", SetContextReducer),
   __reducerSchema("set_goal_status", SetGoalStatusReducer),

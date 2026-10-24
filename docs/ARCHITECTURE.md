@@ -19,7 +19,7 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 
 ## The parts
 - **Brain** (`brain/`): the shared notebook. Holds goals, tasks, file locks, workers, an event log and shared notes. Its rules are the point: claiming a task, locking its files and unblocking waiting tasks each happen as one indivisible step.
-- **MCP server** (`mcp/`): the buttons Claude can press. 16 tools from `contract/tools.json`. One file (`src/brain-client.ts`) talks to the database. `BRAIN_MODE=mock` swaps in an in-memory copy.
+- **MCP server** (`mcp/`): the buttons Claude can press. 17 tools from `contract/tools.json`. One file (`src/brain-client.ts`) talks to the database. `BRAIN_MODE=mock` swaps in an in-memory copy.
 - **Dashboard** (`dashboard/`): the web page. Start screen (host or join), then a Jira-style app: Board (prompt, next step, Waiting → To do → In progress → Done, task details), Goals, Team, Shared memory, Activity, Settings.
 - **Manager** (`manager/`): `watch.ts` waits for goals and runs `plan.ts` (one headless Claude with `PROMPT.md`) that reads goals (`get_goals`), splits each into tasks with file lists and dependencies (`assign_task`, `create_job`), and marks it planned (`mark_goal`). When every task of a goal is done, `finish.ts` merges their branches into `tandem/<goal>`, runs the project's tests, and either finishes the goal or adds one fix task.
 - **start.ps1 / stop.ps1**: one command starts the brain, the page, the manager and the workers (`-Simulate` for fake coding, `-Lan` to let others join, `-Join` to add workers to someone else's team).
@@ -46,6 +46,8 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 - **A file is already locked:** the task waits (stays `open`) until the lock is freed. A Claude that tries to edit it anyway is blocked by the hook.
 - **A worker crashes:** no heartbeat for 2 minutes, so the brain frees its locks and reopens its task.
 - **A worker hits its limit (usage 100):** it is capped and its running task goes back to the queue.
+- **A worker cannot finish a task:** it calls `give_back_task` with a reason (the launcher does this after two failed runs). The locks are freed and a different worker gets it. If a second worker gives it back too, it is marked failed: the page says "needs you" with the reason, and an operator presses **Try again**.
+- **The tests fail on the goal branch:** the manager adds one "Fix the failing tests" task to the goal and checks again when it is done.
 
 ## How teammates join
 A teammate does not need approval to work. On their computer they run `.\start.ps1 -Join ws://<host>:3001 -Db <team>` (the Team page shows the exact command), or connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Ask to make changes**, and the owner clicks **Approve**. The manager asks the same way.
@@ -58,7 +60,6 @@ A teammate does not need approval to work. On their computer they run `.\start.p
 A team is one database on a brain (`-Db`, default `tandem-local`). The page and every Claude use its `live` session. The brain still supports other sessions (the tests use them to stay isolated).
 
 ## Open design questions
-- Who merges the `task/<id>` branches into `main`, and who resolves conflicts? Suggestion: an integrate task run by a worker Claude, escalating to a human, landing through a reviewed PR.
+- Merge conflicts: the manager merges a goal's `task/<id>` branches into `tandem/<goal>` and reports any branch it could not merge. Resolving those is still by hand. A "resolve the conflict" task for a worker Claude is the next step.
 - Identities are saved tokens, not accounts. A real login (GitHub through SpacetimeDB's OIDC support) is the next step before hosting publicly.
-- No fail tool: a task that fails twice waits for the 2-minute stale cleanup before someone else can take it.
 - Hosting: teammates on other machines and judges need a public brain (Maincloud or a tunnel). Nothing is deployed.

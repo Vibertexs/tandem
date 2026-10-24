@@ -33,6 +33,7 @@ export interface Brain {
   releaseFiles(workerId: string, taskId: string): Promise<void>;
   reportProgress(workerId: string, taskId: string, message: string): Promise<void>;
   completeTask(workerId: string, taskId: string, branch: string, summary: string, result?: unknown): Promise<void>;
+  giveBackTask(workerId: string, taskId: string, reason: string): Promise<void>;
   getContext(): Record<string, string>;
   getJobResults(jobId: string): unknown[];
   assignTask(task: TaskDraft, assignee?: string): Promise<string>;
@@ -175,6 +176,10 @@ export class BrainClient implements Brain {
       sessionId: this.session, workerId, taskId, branch, summary,
       result: result === undefined ? undefined : JSON.stringify(result),
     });
+  }
+
+  async giveBackTask(workerId: string, taskId: string, reason: string) {
+    await this.conn.reducers.giveBackTask({ sessionId: this.session, workerId, taskId, reason });
   }
 
   getContext(): Record<string, string> {

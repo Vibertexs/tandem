@@ -45,6 +45,7 @@ export function GoalsPage({ snap, now, say }: Common) {
                   {mine.map(t => {
                     const who = snap.workers.find(w => w.id === t.assignee);
                     const st = stageOf(t);
+                    if (t.status === 'failed') return <li key={t.id} className="warn"><span aria-hidden="true">✕</span> {t.title}<span className="small"> · needs you: {t.resultSummary ?? 'no reason given'}</span></li>;
                     return <li key={t.id} className={`stage-${st}`}><span aria-hidden="true">{STAGE_ICON[st]}</span> {t.title}{who ? <span className="small muted"> · {who.name}</span> : null}</li>;
                   })}
                 </ul>

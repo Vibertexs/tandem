@@ -35,7 +35,7 @@ $suites = @(
   @('brain', 'brain', 'npm.cmd run test'),
   @('brain: who may do what', 'brain', 'npm.cmd run test:auth'),
   @('mcp: mock mode', 'mcp', 'npm.cmd run test:mock'),
-  @('mcp: 16 tools, real brain', 'mcp', 'npm.cmd run test'),
+  @('mcp: 17 tools, real brain', 'mcp', 'npm.cmd run test'),
   @('mcp: manager identity', 'mcp', 'npm.cmd run test:operator'),
   @('mcp: lock-check hook', 'mcp', 'npm.cmd run test:hook'),
   @('launcher', 'launcher', 'npm.cmd run test'),

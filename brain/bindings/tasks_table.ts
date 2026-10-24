@@ -30,4 +30,5 @@ export default __t.row({
   resultSummary: __t.option(__t.string()).name("result_summary"),
   goalId: __t.string().name("goal_id"),
   costUsd: __t.f64().name("cost_usd"),
+  triedBy: __t.string().name("tried_by"),
 });

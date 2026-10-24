@@ -52,9 +52,9 @@ const B = await session('bob');
 const C = await session('manager'); // never registers: uses manager tools only
 
 const tools = (await A.client.listTools()).tools.map(t => t.name).sort();
-const all16 = ['assign_task', 'claim_task', 'complete_task', 'create_job', 'get_capacity', 'get_context', 'get_goals', 'get_job_results',
-  'get_status', 'lock_files', 'mark_goal', 'register_worker', 'release_files', 'report_capacity', 'report_progress', 'set_context'];
-check('tools: all 16 tools from contract/tools.json are listed', tools.join() === all16.join(), tools);
+const all = ['assign_task', 'claim_task', 'complete_task', 'create_job', 'get_capacity', 'get_context', 'get_goals', 'get_job_results',
+  'get_status', 'give_back_task', 'lock_files', 'mark_goal', 'register_worker', 'release_files', 'report_capacity', 'report_progress', 'set_context'];
+check('tools: all 17 tools from contract/tools.json are listed', tools.join() === all.join(), tools);
 
 const noReg = await C.call('claim_task');
 check('claim_task: error before register_worker', noReg.isError && /register_worker/.test(noReg.text), noReg.text);
@@ -195,6 +195,18 @@ const t2now = st.data.tasks.find((t: { id: string }) => t.id === 't2');
 check('crash: Dan\'s task is open again and e.txt is free',
   t5.status === 'open' && !st.data.locks.some((l: { path: string }) => l.path === 'e.txt'), t5);
 check('crash: Alice (alive) keeps her task', t2now.status === 'claimed' && t2now.assignee === 'w-alice', t2now);
+
+// ---- giving a task back ----
+const gb = await A.call('give_back_task', { task_id: 't2', reason: 'the spec is unclear' });
+await sleep(300);
+st = await A.call('get_status');
+const t2back = st.data.tasks.find((t: { id: string }) => t.id === 't2');
+check('give_back_task: the task is open again with its locks freed', gb.data?.ok === true && t2back.status === 'open' && t2back.assignee === null &&
+  !st.data.locks.some((l: { task_id: string }) => l.task_id === 't2'), [gb.text, t2back]);
+const next = await A.call('claim_task');
+check('give_back_task: the worker that gave it back gets something else', next.data?.task?.id !== 't2', next.text);
+const notMine = await B.call('give_back_task', { task_id: 't2', reason: 'x' });
+check('give_back_task: only for a task you have', notMine.isError, notMine.text);
 
 for (const s of [A, B, C]) await s.client.close();
 seed.disconnect();

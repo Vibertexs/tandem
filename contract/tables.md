@@ -33,6 +33,8 @@ Every table has `session_id` (string). Judge mode uses one session per judge. Li
 | result | JSON or null | map tasks: see result-format.json |
 | result_summary | string or null | |
 | goal_id | string | the goal it was planned for ('' if none); set by the brain while that goal is `planning` |
+| cost_usd | number | what its Claude runs cost, as reported by `claude -p` |
+| tried_by | string | comma-separated workers that gave it back (`give_back_task`); they are not given it again. After two, `status` is `failed` and `result_summary` holds the reason |
 
 ## locks
 | Column | Type |

@@ -13,6 +13,7 @@ export type Task = {
   id: string; jobId: string | null; kind: string; title: string; description: string; files: string[];
   difficulty: string; model: string; effort: string; status: string; assignee: string | null;
   branch: string | null; dependsOn: string[]; result: string | null; resultSummary: string | null; goalId: string; costUsd: number;
+  triedBy: string[]; // workers that gave it back
 };
 export type Lock = { path: string; taskId: string; workerId: string; createdAt: Date };
 export type Ev = { id: number; time: Date; workerId: string | null; type: string; message: string };
@@ -41,6 +42,7 @@ export function readSnapshot(conn: DbConnection): Snapshot {
       files: [...r.files], difficulty: r.difficulty, model: r.model, effort: r.effort, status: r.status,
       assignee: r.assignee ?? null, branch: r.branch ?? null, dependsOn: [...r.dependsOn],
       result: r.result ?? null, resultSummary: r.resultSummary ?? null, goalId: r.goalId, costUsd: r.costUsd,
+      triedBy: r.triedBy.split(',').filter(Boolean),
     })),
     locks: mine(conn.db.locks.iter()).map(r => ({
       path: r.path, taskId: r.taskId, workerId: r.workerId, createdAt: date(r.createdAt),
@@ -138,6 +140,7 @@ export function makeApi(conn: DbConnection) {
       }),
     setNote: (key: string, value: string) => conn.reducers.setContext({ sessionId, key, value }),
     clearBoard: () => conn.reducers.clearBoard({ sessionId }),
+    retryTask: (taskId: string) => conn.reducers.retryTask({ sessionId, taskId }),
   };
 }
 export type Api = ReturnType<typeof makeApi>;

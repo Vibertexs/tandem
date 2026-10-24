@@ -70,6 +70,8 @@ pre { margin: 6px 0 2px; padding: 10px 12px; background: var(--bg); border: 1px 
 .chip.goal-planning { background: var(--accent-soft); color: var(--accent-strong); border-color: transparent; }
 .chip.goal-planned { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .chip.sev-high { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+.chip.fail-chip, .stage-chip.is-failed { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+.card.task.is-failed { border-color: var(--danger); border-left: 3px solid var(--danger); }
 .chip.sev-medium { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
 .avatar { display: inline-grid; place-items: center; border-radius: 50%; font-weight: 600; flex: none; }
@@ -129,6 +131,7 @@ textarea { resize: vertical; }
 /* ---- board ---- */
 .next { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-color: var(--accent-strong); background: var(--accent-soft); }
 .next.subtle { border-color: var(--line); background: var(--card); }
+.next.alert { border-color: var(--danger); background: var(--danger-soft); }
 .next > div:not(.row-actions) { flex: 1; min-width: 220px; }
 .next-icon { font-size: 1.4rem; }
 .prompt { display: flex; flex-direction: column; gap: 8px; }

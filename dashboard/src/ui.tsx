@@ -60,9 +60,15 @@ export function Bar({ label, value }: { label: string; value: number | null }) {
 }
 
 // A task is always in exactly one of four stages, shown left to right on the board.
+// A failed task stays in To do, marked, until someone tries it again.
 export type Stage = 'waiting' | 'todo' | 'doing' | 'done';
 export const stageOf = (t: Task): Stage =>
-  t.status === 'blocked' ? 'waiting' : t.status === 'open' ? 'todo' : t.status === 'claimed' ? 'doing' : 'done';
+  t.status === 'blocked' ? 'waiting' : t.status === 'open' || t.status === 'failed' ? 'todo' : t.status === 'claimed' ? 'doing' : 'done';
+const nameOf = (id: string, snap: Snapshot) => snap.workers.find(w => w.id === id)?.name ?? id;
+// The reason the last worker gave when handing it back, from the activity log.
+export const giveBackReason = (t: Task, events: Ev[]) =>
+  t.resultSummary && t.status === 'failed' ? t.resultSummary
+    : events.find(e => e.type === 'task_failed' && e.message.includes(` gave back ${t.title}: `))?.message.split(` gave back ${t.title}: `)[1] ?? null;
 export const STAGES: { key: Stage; title: string; hint: string }[] = [
   { key: 'waiting', title: 'Waiting', hint: 'Needs other tasks to finish first' },
   { key: 'todo', title: 'To do', hint: 'Ready for the next free worker' },
@@ -89,6 +95,13 @@ export function why(task: Task, snap: Snapshot): string {
     : task.difficulty === 'hard' ? 'a hard problem' : 'normal feature work';
   const model = task.model ? `${task.model} model` : 'the model picked by difficulty';
   if (task.status === 'done') return `Finished${who ? ` by ${who.name}` : ''}. It was ${kind}.`;
+  if (task.status === 'failed') {
+    return `${task.triedBy.map(id => nameOf(id, snap)).join(' and ')} could not finish it: ${task.resultSummary ?? 'no reason given'}. Check the task, then press Try again.`;
+  }
+  if (task.status === 'open' && task.triedBy.length > 0) {
+    const reason = giveBackReason(task, snap.events);
+    return `${task.triedBy.map(id => nameOf(id, snap)).join(' and ')} gave it back${reason ? ` (${reason})` : ''}. It waits for a different worker.`;
+  }
   if (task.status === 'claimed' && who) {
     const left = who.usage5h === null ? 'quota unknown' : `${Math.round(100 - who.usage5h)}% quota left`;
     return `${who.name} has it (${left}). It is ${kind}, run with ${model}.`;

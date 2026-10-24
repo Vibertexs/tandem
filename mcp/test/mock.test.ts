@@ -20,7 +20,7 @@ const call = async (tool: string, args: Record<string, unknown> = {}) => {
   return { isError: r.isError === true, text, data: r.isError ? null : JSON.parse(text) };
 };
 
-check('mock: 16 tools listed', (await client.listTools()).tools.length === 16);
+check('mock: 17 tools listed', (await client.listTools()).tools.length === 17);
 
 const reg = await call('register_worker', { name: 'Tester', plan: 'pro' });
 check('mock: register_worker', reg.data?.worker_id === 'w-tester', reg.text);
@@ -35,6 +35,8 @@ const lk = await call('lock_files', { task_id: 't-login-1', paths: ['docs/api.md
 check('mock: lock_files', lk.data?.ok === true, lk.text);
 check('mock: report_progress', (await call('report_progress', { task_id: 't-login-1', message: 'x' })).data?.ok === true);
 check('mock: release_files', (await call('release_files', { task_id: 't-login-1' })).data?.ok === true);
+check('mock: give_back_task, then claim it again', (await call('give_back_task', { task_id: 't-login-1', reason: 'x' })).data?.ok === true &&
+  (await call('claim_task')).data?.task?.id === 't-login-1');
 await call('complete_task', { task_id: 't-login-1', branch: 'b', summary: 's' });
 let st = await call('get_status');
 check('mock: completing t-login-1 unblocks t-login-2 and t-login-3',

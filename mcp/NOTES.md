@@ -1,7 +1,7 @@
 # mcp notes
 
 ## Contract issues found (contract/ not changed)
-1. No tool fails or requeues a task, but the launcher requeues on rate limits and "Make Sam hit a limit" needs it. Workaround in the brain: `report_capacity` with usage 100 caps the worker and puts their running task back in the queue. A launcher that fails a run still has no tool to say so. Suggest `fail_task(task_id, reason, requeue?)`.
+1. **No tool failed a task. Done:** `give_back_task(task_id, reason)` (17 tools). The task goes back to open for a different worker; after two workers gave it back it is `failed` and waits for an operator's "Try again" (`retry_task` reducer, page only). Rate limits still use `report_capacity` with usage 100, which caps the worker and requeues its task.
 2. Tools have no worker or session argument. This server keeps the worker id from `register_worker` (or env `TANDEM_WORKER_ID`) and the session from env `TANDEM_SESSION`.
 3. `register_worker`, `assign_task`, `create_job` "return" ids, but reducers return nothing. The id is made here (`w-<name>`, `t-xxxxxx`, `job-xxxxxx`) and passed in.
 4. `scenarios.md` says "Blocked" for a task waiting on a lock, but `tables.md` uses `blocked` for waiting on `depends_on`. In the brain, a task waiting on a lock simply stays `open`.
@@ -24,4 +24,4 @@ The server sends a heartbeat every 30s (`HEARTBEAT_MS`) once a worker is registe
 - `src/brain-client.ts` imports `../../brain/bindings`, so `brain/` needs `npm install` too. A shared package would fix this.
 - Default database is `bilal-dev` on `ws://127.0.0.1:3001`.
 - The mock is simpler than the real brain: no sessions, no heartbeats, no capped-worker requeue.
-- No per-worker auth: whoever runs the server picks the worker id.
+- A worker belongs to the identity that registered it, but identities are saved tokens, not accounts.

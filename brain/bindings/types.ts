@@ -106,6 +106,7 @@ export const Tasks = __t.object("Tasks", {
   resultSummary: __t.option(__t.string()),
   goalId: __t.string(),
   costUsd: __t.f64(),
+  triedBy: __t.string(),
 });
 export type Tasks = __Infer<typeof Tasks>;
 

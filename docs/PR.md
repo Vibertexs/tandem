@@ -12,7 +12,7 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
   - Owner and operators with one-click access requests, presence, and start over.
   - Each worker belongs to the identity that registered it.
 - **MCP server** (`mcp/`)
-  - The 16 tools in `contract/tools.json`, plus a mock mode.
+  - The 17 tools in `contract/tools.json`, plus a mock mode.
   - A saved identity per machine, a heartbeat and automatic reconnect.
   - The worker rules skill and the lock-check hook.
 - **Manager** (`manager/`)
