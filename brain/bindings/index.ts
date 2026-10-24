@@ -37,6 +37,8 @@ import {
 import ClaimTaskReducer from "./claim_task_reducer";
 import CompleteTaskReducer from "./complete_task_reducer";
 import CreateTaskReducer from "./create_task_reducer";
+import HeartbeatReducer from "./heartbeat_reducer";
+import ReapStaleReducer from "./reap_stale_reducer";
 import RegisterWorkerReducer from "./register_worker_reducer";
 import ReleaseLocksReducer from "./release_locks_reducer";
 import TakeLocksReducer from "./take_locks_reducer";
@@ -107,6 +109,8 @@ const reducersSchema = __reducers(
   __reducerSchema("claim_task", ClaimTaskReducer),
   __reducerSchema("complete_task", CompleteTaskReducer),
   __reducerSchema("create_task", CreateTaskReducer),
+  __reducerSchema("heartbeat", HeartbeatReducer),
+  __reducerSchema("reap_stale", ReapStaleReducer),
   __reducerSchema("register_worker", RegisterWorkerReducer),
   __reducerSchema("release_locks", ReleaseLocksReducer),
   __reducerSchema("take_locks", TakeLocksReducer),

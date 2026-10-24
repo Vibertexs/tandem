@@ -113,6 +113,30 @@ await clients[1].reducers.releaseLocks({ workerId: ids[1], taskId: 't-lk2' });
 await sleep(300);
 check('release_locks: frees only that task', lockPaths() === 'a.txt', lockPaths());
 
+// 5. A silent worker's locks are freed and its task reopened; live workers are untouched.
+await admin.reducers.createTask(task('t-stale', ['s.txt']));
+await sleep(300);
+await clients[2].reducers.claimTask({ workerId: ids[2] });
+await sleep(300);
+check('stale: setup, w2 holds s.txt', lockPaths() === 'a.txt,s.txt', lockPaths());
+await sleep(2500); // w2 stays silent; w0 and w1 prove they are alive
+await clients[0].reducers.heartbeat({ workerId: ids[0] });
+await clients[1].reducers.heartbeat({ workerId: ids[1] });
+await admin.reducers.reapStale({ ttlSeconds: 2 });
+await sleep(400);
+const tasksNow = () => new Map([...admin.db.tasks.iter()].map(x => [x.id, x]));
+const stale = tasksNow().get('t-stale')!;
+check('stale: silent worker\'s task is open again', stale.status === 'open' && stale.assignee === undefined, `${stale.status}/${stale.assignee}`);
+check('stale: its lock is freed, live worker\'s lock stays', lockPaths() === 'a.txt', lockPaths());
+check('stale: live worker keeps its task', tasksNow().get('t-lk1')!.status === 'claimed' && tasksNow().get('t-lk1')!.assignee === ids[0]);
+check('stale: silent worker is idle', [...admin.db.workers.iter()].find(w => w.id === ids[2])!.status === 'idle');
+check('stale: event logged', [...admin.db.events.iter()].some(e => e.message.includes('went silent')));
+const late = await clients[2].reducers.completeTask({ workerId: ids[2], taskId: 't-stale', branch: 'b', summary: 's', result: undefined }).then(() => false, () => true);
+check('stale: the silent worker cannot complete the reopened task', late);
+await clients[3].reducers.claimTask({ workerId: ids[3] });
+await sleep(400);
+check('stale: another worker can claim it', tasksNow().get('t-stale')!.assignee === ids[3], tasksNow().get('t-stale')!.assignee);
+
 for (const c of [admin, ...clients]) c.disconnect();
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);
