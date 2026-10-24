@@ -79,7 +79,7 @@ That is the whole setup. There is nothing to install globally and no PATH to edi
   Open     http://localhost:5173/?db=your-project
   Invite   http://100.x.y.z:5173/?db=your-project
 ```
-**3. On the board, click Control this team** (it also approves the manager). Then describe what you want built on the **Board** and send it. The manager splits it into tasks, each task runs as a Claude Code run in its own git branch, and when the goal is done the work is merged on one branch, `tandem/<goal>`, with your tests run on it.
+**3. On the board, describe what you want built.** The page `tandem start` opens already knows you are the host: you control the team and the manager is approved for you, with nothing to click. Send your goal on the **Board**. (`tandem -d` opens the page again any time.) what you want built on the **Board** and send it. The manager splits it into tasks, each task runs as a Claude Code run in its own git branch, and when the goal is done the work is merged on one branch, `tandem/<goal>`, with your tests run on it.
 
 The board's **Get started** page repeats these steps with your real folders already filled in, and ticks each one as it happens.
 
@@ -103,8 +103,8 @@ Keep the quotes around the link. Tandem copies the project from the host (no Git
 
 ### Who controls the team
 - The computer where `tandem start` ran is the **host**.
-- A browser that clicked **Control this team** is a **controller**: it can send goals and approve others. It is not an account and not anyone's Claude login.
-- Anyone else opening the link is **watching**. They click **Request control**, and a controller approves them.
+- Whoever runs `tandem start` is the **controller** automatically, through the page that command opens. It can send goals and approve others. It is a saved browser permission, not an account and not anyone's Claude login.
+- Anyone else opening the invite link is **watching**. They click **Request control**, and a controller approves them.
 
 ### Public wifi: use Tailscale
 Venue wifi often stops devices reaching each other, and anyone on it could reach an open host. [Tailscale](https://tailscale.com/download) makes a private network between your devices:

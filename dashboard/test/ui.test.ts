@@ -62,30 +62,31 @@ try {
   check('start: an invite nobody answers says it cannot reach the team, with Try again', await seen(A, `Can't reach "${DB}"`, 12_000) && await A.getByRole('button', { name: 'Try again' }).isVisible());
   await A.getByRole('button', { name: 'Choose another team' }).click();
   check('start: "Choose another team" goes back to the start', await seen(A, 'Start a team for a project', 4000));
-  await A.goto(`${URL_}/?db=${DB}`);
+  // ---- 2. a teammate opening the invite before the host has taken control only watches ----
+  const V = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await V.goto(`${URL_}/?db=${DB}`);
+  check('viewer: an invite to a team nobody controls yet says it is waiting for the host, with no way to take control',
+    await seen(V, 'Waiting for the host to take control', 8000) && await V.getByRole('button', { name: 'Request control' }).count() === 0 && await V.getByRole('button', { name: 'Control this team' }).count() === 0);
+  await V.context().close();
 
-  // ---- 2. first visitor becomes the controller ----
-  check('control: a team with no controller explains the browser permission and offers control or watch', await seen(A, `Control “${DB}”?`) && await A.getByRole('button', { name: 'Watch only' }).isVisible() && await seen(A, 'does not start the project server', 1000));
+  // ---- 3. the page `tandem start` opens (host=1) takes control by itself ----
+  await A.goto(`${URL_}/?db=${DB}&host=1`);
+  check('control: no claim-or-watch question; the host page takes control by itself and the prompt is on', await until(() => prompt(A).isEnabled()) && await A.getByText('Watch only').count() === 0);
   await shot(A, '02-owner');
-  await A.getByRole('button', { name: 'Control this team' }).click();
-  check('control: then the board opens, with the prompt on', await until(() => prompt(A).isEnabled()));
   check('control: the sidebar has Get started, Board, Team, Shared memory, Activity, Settings (goals live on the Board)',
     (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Get started|Board|Team|Shared memory|Activity|Settings');
   check('control: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
   check('control: it shows one next step: the manager is not connected yet', await seen(A, 'The manager is not connected yet', 3000));
   check('control: the sidebar says this browser controls the team', await seen(A, 'You control this team', 2000));
 
-  // ---- 3. the manager requests control, and the controller approves with one click ----
+  // ---- 4. the manager requests control, and the host page approves it by itself ----
   const manager = await new Promise<DbConnection>((res, rej) => {
     DbConnection.builder().withUri('ws://127.0.0.1:3001').withDatabaseName(DB)
       .onConnect(c => { c.subscriptionBuilder().onApplied(() => res(c)).subscribe([tables.goals]); }).onConnectError((_c, e) => rej(e)).build();
   });
   await manager.reducers.requestOperator({ name: 'Manager Claude' });
-  check('approve: the board shows "Manager Claude wants to control" with Approve', await seen(A, 'Manager Claude wants to control this team.', 5000));
-  check('approve: Settings shows a badge for the request', await A.locator('.nav a', { hasText: 'Settings' }).locator('.badge-count').innerText().then(t => t === '1'));
+  check('approve: the host page approves the manager without a click, and the next step is "No workers are online"', await seen(A, 'No workers are online.', 8000) && await A.getByRole('button', { name: 'Approve' }).count() === 0);
   await shot(A, '03-approve-manager');
-  await A.getByRole('button', { name: 'Approve' }).click();
-  check('approve: after approving, the next step is "No workers are online"', await seen(A, 'No workers are online.', 5000));
 
   // ---- 4. send a goal ----
   check('goal: a new controller gets example goals; clicking one fills the prompt', await A.locator('.chip.example').count() === 3 &&

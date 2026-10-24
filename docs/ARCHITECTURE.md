@@ -62,7 +62,7 @@ It gets Tandem once, copies the project from the project host into Tandem's priv
 
 ## Who may do what
 - **Worker actions** (claim, lock, complete, heartbeat, report, cost): only by the identity that registered that worker (or an operator). Anyone may register a new worker; a name in use can only be taken over after its owner has been quiet for 2 minutes.
-- **Manager actions** (goals, tasks and jobs, shared memory, clearing the board, approvals): only an **operator** may do them in the team's `live` session. The first visitor chooses **Control this team**; another browser uses **Request control**, and a current controller approves it. This is a saved browser identity, not a Tandem account or a Claude login.
+- **Manager actions** (goals, tasks and jobs, shared memory, clearing the board, approvals): only an **operator** may do them in the team's `live` session. The page `tandem start` opens (`host=1`, never in the invite link) takes control by itself when the team has no controller, and approves the manager's request; another browser uses **Request control**, and a current controller approves it. This is a saved browser identity, not a Tandem account or a Claude login.
 
 ## Teams and sessions
 A team is one database on a brain (`-Db`, default `tandem-local`). The page and every Claude use its `live` session. The brain still supports other sessions (the tests use them to stay isolated).

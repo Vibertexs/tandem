@@ -40,7 +40,6 @@ export function App() {
   const now = useNow();
   const { say, el: toast } = useToast();
   const [page, setPage] = useState<PageKey>(pageFromHash());
-  const [justWatch, setJustWatch] = useState(false);
   useEffect(() => {
     const on = () => setPage(pageFromHash());
     window.addEventListener('hashchange', on);
@@ -68,6 +67,24 @@ export function App() {
     }
   }, [snap.goals, say]);
 
+  // Whoever ran `tandem start` controls the team: the page it opens (host=1) takes control by
+  // itself the first time, and approves the manager when it asks. No button, no choice.
+  const claiming = useRef(false);
+  useEffect(() => {
+    if (!config.host || config.mock || !api || !me || status !== 'connected') return;
+    if (snap.operators.length > 0 || claiming.current) return;
+    claiming.current = true;
+    api.claimTeam().then(
+      () => say('You control this team. Describe what you want built.'),
+      e => { claiming.current = false; say('Could not take control: ' + (e as Error).message); },
+    );
+  }, [api, me, status, snap.operators.length, say]);
+  useEffect(() => {
+    if (!config.host || !api || !me || !snap.operators.some(o => o.identity === me)) return;
+    const mgr = snap.requests.find(r => isManager(r.name));
+    if (mgr) void api.approve(mgr.identity).catch(() => {});
+  }, [snap.requests, snap.operators, api, me]);
+
   const open = (t: Team) => {
     rememberTeam(t);
     history.replaceState(null, '', `?db=${encodeURIComponent(t.db)}${/127\.0\.0\.1/.test(t.uri) ? '' : `&uri=${encodeURIComponent(t.uri)}`}`);
@@ -84,34 +101,6 @@ export function App() {
   const isOp = !config.mock && !!me && snap.operators.some(o => o.identity === me);
   const unowned = !config.mock && snap.operators.length === 0;
   const asked = !!me && snap.requests.some(r => r.identity === me);
-
-  if (unowned && !justWatch && !config.present) {
-    // If the manager started by tandem start is already asking, approve it in the same click.
-    const mgr = snap.requests.find(r => isManager(r.name));
-    const claim = async () => {
-      try {
-        await api!.claimTeam();
-        if (mgr) await api!.approve(mgr.identity);
-        say(mgr ? 'This browser controls the team, and the manager is ready. Describe what you want built.' : 'This browser controls the team. Describe what you want built.');
-      } catch (e) { say('Could not do that: ' + (e as Error).message); }
-    };
-    return (
-      <main className="landing">
-        <section className="card choice narrow">
-          <span className="brand-mark" aria-hidden="true" />
-          <h2>Control &ldquo;{team!.db}&rdquo;?</h2>
-          <p className="muted">This gives this browser permission to send goals, approve people and change settings. It does not start the project server, move the project, or control anyone&apos;s Claude login.</p>
-          <p className="small muted">If you started Tandem for this project, choose control. Otherwise, you can watch until a controller grants access.</p>
-          {mgr && <p className="small">✓ The manager on this team is running and will be approved too.</p>}
-          <div className="row-actions">
-            <button type="button" className="btn primary" disabled={!api} onClick={() => void claim()}>Control this team</button>
-            <button type="button" className="btn" onClick={() => setJustWatch(true)}>Watch only</button>
-          </div>
-        </section>
-        {toast}
-      </main>
-    );
-  }
 
   const workersOnline = snap.workers.filter(w => online(w, now)).length;
   const badge: Partial<Record<PageKey, number>> = { settings: isOp ? snap.requests.length : 0 };
@@ -151,7 +140,7 @@ export function App() {
           <h1>{config.present ? `${team?.db ?? 'Tandem'}` : title}</h1>
           <span className="spacer" />
           {!config.mock && !config.present && team && <Invite team={team} snap={snap} say={say} />}
-          {!config.mock && !isOp && !config.present && status === 'connected' && (
+          {!config.mock && !isOp && !unowned && !config.present && status === 'connected' && (
             asked
               ? <span className="chip goal-new">⏳ Waiting for a controller to approve you</span>
               : <AskToManage onAsk={name => api!.askToManage(name).then(() => say('Control request sent. A controller sees it on the Board.'), e => say('Could not ask: ' + (e as Error).message))} />
@@ -159,6 +148,7 @@ export function App() {
         </header>
         {config.mock && <div className="banner">Sample data, not connected to a team. <a href="?">Host or join a team</a></div>}
         {status === 'connecting' && api && <div className="banner">Connection lost. Reconnecting…</div>}
+        {unowned && !config.host && !config.present && <div className="banner">Waiting for the host to take control. This board shows what happens once they do.</div>}
         <main>
           {page === 'board' && <BoardPage {...common} isOp={isOp} present={config.present} go={go} />}
           {page === 'setup' && <SetupPage snap={snap} team={team ?? { uri: '', db: 'sample' }} now={now} say={say} go={go} isOp={isOp} />}

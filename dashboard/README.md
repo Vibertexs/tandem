@@ -6,7 +6,7 @@ The web page for Tandem. Vite, React, TypeScript. It reads the brain live throug
 1. **Not connected:** the start screen explains **Start a team for a project** (run `tandem start` in the Git project) or **Open a teammate's team** (paste the invite link). The browser is a dashboard; it does not host or copy the project.
    - A wrong address shows "Can't reach" with Try again.
    - A team running an older version shows "needs an update" with the command to run.
-2. **A team with no controller:** **Control this team** (or Watch only). Controller access is a saved browser permission to send goals and approve people; it is not a Tandem account or Claude login.
+2. **A team with no controller:** The page `tandem start` opens takes control by itself; anyone else only watches until a controller approves them. Controller access is a saved browser permission to send goals and approve people; it is not a Tandem account or Claude login.
 3. **The app.** A sidebar with six pages, and **Invite** at the top right of every page (a link to watch plus a whole clone-and-join block for a teammate's workers):
    - **Board:**
      - One next step at a time: approve the manager, start workers, and so on.

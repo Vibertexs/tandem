@@ -46,7 +46,7 @@ export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: s
               <CodeLine code="tandem start" say={say} />
               <span className="small muted">It starts the project host, manager, workers and this page. The page opens automatically.</span>
             </li>
-            <li>On the page, choose <strong>Control this team</strong>. That lets this browser send goals and approve other controllers.</li>
+            <li>On that page you control the team automatically. Describe what you want built.</li>
           </ol>
           <details className="start-help">
             <summary className="small">If <code className="mono">tandem</code> is not recognised</summary>
