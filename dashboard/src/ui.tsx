@@ -125,29 +125,29 @@ export function why(task: Task, snap: Snapshot): string {
 // Our own repo, where a teammate gets the tandem command.
 export const TANDEM_REPO = 'https://github.com/Vibertexs/tandem';
 
-// What a teammate copies to add their computer's workers. It needs nothing installed globally:
-// the command is run from the project's clone, beside the Tandem folder.
-export function JoinSteps({ link, repoUrl, say }: { link: string; repoUrl: string; say: (m: string) => void }) {
-  if (!repoUrl) {
+// What a teammate copies to add their computer's workers: get Tandem once, then one command.
+// The command copies the project from the host by itself, so there is no project to clone and
+// nothing to install globally. `gitUrl` is set once the host serves the project (tandem start).
+export function JoinSteps({ link, gitUrl, say }: { link: string; gitUrl: string; say: (m: string) => void }) {
+  if (!gitUrl) {
     return (
       <div className="join-steps">
-        <p className="small warn">Their work reaches yours through GitHub, and this project has no GitHub remote yet. Put the project on GitHub first (Setup, step 4), restart Tandem, and the commands for them appear here.</p>
+        <p className="small warn">This computer is not sharing the project yet, so others can watch but not add workers. In the project's folder, restart Tandem so it can:</p>
+        <CodeLine code={'tandem stop\ntandem start'} say={say} />
       </div>
     );
   }
-  const folder = repoUrl.replace(/\/+$/, '').split(/[/:]/).pop()?.replace(/\.git$/, '') || 'project';
   return (
     <div className="join-steps">
-      <p className="small muted">1. Get Tandem and the project, side by side (once). Needs Node.js 22.18 or newer (<code className="mono">node --version</code>) and Git:</p>
-      <CodeLine code={`git clone ${TANDEM_REPO}\ngit clone ${repoUrl}`} say={say} />
-      <p className="small muted">2. In the project's folder, run:</p>
-      <CodeLine code={`cd ${folder}\n..\\tandem\\tandem.cmd join "${link}"`} say={say} />
-      <p className="small muted">On Mac or Linux: <code className="mono">{`../tandem/tandem join "${link}"`}</code></p>
+      <p className="small muted">1. Get Tandem (once). It needs Node.js 22.18 or newer (<code className="mono">node --version</code>), Git, and Claude Code signed in:</p>
+      <CodeLine code={`git clone ${TANDEM_REPO}`} say={say} />
+      <p className="small muted">2. In the new <code className="mono">tandem</code> folder, run this. It copies the project from the host and starts their Claude workers:</p>
+      <CodeLine code={`.\\tandem.cmd join "${link}"`} say={say} />
+      <p className="small muted">On Mac or Linux: <code className="mono">{`./tandem join "${link}"`}</code></p>
       <p className="small muted">Their Claude Code runs under their own login and quota.</p>
     </div>
   );
 }
-
 export const copy = (text: string, say: (m: string) => void, what = 'Copied') => {
   void navigator.clipboard?.writeText(text).then(() => say(`${what}.`), () => say('Could not copy. Select the text instead.'));
 };

@@ -198,7 +198,7 @@ function Invite({ team, snap, say }: { team: Team; snap: Snapshot; say: (m: stri
           <p className="small"><strong>Send this link.</strong> <span className="muted">In a browser it shows this board.</span></p>
           <CodeLine code={share.page} say={say} />
           <p className="small muted">To add their computer's workers:</p>
-          <JoinSteps link={share.page} repoUrl={snap.context.repo_url ?? ''} say={say} />
+          <JoinSteps link={share.page} gitUrl={snap.context.git_url ?? ''} say={say} />
         </div>
       )}
     </div>

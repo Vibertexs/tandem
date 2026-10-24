@@ -28,6 +28,7 @@ const { values: opt } = parseArgs({
     poll: { type: 'string', default: '3' },
     push: { type: 'boolean', default: false },
     notify: { type: 'string', default: process.env.TANDEM_WEBHOOK },
+    'git-url': { type: 'string' }, // where teammates' computers clone the project from (tandem start serves it)
     review: { type: 'boolean', default: false },
   },
 });
@@ -59,6 +60,7 @@ if (!brain.isOperator()) {
   let url = '';
   try { url = execFileSync('git', ['-C', REPO, 'remote', 'get-url', 'origin'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch { /* no origin */ }
   await brain.setContext('repo_url', url).catch(() => {});
+  await brain.setContext('git_url', opt['git-url'] ?? '').catch(() => {});
   // where Tandem and the project are on this computer, so the Setup page can show real commands
   await brain.setContext('tandem_dir', resolve(here, '..')).catch(() => {});
   await brain.setContext('project_dir', REPO).catch(() => {});

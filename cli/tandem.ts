@@ -15,6 +15,7 @@ import { hostname, networkInterfaces } from 'node:os';
 import { basename, delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { freePort, gitUrl } from './gitshare.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STATE = process.env.TANDEM_STATE ?? join(ROOT, '.tandem'); // (tests use their own)
@@ -44,7 +45,7 @@ const HELP = `tandem: your team's Claude Codes, working as one.
 
   tandem join <address>     In your clone of the team's repo: add this computer's workers.
                             <address> is the invite the host's page shows, like http://192.168.1.20:5173/?db=shop
-    --simulate, --workers N, --accounts as above
+    --simulate, --workers N, --accounts as above; --repo <path> uses your own clone
 
   tandem account add <label> [--agent codex]   A login for workers (opens that CLI to sign in).
   tandem account list | remove <label>          Each account gets its own login folder in the
@@ -358,10 +359,22 @@ async function start(argv: string[]) {
   const shared = !!ip && await reachable(ip, BRAIN_PORT);
   const uri = `ws://127.0.0.1:${BRAIN_PORT}`;
 
+  // The project, served from this computer, so a teammate's computer can clone it and push its
+  // task branches back with no GitHub (cli/gitshare.ts). Only when others can reach this computer.
+  let shareUrl: string | null = null;
+  let sharePort = teams()[team]?.gitPort;
+  if (shared && ip) {
+    if (!(running('git share', team) && sharePort)) sharePort = await freePort(9418, ip);
+    if (!running('git share', team)) background('git share', team, process.execPath, [join(ROOT, 'cli', 'gitserver.ts'), repo, ip, String(sharePort)], ROOT);
+    if (await waitFor(ip, sharePort!, 10)) { shareUrl = gitUrl(ip, sharePort!, repo); done('project', `shared from this computer: no GitHub needed`); }
+    else say(dim(`  ! could not share the project (see ${join(LOGS, `${team}-git-share.err`)}). Teammates can watch but not add workers.`));
+  }
+
   if (!o['no-manager']) {
     if (running('manager', team)) done('manager', 'running');
     else {
       const args = ['--import', tsx('manager'), join(ROOT, 'manager', 'watch.ts'), '--repo', repo, '--model', o['manager-model']!, '--budget', o.budget!];
+      if (shareUrl) args.push('--git-url', shareUrl);
       if (o.push) args.push('--push');
       if (o.review) args.push('--review');
       if (o.notify) args.push('--notify', o.notify);
@@ -379,7 +392,7 @@ async function start(argv: string[]) {
 
   const page = `http://localhost:${PAGE_PORT}/?db=${team}${shared ? `&lan=${ip}` : ''}`;
   const invite = shared ? `http://${ip}:${PAGE_PORT}/?db=${team}` : null;
-  remember(team, { page, repo, invite });
+  remember(team, { page, repo, invite, gitPort: sharePort });
   say();
   say(`  Tandem is running for ${repo}`);
   say();
@@ -414,15 +427,31 @@ function parseAddress(address: string, team?: string): { host: string; team: str
   return fail(`Could not read the address "${address}". Use the invite the host's page shows, like http://192.168.1.20:5173/?db=shop`);
 }
 
-// The repo the team works on, if the host published it (manager with --push). Read-only SQL over HTTP.
-async function teamRepo(host: string, team: string): Promise<string> {
+// One value the host published about the team (git_url, repo_url, ...). Read-only SQL over HTTP.
+async function teamContext(host: string, team: string, key: string): Promise<string> {
   try {
     const r = await fetch(`http://${host}:${BRAIN_PORT}/v1/database/${team}/sql`, {
-      method: 'POST', body: "SELECT value FROM context WHERE session_id = 'live' AND key = 'repo_url'", signal: AbortSignal.timeout(3000),
+      method: 'POST', body: `SELECT value FROM context WHERE session_id = 'live' AND key = '${key}'`, signal: AbortSignal.timeout(3000),
     });
     const rows = (await r.json() as { rows: unknown[][] }[])[0]?.rows ?? [];
     return String(rows[0]?.[0] ?? '').replace(/^"|"$/g, '');
   } catch { return ''; }
+}
+
+// This computer's copy of the host's project: cloned once from the host (no GitHub), then brought
+// up to date each time. Lives inside the Tandem folder's .tandem, so nothing else is touched.
+function workClone(url: string, team: string): string {
+  const dir = join(STATE, 'work', team);
+  if (!existsSync(join(dir, '.git'))) {
+    mkdirSync(dirname(dir), { recursive: true });
+    const r = git(ROOT, 'clone', '-q', url, dir);
+    if (!r.ok) fail(`Could not get the project from the host (${url}):\n${r.out}\nCheck the host is still running Tandem, and that you can reach it.`);
+  } else {
+    git(dir, 'remote', 'set-url', 'origin', url); // the host's address may have changed
+    git(dir, 'fetch', '-q', 'origin');
+    git(dir, 'merge', '--ff-only', '-q', 'origin/HEAD'); // best effort: stays as it is if it cannot move forward
+  }
+  return dir;
 }
 
 async function joinTeam(argv: string[]) {
@@ -430,6 +459,7 @@ async function joinTeam(argv: string[]) {
     simulate: { type: 'boolean', default: false }, workers: { type: 'string', default: '2' },
     team: { type: 'string' }, model: { type: 'string', default: 'haiku' }, budget: { type: 'string', default: '0.50' },
     'no-browser': { type: 'boolean', default: false }, accounts: { type: 'string' },
+    repo: { type: 'string' }, // use your own clone of the project instead of the one Tandem makes
   } });
   const accts = pickAccounts(o.accounts);
   if (!positionals[0]) fail('Which team? tandem join <invite>, using the link the host\'s page shows (Invite, top right).');
@@ -443,25 +473,22 @@ async function joinTeam(argv: string[]) {
   done('host', 'reachable');
 
   const workers = accts.length || Number(o.workers);
-  let repo = repoAt(process.cwd());
-  const repoUrl = await teamRepo(host, team);
+  let repo: string | null = null;
   if (!o.simulate && workers > 0) {
-    if (repo && resolve(repo) === ROOT) {
-      fail('This is the Tandem folder itself. For real work, run join from the project\'s clone (next to the tandem folder):\n' +
-        `  cd <project folder>\n  ${WIN ? '..\\tandem\\tandem.cmd' : '../tandem/tandem'} join "${positionals[0]}"\n` +
-        'Or add --simulate to try it here with fake workers.');
-    }
-    if (!repo) {
-      fail(repoUrl
-        ? `Run tandem join inside your clone of the team's repo:\n  git clone ${repoUrl}\n  cd ${basename(repoUrl).replace(/\.git$/, '')}\n  tandem join ${positionals[0]}`
-        : 'Run tandem join inside your clone of the team\'s repo (ask the host for it).\nOr add --simulate for workers that fake the coding.');
-    }
-    if (!git(repo!, 'remote', 'get-url', 'origin').ok) fail(`${repo} has no origin remote. The workers push their branches there for the host to merge.`);
     for (const agent of new Set(accts.length ? accts.map(a => a.agent) : ['claude'])) {
-      if (!which(agent)) fail(agent === 'codex' ? 'The Codex CLI (codex) is not installed. See https://github.com/openai/codex' : 'Claude Code (claude) is not installed or not on PATH. Or add --simulate.');
+      if (!which(agent)) fail(agent === 'codex' ? 'The Codex CLI (codex) is not installed. See https://github.com/openai/codex' : 'Claude Code (claude) is not installed or not on PATH.');
     }
-    done('repo', repo!);
-    if (!repoUrl) say(dim('  note: the host\'s repo has no origin remote, so it cannot fetch the branches your workers push. Ask them to add one.'));
+    const from = await teamContext(host, team, 'git_url');
+    if (o.repo) {
+      repo = repoAt(resolve(o.repo)) ?? fail(`${o.repo} is not a git repository.`);
+      if (!git(repo, 'remote', 'get-url', 'origin').ok) fail(`${repo} has no origin remote. The workers push their branches there for the host to merge.`);
+      done('project', repo);
+    } else if (from) {
+      repo = workClone(from, team);
+      done('project', `copied from the host to ${repo}`);
+    } else {
+      fail('The host is not sharing the project yet. On the host, run: tandem stop, then tandem start\n(the host has to be on a network others can reach, not --local).');
+    }
   }
   repo ??= process.cwd();
   installPackages(['brain', 'mcp', 'launcher', 'manager']);
@@ -485,7 +512,7 @@ async function joinTeam(argv: string[]) {
 }
 
 // ---------- the teams this computer started or joined (for status and open) ----------
-type TeamInfo = { page: string; repo: string; invite?: string | null; host?: string };
+type TeamInfo = { page: string; repo: string; invite?: string | null; host?: string; gitPort?: number };
 const TEAMS = join(STATE, 'teams.json');
 function teams(): Record<string, TeamInfo> { try { return JSON.parse(readFileSync(TEAMS, 'utf8')); } catch { return {}; } }
 function remember(team: string, info: TeamInfo) { mkdirSync(STATE, { recursive: true }); writeFileSync(TEAMS, JSON.stringify({ ...teams(), [team]: info }, null, 2)); }

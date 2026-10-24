@@ -21,7 +21,7 @@ export function SetupPage({ snap, team, now, say, go }: { snap: Snapshot; team: 
   const ctx = snap.context;
   const tandemDir = ctx.tandem_dir || '<the Tandem folder>';
   const projectDir = ctx.project_dir || '<your project folder>';
-  const repoUrl = ctx.repo_url ?? '';
+  const gitUrl = ctx.git_url ?? ''; // set once this computer serves the project to teammates
   const share = shareable(team);
   const live = snap.workers.filter(w => online(w, now));
   const real = live.filter(w => w.agent !== 'simulated');
@@ -57,19 +57,7 @@ export function SetupPage({ snap, team, now, say, go }: { snap: Snapshot; team: 
           <p className="small muted">Claude Code has to be signed in on this computer. Check by running <code className="mono">claude</code> in a terminal.</p>
         </Step>
 
-        <Step done={!!repoUrl} title="4. The project is on GitHub (so a teammate's work can reach yours)">
-          {repoUrl
-            ? <p className="small muted">Yes: <code className="mono">{repoUrl}</code></p>
-            : (
-              <>
-                <p className="small muted">Create an empty private repo on github.com (no README), add your teammate under Settings, Collaborators, then:</p>
-                <CodeLine code={`cd ${projectDir}\ngit remote add origin https://github.com/<you>/<repo>.git\ngit push -u origin main`} say={say} />
-                <p className="small muted">Then restart so Tandem notices: <code className="mono">tandem stop</code>, then <code className="mono">tandem start</code>.</p>
-              </>
-            )}
-        </Step>
-
-        <Step done={joined.length > 0} title="5. Invite a teammate">
+        <Step done={joined.length > 0} title="4. Invite a teammate">
           {!share ? (
             <>
               <p className="small warn">Only this computer can join right now.</p>
@@ -82,13 +70,13 @@ export function SetupPage({ snap, team, now, say, go }: { snap: Snapshot; team: 
                 : <p className="small muted">This invite uses your wifi address. It only works if both computers are on the same wifi and the wifi lets devices talk to each other. On public wifi, use Tailscale and run <code className="mono">tandem start</code> again.</p>}
               <p className="small muted">Send them this link. In a browser it shows this board:</p>
               <CodeLine code={share.page} say={say} />
-              <JoinSteps link={share.page} repoUrl={repoUrl} say={say} />
+              <JoinSteps link={share.page} gitUrl={gitUrl} say={say} />
             </>
           )}
           {joined.length > 0 && <p className="small muted">Joined: {joined.map(w => w.name).join(', ')}.</p>}
         </Step>
 
-        <Step done={snap.goals.length > 0} title="6. Send a goal">
+        <Step done={snap.goals.length > 0} title="5. Send a goal">
           <p className="small muted">On the <a href="#/board" onClick={() => go('board')}>Board</a>, click an example or describe what you want built, then Send. The manager plans it, and tasks go to every worker that is online.</p>
         </Step>
       </ol>

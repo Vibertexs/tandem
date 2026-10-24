@@ -25,7 +25,7 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
   const share = shareable(team);
   const uri = share?.uri ?? team.uri;
   // The manager says which repo the team works on (its origin). Real workers elsewhere need a clone.
-  const repoUrl = snap.context.repo_url ?? '';
+  const gitUrl = snap.context.git_url ?? ''; // set once the host serves the project (tandem start)
   const mcp = `claude mcp add tandem -e STDB_URI=${uri} -e STDB_DB=${team.db} -e TANDEM_SESSION=live -- node --import tsx <tandem-folder>/mcp/src/server.ts`;
   const sorted = [...snap.workers].sort((a, b) => Number(online(b, now)) - Number(online(a, now)) || a.name.localeCompare(b.name));
   return (
@@ -56,7 +56,7 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
         {share ? (
           <>
             <p className="muted small">Send them the invite: <a href={share.page}>{share.page}</a>. In a browser it shows this board. To add their computer's workers:</p>
-            <JoinSteps link={share.page} repoUrl={repoUrl} say={say} />
+            <JoinSteps link={share.page} gitUrl={gitUrl} say={say} />
           </>
         ) : (
           <>
