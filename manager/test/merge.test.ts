@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ignoreWorktrees, mergeGoal, mergeNote, pushIfRemote } from '../merge.js';
+import { ignoreWorktrees, mergeGoal, mergeNote, pushIfRemote, startFromBranches } from '../merge.js';
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail: unknown = '') => {
@@ -57,6 +57,16 @@ git('remote', 'add', 'origin', bare);
 check('push: with an origin remote, the goal branch is pushed', pushIfRemote(repo, 'tandem/g1') === 'pushed' &&
   execFileSync('git', ['--git-dir', bare, 'rev-parse', '--verify', '--quiet', 'refs/heads/tandem/g1'], { encoding: 'utf8' }).trim() === git('rev-parse', 'tandem/g1'));
 check('push: a branch that does not exist fails without throwing', pushIfRemote(repo, 'nope/branch') === 'failed');
+
+// a task that depends on task/a and task/b starts with both of their work in its worktree
+{
+  const tree = join(repo, '.worktrees', 'dep');
+  git('worktree', 'add', '-q', '-b', 'task/dep', tree, 'main');
+  const from = startFromBranches(tree, ['task/a', 'task/b', 'task/missing']);
+  check('a dependent task starts from its dependencies\' branches (a missing one is skipped)', from.join() === 'task/a,task/b' &&
+    existsSync(join(tree, 'calc.py')) && existsSync(join(tree, 'test_calc.py')), from);
+  git('worktree', 'remove', '--force', tree);
+}
 
 // your own repo, with no .gitignore for .worktrees: it stays out of `git status`, nothing is committed
 {

@@ -58,6 +58,22 @@ const conflictedFiles = (tree: string) => {
   try { return git(tree, 'diff', '--name-only', '--diff-filter=U').split('\n').map(f => f.trim()).filter(Boolean); } catch { return []; }
 };
 
+// For a task that depends on others: merges their branches into its new worktree, so its Claude
+// sees the code it builds on (fetched from origin if a worker on another computer made it).
+// A branch that cannot be merged is skipped. Returns the branches merged.
+export function startFromBranches(tree: string, branches: string[]): string[] {
+  const merged: string[] = [];
+  for (const b of branches) {
+    try { git(tree, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`); } catch {
+      try { git(tree, 'fetch', '-q', 'origin', `${b}:${b}`); } catch { continue; }
+    }
+    try { git(tree, 'merge', '--no-ff', '--no-edit', '-m', `Start from ${b}`, b); merged.push(b); } catch {
+      try { git(tree, 'merge', '--abort'); } catch { /* nothing to abort */ }
+    }
+  }
+  return merged;
+}
+
 // For a "resolve the conflict" task: starts merging `branch` into the worktree's branch and
 // leaves the conflict markers in place for Claude to edit out. Returns the conflicted files
 // ([] if it merged cleanly, so there is nothing left to do). Committing the worktree afterwards

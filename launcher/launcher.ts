@@ -17,7 +17,7 @@ import { parseArgs } from 'node:util';
 import { BrainClient, type Task } from '../mcp/src/brain-client.js';
 import { loadRouting, route } from './routing.js';
 import { isRateLimit, resetTime } from './limits.js';
-import { filesWithMarkers, ignoreWorktrees, mergeInProgress, pushIfRemote, startConflictMerge } from '../manager/merge.js';
+import { filesWithMarkers, ignoreWorktrees, mergeInProgress, pushIfRemote, startConflictMerge, startFromBranches } from '../manager/merge.js';
 import { conflictBranch } from '../manager/finish.js';
 
 const { values: opt } = parseArgs({
@@ -120,6 +120,7 @@ async function realRun(t: Task) {
   const repo = resolve(opt.repo!);
   const tree = join(repo, '.worktrees', t.id);
   const branch = `task/${t.id}`;
+  let startedFrom: string[] = [];
   if (!existsSync(tree)) {
     ignoreWorktrees(repo);
     mkdirSync(join(repo, '.worktrees'), { recursive: true });
@@ -127,6 +128,10 @@ async function realRun(t: Task) {
     let base = 'HEAD';
     if (t.goal_id) { try { git(repo, 'rev-parse', '--verify', '--quiet', `refs/heads/tandem/${t.goal_id}`); base = `tandem/${t.goal_id}`; } catch { /* no goal branch yet */ } }
     git(repo, 'worktree', 'add', '-q', '-b', branch, tree, base);
+    // A task that waited for others starts with their work in it.
+    const deps = t.depends_on.map(d => brain.getStatus().tasks.find(x => x.id === d)?.branch ?? '').filter(b => b.startsWith('task/'));
+    startedFrom = startFromBranches(tree, deps);
+    if (startedFrom.length) log(`${t.id} starts from ${startedFrom.join(', ')}`);
   }
   // A "resolve the merge conflict" task: start the merge here, so Claude only edits out the markers.
   const resolving = conflictBranch(t.title);
@@ -150,6 +155,7 @@ async function realRun(t: Task) {
     `Do NOT call register_worker, claim_task or complete_task. Do use report_progress and lock_files.\n` +
     `task_id: ${t.id}\ntitle: ${t.title}\ndescription: ${t.description || '(none)'}\nfiles: ${t.files.join(', ')}\n` +
     (resolving ? `The merge of ${resolving} is already in progress in this worktree. Do not run git. Conflict markers are in: ${conflicted.join(', ')}.\n` : '') +
+    (startedFrom.length ? `This worktree already has the work of the tasks this one waited for (${startedFrom.join(', ')}): read their files before you start.\n` : '') +
     `You are in a git worktree of the repo; paths are relative to it. When finished, reply with one line saying what you did.`;
 
   let lastError = '';
