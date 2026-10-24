@@ -55,6 +55,7 @@ let file = '';
 try { file = git('show', 'task/t-hello:hello.py'); } catch { /* missing */ }
 check('the branch has a commit with hello.py', /hello from tandem/.test(file), file);
 check('main is untouched (the work stayed on the task branch)', !git('ls-tree', '--name-only', 'HEAD').split('\n').includes('hello.py'));
+check('the real cost of the run is recorded on the task', (t?.costUsd ?? 0) > 0, t?.costUsd);
 check('progress shows the model it ran with', [...conn.db.events.iter()].some(e => e.sessionId === S && e.type === 'progress' && /haiku/.test(e.message)));
 
 conn.disconnect();

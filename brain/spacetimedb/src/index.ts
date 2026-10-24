@@ -44,6 +44,7 @@ const tasks = table(
     result: t.option(t.string()), // JSON text; see contract/result-format.json
     result_summary: t.option(t.string()),
     goal_id: t.string().default(''), // the goal this task was planned for, '' if none
+    cost_usd: t.f64().default(0), // what its Claude runs cost, as reported by claude -p
   }
 );
 
@@ -95,6 +96,7 @@ const goals = table(
     created_at: t.timestamp(),
     branch: t.string().default(''), // when done: the branch with all of its work merged
     note: t.string().default(''), // when done: how it went ("Tests pass", what could not be merged)
+    cost_usd: t.f64().default(0), // what planning it cost (its tasks' costs are on the tasks)
   }
 );
 
@@ -254,7 +256,7 @@ function insertTask(
   // While the manager is planning exactly one goal, every task it creates belongs to that goal.
   const planning = [...ctx.db.goals.session_id.filter(session)].filter(g => g.status === 'planning');
   const goal_id = planning.length === 1 ? planning[0].id : '';
-  ctx.db.tasks.insert({ goal_id,
+  ctx.db.tasks.insert({ goal_id, cost_usd: 0,
     pk: pk(session, a.id), session_id: session, id: a.id, job_id: jobId, kind, title: a.title,
     description: a.description, files: a.files, difficulty: a.difficulty, model: a.model, effort: a.effort,
     status, assignee, branch: undefined, depends_on: a.depends_on, result: undefined, result_summary: undefined,
@@ -570,7 +572,7 @@ export const postGoal = spacetimedb.reducer(
     const clean = text.trim();
     if (clean.length === 0 || clean.length > 2000) throw new SenderError('a goal is 1 to 2000 characters');
     if (ctx.db.goals.pk.find(pk(session_id, id))) throw new SenderError(`goal ${id} already exists`);
-    ctx.db.goals.insert({ pk: pk(session_id, id), session_id, id, text: clean, status: 'new', created_at: ctx.timestamp, branch: '', note: '' });
+    ctx.db.goals.insert({ pk: pk(session_id, id), session_id, id, text: clean, status: 'new', created_at: ctx.timestamp, branch: '', note: '', cost_usd: 0 });
     addEvent(ctx, session_id, undefined, 'task_created', `Goal sent to the manager: ${clean.slice(0, 80)}`);
   }
 );
@@ -665,5 +667,29 @@ export const ping = spacetimedb.reducer(
     const row = { identity: ctx.sender, session_id, name: cleanName(name), kind: kind.slice(0, 20), last_seen: ctx.timestamp };
     if (ctx.db.presence.identity.find(ctx.sender)) ctx.db.presence.identity.update(row);
     else ctx.db.presence.insert(row);
+  }
+);
+
+const cleanCost = (usd: number) => (Number.isFinite(usd) && usd > 0 ? Math.min(usd, 1000) : 0);
+
+// What a task's Claude run cost. Only the worker that has (or had) the task may add to it.
+export const recordCost = spacetimedb.reducer(
+  { session_id: t.string(), worker_id: t.string(), task_id: t.string(), usd: t.f64() },
+  (ctx, { session_id, worker_id, task_id, usd }) => {
+    const task = ctx.db.tasks.pk.find(pk(session_id, task_id));
+    if (!task) throw new SenderError('unknown task');
+    if (task.assignee !== worker_id) throw new SenderError('task is not assigned to this worker');
+    ctx.db.tasks.pk.update({ ...task, cost_usd: task.cost_usd + cleanCost(usd) });
+  }
+);
+
+// What planning a goal cost (the manager reports it).
+export const addGoalCost = spacetimedb.reducer(
+  { session_id: t.string(), id: t.string(), usd: t.f64() },
+  (ctx, { session_id, id, usd }) => {
+    requireOperator(ctx, session_id);
+    const goal = ctx.db.goals.pk.find(pk(session_id, id));
+    if (!goal) throw new SenderError('unknown goal');
+    ctx.db.goals.pk.update({ ...goal, cost_usd: goal.cost_usd + cleanCost(usd) });
   }
 );

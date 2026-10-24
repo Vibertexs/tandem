@@ -6,6 +6,7 @@
 import { type Infer as __Infer } from "spacetimedb";
 
 // Import all reducer arg schemas
+import AddGoalCostReducer from "../add_goal_cost_reducer";
 import AddOperatorReducer from "../add_operator_reducer";
 import ApproveOperatorReducer from "../approve_operator_reducer";
 import ClaimOperatorReducer from "../claim_operator_reducer";
@@ -20,6 +21,7 @@ import HeartbeatReducer from "../heartbeat_reducer";
 import PingReducer from "../ping_reducer";
 import PostGoalReducer from "../post_goal_reducer";
 import ReapStaleReducer from "../reap_stale_reducer";
+import RecordCostReducer from "../record_cost_reducer";
 import RegisterWorkerReducer from "../register_worker_reducer";
 import ReleaseLocksReducer from "../release_locks_reducer";
 import RemoveOperatorReducer from "../remove_operator_reducer";
@@ -32,6 +34,7 @@ import SetGoalStatusReducer from "../set_goal_status_reducer";
 import TakeLocksReducer from "../take_locks_reducer";
 import UpdateCapacityReducer from "../update_capacity_reducer";
 
+export type AddGoalCostParams = __Infer<typeof AddGoalCostReducer>;
 export type AddOperatorParams = __Infer<typeof AddOperatorReducer>;
 export type ApproveOperatorParams = __Infer<typeof ApproveOperatorReducer>;
 export type ClaimOperatorParams = __Infer<typeof ClaimOperatorReducer>;
@@ -46,6 +49,7 @@ export type HeartbeatParams = __Infer<typeof HeartbeatReducer>;
 export type PingParams = __Infer<typeof PingReducer>;
 export type PostGoalParams = __Infer<typeof PostGoalReducer>;
 export type ReapStaleParams = __Infer<typeof ReapStaleReducer>;
+export type RecordCostParams = __Infer<typeof RecordCostReducer>;
 export type RegisterWorkerParams = __Infer<typeof RegisterWorkerReducer>;
 export type ReleaseLocksParams = __Infer<typeof ReleaseLocksReducer>;
 export type RemoveOperatorParams = __Infer<typeof RemoveOperatorReducer>;

@@ -34,7 +34,7 @@ const tokenFile = opt['token-file'] ?? join(mcp, '.tandem', `manager-token-${opt
 process.env.TANDEM_TOKEN_FILE = tokenFile;
 const brain = await BrainClient.connect(opt.uri!, opt.db!, opt.session!);
 console.log(`Manager identity: ${brain.identity}`);
-brain.disconnect();
+const waiting = brain.getGoals().map(g => g.id); // what this run is about to plan
 
 const work = join(tmpdir(), 'tandem-manager');
 mkdirSync(work, { recursive: true });
@@ -48,12 +48,25 @@ writeFileSync(config, JSON.stringify({ mcpServers: { tandem: {
 const prompt = readFileSync(join(here, 'PROMPT.md'), 'utf8') + '\n\nBegin now: call get_goals.';
 const code = await new Promise<number>(done => {
   const child = spawn('claude', ['-p', '--model', opt.model!, '--mcp-config', config, '--strict-mcp-config',
-    '--allowedTools', 'mcp__tandem', 'Read', 'Glob', 'Grep', '--max-budget-usd', opt.budget!], { cwd: resolve(opt.workdir!) });
-  let out = '';
-  child.stdout.on('data', d => { out += d; process.stdout.write(d); });
-  child.stderr.on('data', d => { out += d; process.stderr.write(d); });
-  child.on('error', e => { out += String(e); done(1); });
-  child.on('close', c => { if (opt.log) writeFileSync(opt.log, out); done(c ?? 1); });
+    '--allowedTools', 'mcp__tandem', 'Read', 'Glob', 'Grep', '--max-budget-usd', opt.budget!, '--output-format', 'json'],
+    { cwd: resolve(opt.workdir!) });
+  let stdout = ''; let stderr = '';
+  child.stdout.on('data', d => { stdout += d; });
+  child.stderr.on('data', d => { stderr += d; process.stderr.write(d); });
+  child.on('error', e => { stderr += String(e); done(1); });
+  child.on('close', async c => {
+    let json: { result?: string; total_cost_usd?: number; is_error?: boolean } = {};
+    try { json = JSON.parse(stdout.trim().split('\n').pop() ?? '{}'); } catch { /* plain text */ }
+    console.log(json.result ?? stdout);
+    if (opt.log) writeFileSync(opt.log, `${json.result ?? stdout}\n${stderr}`);
+    // the planning cost, split over the goals this run planned
+    const usd = json.total_cost_usd ?? 0;
+    if (usd > 0 && waiting.length > 0) {
+      for (const id of waiting) await brain.addGoalCost(id, usd / waiting.length).catch(() => {});
+    }
+    done(c === 0 && !json.is_error ? 0 : (c || 1));
+  });
   child.stdin.end(prompt);
 });
+brain.disconnect();
 setTimeout(() => process.exit(code), 300);

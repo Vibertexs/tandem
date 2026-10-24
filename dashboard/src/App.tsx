@@ -84,14 +84,24 @@ export function App() {
   const asked = !!me && snap.requests.some(r => r.identity === me);
 
   if (unowned && !justWatch && !config.present) {
+    // If the manager started by start.ps1 is already asking, approve it in the same click.
+    const mgr = snap.requests.find(r => isManager(r.name));
+    const claim = async () => {
+      try {
+        await api!.claimTeam();
+        if (mgr) await api!.approve(mgr.identity);
+        say(mgr ? "You're the owner, and the manager is ready. Describe what you want built." : "You're the owner. Describe what you want built.");
+      } catch (e) { say('Could not do that: ' + (e as Error).message); }
+    };
     return (
       <main className="landing">
         <section className="card choice narrow">
           <span className="brand-mark" aria-hidden="true" />
           <h2>"{team!.db}" has no owner yet</h2>
           <p className="muted">The owner sends work to the team and approves who else can. If you started this team, that's you.</p>
+          {mgr && <p className="small">✓ The manager on this team is running and will be approved too.</p>}
           <div className="row-actions">
-            <button type="button" className="btn primary" disabled={!api} onClick={() => api!.claimTeam().then(() => say("You're the owner. Describe what you want built."), e => say('Could not do that: ' + (e as Error).message))}>Make me the owner</button>
+            <button type="button" className="btn primary" disabled={!api} onClick={() => void claim()}>Make me the owner</button>
             <button type="button" className="btn" onClick={() => setJustWatch(true)}>Just watch</button>
           </div>
         </section>

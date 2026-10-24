@@ -12,11 +12,11 @@ export type Worker = {
 export type Task = {
   id: string; jobId: string | null; kind: string; title: string; description: string; files: string[];
   difficulty: string; model: string; effort: string; status: string; assignee: string | null;
-  branch: string | null; dependsOn: string[]; result: string | null; resultSummary: string | null; goalId: string;
+  branch: string | null; dependsOn: string[]; result: string | null; resultSummary: string | null; goalId: string; costUsd: number;
 };
 export type Lock = { path: string; taskId: string; workerId: string; createdAt: Date };
 export type Ev = { id: number; time: Date; workerId: string | null; type: string; message: string };
-export type Goal = { id: string; text: string; status: string; createdAt: Date; branch: string; note: string };
+export type Goal = { id: string; text: string; status: string; createdAt: Date; branch: string; note: string; costUsd: number };
 export type Presence = { name: string; kind: string; lastSeen: Date };
 export type Person = { identity: string; name: string; at: Date }; // operators and access requests
 export type Snapshot = {
@@ -40,7 +40,7 @@ export function readSnapshot(conn: DbConnection): Snapshot {
       id: r.id, jobId: r.jobId ?? null, kind: r.kind, title: r.title, description: r.description,
       files: [...r.files], difficulty: r.difficulty, model: r.model, effort: r.effort, status: r.status,
       assignee: r.assignee ?? null, branch: r.branch ?? null, dependsOn: [...r.dependsOn],
-      result: r.result ?? null, resultSummary: r.resultSummary ?? null, goalId: r.goalId,
+      result: r.result ?? null, resultSummary: r.resultSummary ?? null, goalId: r.goalId, costUsd: r.costUsd,
     })),
     locks: mine(conn.db.locks.iter()).map(r => ({
       path: r.path, taskId: r.taskId, workerId: r.workerId, createdAt: date(r.createdAt),
@@ -49,7 +49,7 @@ export function readSnapshot(conn: DbConnection): Snapshot {
       .map(r => ({ id: Number(r.id), time: date(r.timestamp), workerId: r.workerId ?? null, type: r.type, message: r.message }))
       .sort((a, b) => b.id - a.id),
     goals: mine(conn.db.goals.iter())
-      .map(r => ({ id: r.id, text: r.text, status: r.status, createdAt: date(r.createdAt), branch: r.branch, note: r.note }))
+      .map(r => ({ id: r.id, text: r.text, status: r.status, createdAt: date(r.createdAt), branch: r.branch, note: r.note, costUsd: r.costUsd }))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
     context: Object.fromEntries(mine(conn.db.context.iter()).map(r => [r.key, r.value])),
     operators: [...conn.db.operators.iter()].map(r => ({ identity: r.identity.toHexString(), name: r.name, at: date(r.addedAt) })),

@@ -243,6 +243,23 @@ await admin.reducers.resetSession({ sessionId: G });
 await sleep(400);
 check('goals: reset wipes them', goals().length === 0);
 
+// 12b. Costs: a worker adds what its runs cost to its task; planning cost goes on the goal.
+const K = `ct-${run}`;
+const kv = view(K);
+await admin.reducers.registerWorker({ sessionId: K, id: 'w-x', name: 'X', plan: 'pro' });
+await admin.reducers.postGoal({ sessionId: K, id: 'g', text: 'costly' });
+await admin.reducers.setGoalStatus({ sessionId: K, id: 'g', status: 'planning' });
+await newTask(K, 'paid', ['p.txt']);
+await admin.reducers.claimTask({ sessionId: K, workerId: 'w-x' });
+await admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: 0.03 });
+await admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: 0.02 });
+await admin.reducers.addGoalCost({ sessionId: K, id: 'g', usd: 0.01 });
+await sleep(400);
+check('cost: a task adds up the cost of its runs', Math.abs(kv.tasks().get('paid')!.costUsd - 0.05) < 1e-9, kv.tasks().get('paid')!.costUsd);
+check('cost: only the task\'s worker can add to it', await rejects(admin.reducers.recordCost({ sessionId: K, workerId: 'w-other', taskId: 'paid', usd: 1 })));
+check('cost: nonsense amounts are ignored', !(await rejects(admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: -5 }))) && Math.abs(kv.tasks().get('paid')!.costUsd - 0.05) < 1e-9);
+check('cost: planning cost is kept on the goal', Math.abs([...admin.db.goals.iter()].find(g => g.sessionId === K)!.costUsd - 0.01) < 1e-9);
+
 // 13. Tasks remember their goal; a goal can be finished with its branch; presence.
 const H = `gl-${run}`;
 const hv = view(H);

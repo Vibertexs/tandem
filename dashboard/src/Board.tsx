@@ -1,7 +1,7 @@
 // The main page: tell the team what to build, then watch the tasks move across the board.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Api, Snapshot, Task } from './brain';
-import { Avatar, EV_ICON, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, online, stageOf, took, why, type Stage } from './ui';
+import { Avatar, EV_ICON, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, money, online, stageOf, took, why, type Stage } from './ui';
 
 type Props = { snap: Snapshot; api: Api | null; isOp: boolean; now: number; say: (m: string) => void; present: boolean; go: (page: string) => void };
 
@@ -204,6 +204,7 @@ function Drawer({ t, snap, now, onClose }: { t: Task; snap: Snapshot; now: numbe
         {deps.length > 0 && <><dt>After</dt><dd>{deps.map(d => <div key={d.id}>{d.status === 'done' ? '✓' : '○'} {d.title}</div>)}</dd></>}
         <dt>Model</dt><dd>{t.model || 'by difficulty'} · {t.difficulty}</dd>
         {t.branch && <><dt>Branch</dt><dd className="mono small">{t.branch}</dd></>}
+        {t.costUsd > 0 && <><dt>Cost</dt><dd>{money(t.costUsd)}</dd></>}
       </dl>
       {t.description && <section><h3>What to do</h3><p>{t.description}</p></section>}
       <section><h3>Why it is here</h3><p>{why(t, snap)}</p></section>

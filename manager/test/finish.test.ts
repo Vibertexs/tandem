@@ -21,10 +21,10 @@ function fakeBrain() {
   };
   return { brain, calls };
 }
-const goal: Goal = { id: 'g1', text: 'Build the calculator', status: 'planned', created_at: '', branch: '' };
+const goal: Goal = { id: 'g1', text: 'Build the calculator', status: 'planned', created_at: '', branch: '', cost_usd: 0 };
 const task = (id: string, branch: string, files: string[], title = id): Task => ({
   id, job_id: null, kind: 'normal', title, description: '', files, difficulty: 'easy', model: '', effort: 'default',
-  status: 'done', assignee: 'w-a', branch, depends_on: [], result: null, result_summary: null, goal_id: 'g1',
+  status: 'done', assignee: 'w-a', branch, depends_on: [], result: null, result_summary: null, goal_id: 'g1', cost_usd: 0,
 });
 
 // a repo where task/a adds calc.py and task/b adds a test that passes or fails

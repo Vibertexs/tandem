@@ -127,6 +127,8 @@ export const EV_ICON: Record<string, string> = {
 };
 
 export const isManager = (name: string) => /manager/i.test(name);
+// "$0.04" (or "$0.004" for tiny amounts), what a Claude run cost as reported by claude -p
+export const money = (usd: number) => `$${usd > 0 && usd < 0.01 ? usd.toFixed(3) : usd.toFixed(2)}`;
 // The manager pings every 15 seconds while it runs.
 export const managerOnline = (snap: Snapshot, now: number) =>
   snap.presence.some(p => p.kind === 'manager' && now - p.lastSeen.getTime() < 45_000);

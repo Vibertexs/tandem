@@ -34,6 +34,7 @@ import {
 } from "spacetimedb";
 
 // Import all reducer arg schemas
+import AddGoalCostReducer from "./add_goal_cost_reducer";
 import AddOperatorReducer from "./add_operator_reducer";
 import ApproveOperatorReducer from "./approve_operator_reducer";
 import ClaimOperatorReducer from "./claim_operator_reducer";
@@ -48,6 +49,7 @@ import HeartbeatReducer from "./heartbeat_reducer";
 import PingReducer from "./ping_reducer";
 import PostGoalReducer from "./post_goal_reducer";
 import ReapStaleReducer from "./reap_stale_reducer";
+import RecordCostReducer from "./record_cost_reducer";
 import RegisterWorkerReducer from "./register_worker_reducer";
 import ReleaseLocksReducer from "./release_locks_reducer";
 import RemoveOperatorReducer from "./remove_operator_reducer";
@@ -201,6 +203,7 @@ const tablesSchema = __schema({
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
+  __reducerSchema("add_goal_cost", AddGoalCostReducer),
   __reducerSchema("add_operator", AddOperatorReducer),
   __reducerSchema("approve_operator", ApproveOperatorReducer),
   __reducerSchema("claim_operator", ClaimOperatorReducer),
@@ -215,6 +218,7 @@ const reducersSchema = __reducers(
   __reducerSchema("ping", PingReducer),
   __reducerSchema("post_goal", PostGoalReducer),
   __reducerSchema("reap_stale", ReapStaleReducer),
+  __reducerSchema("record_cost", RecordCostReducer),
   __reducerSchema("register_worker", RegisterWorkerReducer),
   __reducerSchema("release_locks", ReleaseLocksReducer),
   __reducerSchema("remove_operator", RemoveOperatorReducer),

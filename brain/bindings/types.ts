@@ -37,6 +37,7 @@ export const Goals = __t.object("Goals", {
   createdAt: __t.timestamp(),
   branch: __t.string(),
   note: __t.string(),
+  costUsd: __t.f64(),
 });
 export type Goals = __Infer<typeof Goals>;
 
@@ -104,6 +105,7 @@ export const Tasks = __t.object("Tasks", {
   result: __t.option(__t.string()),
   resultSummary: __t.option(__t.string()),
   goalId: __t.string(),
+  costUsd: __t.f64(),
 });
 export type Tasks = __Infer<typeof Tasks>;
 

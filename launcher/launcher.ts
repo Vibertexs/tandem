@@ -79,14 +79,20 @@ function runClaude(cwd: string, prompt: string, model: string, effort: string, e
     hooks: [{ type: 'command', command: `"${process.execPath}" "${join(mcpDir, 'hook', 'check-lock.mjs')}"` }] }] } }));
   const args = ['-p', '--model', model, '--mcp-config', mcpConfig, '--strict-mcp-config', '--settings', settings,
     '--allowedTools', 'mcp__tandem', 'Read', 'Write', 'Edit', 'Glob', 'Grep', '--permission-mode', 'acceptEdits',
-    '--max-budget-usd', BUDGET];
+    '--max-budget-usd', BUDGET, '--output-format', 'json'];
   if (effort && effort !== 'default') args.push('--effort', effort);
-  return new Promise<{ code: number; out: string }>(done => {
+  return new Promise<{ code: number; out: string; result: string; cost: number; isError: boolean }>(done => {
     const child = spawn('claude', args, { cwd, env: { ...process.env, TANDEM_WORKER_ID: workerId, TANDEM_SESSION: SESSION, STDB_URI: URI, STDB_DB: DB, ...extraEnv } });
-    let out = '';
-    child.stdout.on('data', d => { out += d; });
-    child.stderr.on('data', d => { out += d; });
-    child.on('close', code => done({ code: code ?? 1, out }));
+    let stdout = ''; let stderr = '';
+    child.stdout.on('data', d => { stdout += d; });
+    child.stderr.on('data', d => { stderr += d; });
+    child.on('error', e => { stderr += String(e); });
+    child.on('close', code => {
+      // --output-format json: one JSON object with the final text, the cost and whether it failed
+      let json: { result?: string; total_cost_usd?: number; is_error?: boolean } = {};
+      try { json = JSON.parse(stdout.trim().split('\n').pop() ?? '{}'); } catch { /* plain text */ }
+      done({ code: code ?? 1, out: stdout + stderr, result: json.result ?? stdout, cost: json.total_cost_usd ?? 0, isError: json.is_error === true });
+    });
     child.stdin.end(prompt);
   });
 }
@@ -115,14 +121,15 @@ async function realRun(t: Task) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     log(`running ${t.id} with ${model}${effort !== 'default' ? `/${effort}` : ''} (attempt ${attempt})`);
     await brain.reportProgress(workerId, t.id, `started (${model})`);
-    const { code, out } = await runClaude(tree, prompt, model, effort, {});
-    if (/rate.?limit|usage limit|limit reached|try again later/i.test(out) && code !== 0) {
+    const { code, out, result, cost, isError } = await runClaude(tree, prompt, model, effort, {});
+    if (cost > 0) await brain.recordCost(workerId, t.id, cost).catch(() => {});
+    if (/rate.?limit|usage limit|limit reached|try again later/i.test(out) && (code !== 0 || isError)) {
       // cap this worker: the brain puts the task back in the queue for someone with headroom
       log('hit a rate limit; reporting capped');
       await brain.reportCapacity(workerId, 100, null, null);
       return 'capped';
     }
-    if (code === 0) {
+    if (code === 0 && !isError) {
       git(tree, 'add', '-A');
       const dirty = git(tree, 'status', '--porcelain');
       if (dirty) git(tree, '-c', 'user.name=tandem', '-c', 'user.email=tandem@localhost', 'commit', '-q', '-m', `${t.title} (${t.id})`);
@@ -131,7 +138,7 @@ async function realRun(t: Task) {
         const pushed = pushIfRemote(tree, branch);
         if (pushed !== 'pushed') await brain.reportProgress(workerId, t.id, pushed === 'no-remote' ? 'no origin remote: branch not pushed' : 'could not push the branch');
       }
-      const summary = out.trim().split('\n').filter(Boolean).pop()?.slice(0, 200) ?? 'done';
+      const summary = result.trim().split('\n').filter(Boolean).pop()?.slice(0, 200) ?? 'done';
       await brain.completeTask(workerId, t.id, branch, summary, t.kind === 'map' ? { status: 'ok', files_touched: t.files, findings: [], notes: summary } : undefined);
       return 'done';
     }

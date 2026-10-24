@@ -21,7 +21,7 @@ export class MockBrain implements Brain {
     const path = fileURLToPath(new URL('../../contract/seed.json', import.meta.url));
     const seed = JSON.parse(readFileSync(path, 'utf8')) as Seed;
     this.workers = seed.workers.map(w => ({ ...w, last_seen: new Date().toISOString() }));
-    this.tasks = seed.tasks.map(t => ({ ...t, goal_id: '' }));
+    this.tasks = seed.tasks.map(t => ({ ...t, goal_id: '', cost_usd: 0 }));
     this.context = { ...seed.context };
   }
 
@@ -100,7 +100,7 @@ export class MockBrain implements Brain {
       id, job_id: jobId, kind, title: d.title, description: d.description ?? '', files: d.files,
       difficulty: d.difficulty ?? 'normal', model: d.model ?? '', effort: d.effort ?? 'default',
       status: dependsOn.length ? 'blocked' : 'open', assignee, branch: null, depends_on: dependsOn,
-      result: null, result_summary: null, goal_id: '',
+      result: null, result_summary: null, goal_id: '', cost_usd: 0,
     });
     return id;
   }
@@ -122,7 +122,7 @@ export class MockBrain implements Brain {
   getGoals() {
     if (this.goals.length === 0 && !this.seededGoal) {
       this.seededGoal = true;
-      this.goals.push({ id: 'g-demo', text: 'Build a login page with an API', status: 'new', created_at: new Date().toISOString(), branch: '' });
+      this.goals.push({ id: 'g-demo', text: 'Build a login page with an API', status: 'new', created_at: new Date().toISOString(), branch: '', cost_usd: 0 });
     }
     return this.goals.filter(g => g.status === 'new').map(g => ({ ...g }));
   }

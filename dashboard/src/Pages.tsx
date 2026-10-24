@@ -5,7 +5,7 @@ import type { Api, Snapshot } from './brain';
 import type { Team } from './config';
 import { GoalChip } from './Board';
 import { stageOf } from './ui';
-import { Avatar, Bar, CodeLine, EV_ICON, WorkerStatus, ago, copy, isManager, online, took, liveInfo } from './ui';
+import { Avatar, Bar, CodeLine, EV_ICON, WorkerStatus, ago, copy, isManager, money, online, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
 
@@ -34,10 +34,11 @@ export function GoalsPage({ snap, now, say }: Common) {
         {snap.goals.map(g => {
           const mine = snap.tasks.filter(t => t.goalId === g.id);
           const done = mine.filter(t => t.status === 'done').length;
+          const cost = g.costUsd + mine.reduce((sum, t) => sum + t.costUsd, 0);
           return (
             <article key={g.id} className="card goal-card">
               <header><h2 className="grow">{g.text}</h2><GoalChip status={g.status} /></header>
-              <p className="small muted">Sent {ago(g.createdAt, now)}{mine.length ? ` · ${done} of ${mine.length} tasks done` : ''}</p>
+              <p className="small muted">Sent {ago(g.createdAt, now)}{mine.length ? ` · ${done} of ${mine.length} tasks done` : ''}{cost > 0 ? ` · ${money(cost)} of Claude usage` : ''}</p>
               {mine.length > 0 && <div className="bar"><div className="bar-fill job-fill" style={{ width: `${Math.round((100 * done) / mine.length)}%` }} /></div>}
               {mine.length > 0 && (
                 <ul className="plain goal-tasks">
@@ -78,6 +79,8 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
           const current = snap.tasks.find(t => t.status === 'claimed' && t.assignee === w.id);
           const info = current ? liveInfo(current, snap.events) : null;
           const held = snap.locks.filter(l => l.workerId === w.id);
+          const theirs = snap.tasks.filter(t => t.assignee === w.id && t.status === 'done');
+          const spent = snap.tasks.filter(t => t.assignee === w.id).reduce((sum, t) => sum + t.costUsd, 0);
           return (
             <article key={w.id} className={`card worker ${online(w, now) ? '' : 'is-offline'}`} aria-label={w.name}>
               <header><Avatar name={w.name} size={36} /><div><strong>{w.name}</strong><div className="small muted">{w.plan} plan · seen {ago(w.lastSeen, now)}</div></div><WorkerStatus w={w} now={now} /></header>
@@ -85,6 +88,7 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
               <Bar label="5 hours" value={w.usage5h} />
               <Bar label="Week" value={w.usageWeek} />
               {held.length > 0 && <p className="small mono muted">🔒 {held.map(l => l.path).join(', ')}</p>}
+              <p className="small muted">{theirs.length} task{theirs.length === 1 ? '' : 's'} done{spent > 0 ? ` · ${money(spent)} spent` : ''}</p>
             </article>
           );
         })}

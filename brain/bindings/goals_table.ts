@@ -19,4 +19,5 @@ export default __t.row({
   createdAt: __t.timestamp().name("created_at"),
   branch: __t.string(),
   note: __t.string(),
+  costUsd: __t.f64().name("cost_usd"),
 });

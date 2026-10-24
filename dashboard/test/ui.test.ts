@@ -137,7 +137,9 @@ try {
   await A.keyboard.press('Escape');
   check('details: Escape closes it', await until(() => drawer.count().then(n => n === 0), 2000));
   check('board: everything finishes (7 of 7) and the big job reaches 3/3', await seen(A, '7 of 7 tasks done', 90_000) && await seen(A, 'Big job: 3/3 pieces done', 1000));
-  await manager.reducers.finishGoal({ sessionId: 'live', id: goalId, branch: `tandem/${goalId}`, note: '' });
+  // what the runs cost (a real launcher and the manager report this)
+  await manager.reducers.addGoalCost({ sessionId: 'live', id: goalId, usd: 0.01 });
+  await manager.reducers.finishGoal({ sessionId: 'live', id: goalId, branch: `tandem/${goalId}`, note: 'Tests pass (python -m unittest).' });
   check('goal done: the goal row says Done and shows its branch', await until(async () => {
     const row = await A.locator('.goal-row').first().innerText();
     return row.includes('2/2') && row.includes('Done') && row.includes(`tandem/${goalId}`);
@@ -148,8 +150,10 @@ try {
   await nav(A, 'Goals');
   const card = await A.locator('.goal-card').first().innerText();
   check('goals page: the finished goal lists its tasks and where its work is', card.includes('Write calc.py') && card.includes('Test calc.py') && card.includes(`tandem/${goalId}`) && card.includes('2 of 2 tasks done'), card);
+  check('goals page: it shows how it went and what it cost', card.includes('Tests pass') && card.includes('$0.01 of Claude usage'), card);
   await shot(A, '06b-goals');
   await nav(A, 'Team');
+  check('team: each worker card says how many tasks it finished', await until(async () => /\d+ tasks? done/.test(await A.locator('.worker').first().innerText())));
   check('team: both workers are listed as online cards', await until(async () => await A.locator('.worker').count() === 2) && await seen(A, 'Alex', 2000) && await seen(A, 'Sam', 1000));
   const connect = await A.locator('.connect').innerText();
   check('team: "Connect a computer" gives the exact join command for this team', connect.includes(`-Join ws://127.0.0.1:3001 -Db ${DB}`), connect.slice(0, 160));
