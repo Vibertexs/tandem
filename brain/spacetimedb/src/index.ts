@@ -43,6 +43,7 @@ const tasks = table(
     depends_on: t.array(t.string()),
     result: t.option(t.string()), // JSON text; see contract/result-format.json
     result_summary: t.option(t.string()),
+    goal_id: t.string().default(''), // the goal this task was planned for, '' if none
   }
 );
 
@@ -90,8 +91,21 @@ const goals = table(
     session_id: t.string().index('btree'),
     id: t.string(),
     text: t.string(),
-    status: t.string(),
+    status: t.string(), // new | planning | planned | done
     created_at: t.timestamp(),
+    branch: t.string().default(''), // when done: the branch with all of its work merged
+  }
+);
+
+// Who is connected right now (the manager pings it). The page uses it to say "Manager online".
+const presence = table(
+  { name: 'presence', public: true },
+  {
+    identity: t.identity().primaryKey(),
+    session_id: t.string(),
+    name: t.string(),
+    kind: t.string(), // manager
+    last_seen: t.timestamp(),
   }
 );
 
@@ -116,7 +130,7 @@ const operatorRequests = table(
   }
 );
 
-const spacetimedb = schema({ workers, tasks, locks, events, context, goals, operators, operatorRequests });
+const spacetimedb = schema({ workers, tasks, locks, events, context, goals, operators, operatorRequests, presence });
 export default spacetimedb;
 
 type Ctx = ReducerCtx<InferSchema<typeof spacetimedb>>;
@@ -236,7 +250,10 @@ function insertTask(
   kind: string, jobId: string | undefined, assignee: string | undefined, status: string
 ) {
   if (ctx.db.tasks.pk.find(pk(session, a.id))) throw new SenderError(`task ${a.id} already exists`);
-  ctx.db.tasks.insert({
+  // While the manager is planning exactly one goal, every task it creates belongs to that goal.
+  const planning = [...ctx.db.goals.session_id.filter(session)].filter(g => g.status === 'planning');
+  const goal_id = planning.length === 1 ? planning[0].id : '';
+  ctx.db.tasks.insert({ goal_id,
     pk: pk(session, a.id), session_id: session, id: a.id, job_id: jobId, kind, title: a.title,
     description: a.description, files: a.files, difficulty: a.difficulty, model: a.model, effort: a.effort,
     status, assignee, branch: undefined, depends_on: a.depends_on, result: undefined, result_summary: undefined,
@@ -552,7 +569,7 @@ export const postGoal = spacetimedb.reducer(
     const clean = text.trim();
     if (clean.length === 0 || clean.length > 2000) throw new SenderError('a goal is 1 to 2000 characters');
     if (ctx.db.goals.pk.find(pk(session_id, id))) throw new SenderError(`goal ${id} already exists`);
-    ctx.db.goals.insert({ pk: pk(session_id, id), session_id, id, text: clean, status: 'new', created_at: ctx.timestamp });
+    ctx.db.goals.insert({ pk: pk(session_id, id), session_id, id, text: clean, status: 'new', created_at: ctx.timestamp, branch: '' });
     addEvent(ctx, session_id, undefined, 'task_created', `Goal sent to the manager: ${clean.slice(0, 80)}`);
   }
 );
@@ -562,6 +579,12 @@ export const setGoalStatus = spacetimedb.reducer(
   (ctx, { session_id, id, status }) => {
     requireOperator(ctx, session_id);
     if (!['new', 'planning', 'planned'].includes(status)) throw new SenderError('bad status');
+    // One goal is planned at a time, so its tasks can be linked to it without asking the manager.
+    if (status === 'planning') {
+      for (const g of [...ctx.db.goals.session_id.filter(session_id)]) {
+        if (g.status === 'planning' && g.id !== id) ctx.db.goals.pk.update({ ...g, status: 'planned' });
+      }
+    }
     const goal = ctx.db.goals.pk.find(pk(session_id, id));
     if (!goal) throw new SenderError('unknown goal');
     ctx.db.goals.pk.update({ ...goal, status });
@@ -616,5 +639,30 @@ export const clearBoard = spacetimedb.reducer(
       if (w.status === 'busy') ctx.db.workers.pk.update({ ...w, status: 'idle' });
     }
     addEvent(ctx, session_id, undefined, 'task_created', 'The board was cleared. Ready for a new goal.');
+  }
+);
+
+// Every task of a goal is done. `branch` is where the manager merged all of them ('' if nothing
+// to merge, for example simulated workers). `note` explains anything that went wrong.
+export const finishGoal = spacetimedb.reducer(
+  { session_id: t.string(), id: t.string(), branch: t.string(), note: t.string() },
+  (ctx, { session_id, id, branch, note }) => {
+    requireOperator(ctx, session_id);
+    const goal = ctx.db.goals.pk.find(pk(session_id, id));
+    if (!goal) throw new SenderError('unknown goal');
+    ctx.db.goals.pk.update({ ...goal, status: 'done', branch });
+    const short = goal.text.length > 60 ? goal.text.slice(0, 57) + '...' : goal.text;
+    addEvent(ctx, session_id, undefined, 'merge_unblocked',
+      `Goal done: ${short}${branch ? ` Everything is on branch ${branch}.` : ''}${note ? ` ${note}` : ''}`);
+  }
+);
+
+// "I'm still here." Used by the manager so the page can show it as online.
+export const ping = spacetimedb.reducer(
+  { session_id: t.string(), name: t.string(), kind: t.string() },
+  (ctx, { session_id, name, kind }) => {
+    const row = { identity: ctx.sender, session_id, name: cleanName(name), kind: kind.slice(0, 20), last_seen: ctx.timestamp };
+    if (ctx.db.presence.identity.find(ctx.sender)) ctx.db.presence.identity.update(row);
+    else ctx.db.presence.insert(row);
   }
 );

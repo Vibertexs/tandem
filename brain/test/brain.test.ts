@@ -16,7 +16,7 @@ function connect(): Promise<DbConnection> {
       .onConnect(c => {
         c.subscriptionBuilder()
           .onApplied(() => resolve(c))
-          .subscribe([tables.workers, tables.tasks, tables.locks, tables.events, tables.context, tables.goals]);
+          .subscribe([tables.workers, tables.tasks, tables.locks, tables.events, tables.context, tables.goals, tables.presence]);
       })
       .onConnectError((_c, e) => reject(e))
       .build();
@@ -242,6 +242,37 @@ check('goals: a log line tells the team', [...admin.db.events.iter()].some(e => 
 await admin.reducers.resetSession({ sessionId: G });
 await sleep(400);
 check('goals: reset wipes them', goals().length === 0);
+
+// 13. Tasks remember their goal; a goal can be finished with its branch; presence.
+const H = `gl-${run}`;
+const hv = view(H);
+const goalRow = (id: string) => [...admin.db.goals.iter()].find(g => g.sessionId === H && g.id === id)!;
+await admin.reducers.postGoal({ sessionId: H, id: 'g1', text: 'Build the calculator' });
+await admin.reducers.postGoal({ sessionId: H, id: 'g2', text: 'Write the docs' });
+await admin.reducers.setGoalStatus({ sessionId: H, id: 'g1', status: 'planning' });
+await newTask(H, 'c1', ['calc.py']);
+await newTask(H, 'c2', ['test_calc.py'], { dependsOn: ['c1'] });
+await admin.reducers.setGoalStatus({ sessionId: H, id: 'g1', status: 'planned' });
+await newTask(H, 'free', ['notes.md']);
+await sleep(400);
+check('goal link: tasks created while a goal is being planned belong to it', hv.tasks().get('c1')!.goalId === 'g1' && hv.tasks().get('c2')!.goalId === 'g1');
+check('goal link: tasks created at other times belong to no goal', hv.tasks().get('free')!.goalId === '');
+await admin.reducers.setGoalStatus({ sessionId: H, id: 'g1', status: 'planning' });
+await admin.reducers.setGoalStatus({ sessionId: H, id: 'g2', status: 'planning' });
+await sleep(300);
+check('goal link: only one goal is planned at a time (starting g2 finishes planning g1)', goalRow('g1').status === 'planned' && goalRow('g2').status === 'planning');
+await admin.reducers.finishGoal({ sessionId: H, id: 'g1', branch: 'tandem/g1', note: '' });
+await sleep(300);
+check('finish: the goal is done and remembers its branch', goalRow('g1').status === 'done' && goalRow('g1').branch === 'tandem/g1');
+check('finish: the log says where the work is', hv.events().some(e => e.message.includes('Goal done: Build the calculator') && e.message.includes('tandem/g1')));
+await clients[0].reducers.ping({ sessionId: H, name: 'Manager Claude', kind: 'manager' });
+await sleep(200);
+const first = [...admin.db.presence.iter()].filter(p => p.sessionId === H);
+await clients[0].reducers.ping({ sessionId: H, name: 'Manager Claude', kind: 'manager' });
+await sleep(300);
+const again = [...admin.db.presence.iter()].filter(p => p.sessionId === H);
+check('presence: a ping shows who is here, and pinging again updates the same row',
+  first.length === 1 && again.length === 1 && again[0].kind === 'manager' && again[0].lastSeen.microsSinceUnixEpoch > first[0].lastSeen.microsSinceUnixEpoch);
 
 for (const c of [admin, ...clients]) c.disconnect();
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);

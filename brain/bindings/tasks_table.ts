@@ -28,4 +28,5 @@ export default __t.row({
   dependsOn: __t.array(__t.string()).name("depends_on"),
   result: __t.option(__t.string()),
   resultSummary: __t.option(__t.string()).name("result_summary"),
+  goalId: __t.string().name("goal_id"),
 });

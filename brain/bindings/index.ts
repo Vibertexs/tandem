@@ -43,7 +43,9 @@ import CompleteTaskReducer from "./complete_task_reducer";
 import CreateJobReducer from "./create_job_reducer";
 import CreateTaskReducer from "./create_task_reducer";
 import DismissRequestReducer from "./dismiss_request_reducer";
+import FinishGoalReducer from "./finish_goal_reducer";
 import HeartbeatReducer from "./heartbeat_reducer";
+import PingReducer from "./ping_reducer";
 import PostGoalReducer from "./post_goal_reducer";
 import ReapStaleReducer from "./reap_stale_reducer";
 import RegisterWorkerReducer from "./register_worker_reducer";
@@ -67,6 +69,7 @@ import GoalsRow from "./goals_table";
 import LocksRow from "./locks_table";
 import OperatorRequestsRow from "./operator_requests_table";
 import OperatorsRow from "./operators_table";
+import PresenceRow from "./presence_table";
 import TasksRow from "./tasks_table";
 import WorkersRow from "./workers_table";
 
@@ -155,6 +158,17 @@ const tablesSchema = __schema({
       { name: 'operators_identity_key', constraint: 'unique', columns: ['identity'] },
     ],
   }, OperatorsRow),
+  presence: __table({
+    name: 'presence',
+    indexes: [
+      { accessor: 'identity', name: 'presence_identity_idx_btree', algorithm: 'btree', columns: [
+        'identity',
+      ] },
+    ],
+    constraints: [
+      { name: 'presence_identity_key', constraint: 'unique', columns: ['identity'] },
+    ],
+  }, PresenceRow),
   tasks: __table({
     name: 'tasks',
     indexes: [
@@ -196,7 +210,9 @@ const reducersSchema = __reducers(
   __reducerSchema("create_job", CreateJobReducer),
   __reducerSchema("create_task", CreateTaskReducer),
   __reducerSchema("dismiss_request", DismissRequestReducer),
+  __reducerSchema("finish_goal", FinishGoalReducer),
   __reducerSchema("heartbeat", HeartbeatReducer),
+  __reducerSchema("ping", PingReducer),
   __reducerSchema("post_goal", PostGoalReducer),
   __reducerSchema("reap_stale", ReapStaleReducer),
   __reducerSchema("register_worker", RegisterWorkerReducer),

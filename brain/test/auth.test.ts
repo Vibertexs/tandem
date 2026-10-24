@@ -94,6 +94,8 @@ check('request: an operator asking is a no-op', requests().length === 0);
 const owner = [...a.conn.db.operators.iter()].find(o => o.identity.isEqual(a.identity));
 check('claim: the first operator is named Owner', owner?.name === 'Owner', owner?.name);
 
+check('finish_goal: a non-operator cannot finish a goal in live', await rejects(c.conn.reducers.finishGoal({ sessionId: 'live', id: 'g1', branch: '', note: '' })));
+
 // Start over
 await create(a.conn, 'live', 'x9');
 await a.conn.reducers.postGoal({ sessionId: 'live', id: 'g9', text: 'again' });

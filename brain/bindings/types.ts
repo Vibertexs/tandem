@@ -35,6 +35,7 @@ export const Goals = __t.object("Goals", {
   text: __t.string(),
   status: __t.string(),
   createdAt: __t.timestamp(),
+  branch: __t.string(),
 });
 export type Goals = __Infer<typeof Goals>;
 
@@ -61,6 +62,15 @@ export const Operators = __t.object("Operators", {
   name: __t.string(),
 });
 export type Operators = __Infer<typeof Operators>;
+
+export const Presence = __t.object("Presence", {
+  identity: __t.identity(),
+  sessionId: __t.string(),
+  name: __t.string(),
+  kind: __t.string(),
+  lastSeen: __t.timestamp(),
+});
+export type Presence = __Infer<typeof Presence>;
 
 export const TaskInput = __t.object("TaskInput", {
   id: __t.string(),
@@ -92,6 +102,7 @@ export const Tasks = __t.object("Tasks", {
   dependsOn: __t.array(__t.string()),
   result: __t.option(__t.string()),
   resultSummary: __t.option(__t.string()),
+  goalId: __t.string(),
 });
 export type Tasks = __Infer<typeof Tasks>;
 

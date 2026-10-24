@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "watch": "tsx watch.ts"
+    "watch": "tsx watch.ts",
+    "test": "tsx test/merge.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

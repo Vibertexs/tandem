@@ -17,4 +17,5 @@ export default __t.row({
   text: __t.string(),
   status: __t.string(),
   createdAt: __t.timestamp().name("created_at"),
+  branch: __t.string(),
 });

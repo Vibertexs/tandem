@@ -10,9 +10,9 @@ export type Task = {
   id: string; job_id: string | null; kind: string; title: string; description: string;
   files: string[]; difficulty: string; model: string; effort: string; status: string;
   assignee: string | null; branch: string | null; depends_on: string[];
-  result: unknown; result_summary: string | null;
+  result: unknown; result_summary: string | null; goal_id: string;
 };
-export type Goal = { id: string; text: string; status: string; created_at: string };
+export type Goal = { id: string; text: string; status: string; created_at: string; branch: string };
 export type Lock = { path: string; task_id: string; worker_id: string; created_at: string };
 export type Worker = {
   id: string; name: string; plan: string; status: string; usage_5h_pct: number | null;
@@ -64,7 +64,7 @@ const toTask = (r: TaskRow): Task => ({
   id: r.id, job_id: r.jobId ?? null, kind: r.kind, title: r.title, description: r.description,
   files: [...r.files], difficulty: r.difficulty, model: r.model, effort: r.effort, status: r.status,
   assignee: r.assignee ?? null, branch: r.branch ?? null, depends_on: [...r.dependsOn],
-  result: r.result == null ? null : safeParse(r.result), result_summary: r.resultSummary ?? null,
+  result: r.result == null ? null : safeParse(r.result), result_summary: r.resultSummary ?? null, goal_id: r.goalId,
 });
 const toLock = (r: LockRow): Lock => ({ path: r.path, task_id: r.taskId, worker_id: r.workerId, created_at: iso(r.createdAt) });
 const toWorker = (r: WorkerRow): Worker => ({
@@ -217,7 +217,21 @@ export class BrainClient implements Brain {
     return [...this.conn.db.goals.iter()]
       .filter(r => r.sessionId === this.session && r.status === 'new')
       .sort((a, b) => Number(a.createdAt.microsSinceUnixEpoch - b.createdAt.microsSinceUnixEpoch))
-      .map(r => ({ id: r.id, text: r.text, status: r.status, created_at: iso(r.createdAt) }));
+      .map(r => ({ id: r.id, text: r.text, status: r.status, created_at: iso(r.createdAt), branch: r.branch }));
+  }
+
+  // --- not part of the tools: used by the manager watcher ---
+  listGoals(): Goal[] {
+    return [...this.conn.db.goals.iter()].filter(r => r.sessionId === this.session)
+      .map(r => ({ id: r.id, text: r.text, status: r.status, created_at: iso(r.createdAt), branch: r.branch }));
+  }
+
+  async finishGoal(goalId: string, branch: string, note: string) {
+    await this.conn.reducers.finishGoal({ sessionId: this.session, id: goalId, branch, note });
+  }
+
+  async ping(name: string, kind: string) {
+    await this.conn.reducers.ping({ sessionId: this.session, name, kind });
   }
 
   // Not part of the tools: used by the manager watcher to get itself approved.
