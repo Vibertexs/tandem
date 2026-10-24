@@ -29,6 +29,22 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
       </div>
     );
   }
+  const unplanned = snap.goals.find(g => g.status === 'failed');
+  if (unplanned) {
+    return (
+      <div className="next card alert" role="status">
+        <span className="next-icon" aria-hidden="true">⚠</span>
+        <div><strong>The manager could not plan "{unplanned.text.slice(0, 80)}".</strong>
+          <p className="small muted">{unplanned.note}</p></div>
+        <button type="button" className="btn" disabled={busy || !api} onClick={async () => {
+          setBusy(true);
+          try { await api!.retryGoal(unplanned.id); say('Sent to the manager again.'); }
+          catch (e) { say('Could not do that: ' + (e as Error).message); }
+          finally { setBusy(false); }
+        }}>Try again</button>
+      </div>
+    );
+  }
   const failed = snap.tasks.filter(t => t.status === 'failed');
   if (failed.length > 0) {
     return (
@@ -104,7 +120,7 @@ function Prompt({ snap, api, isOp, say }: Props) {
 
 export function GoalChip({ status }: { status: string }) {
   const text = status === 'new' ? '⏳ Waiting for the manager' : status === 'planning' ? '✎ Being planned'
-    : status === 'done' ? '✓ Done' : '▶ Planned';
+    : status === 'done' ? '✓ Done' : status === 'failed' ? '✕ Could not plan' : '▶ Planned';
   return <span className={`chip goal-${status}`}>{text}</span>;
 }
 

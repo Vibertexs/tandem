@@ -46,18 +46,29 @@ writeFileSync(config, JSON.stringify({ mcpServers: { tandem: {
 } } }));
 
 const prompt = readFileSync(join(here, 'PROMPT.md'), 'utf8') + '\n\nBegin now: call get_goals.';
+// TANDEM_CLAUDE: a node script standing in for claude (tests only)
+const [cmd, ...pre] = process.env.TANDEM_CLAUDE ? [process.execPath, process.env.TANDEM_CLAUDE] : ['claude'];
 const code = await new Promise<number>(done => {
-  const child = spawn('claude', ['-p', '--model', opt.model!, '--mcp-config', config, '--strict-mcp-config',
+  const child = spawn(cmd, [...pre, '-p', '--model', opt.model!, '--mcp-config', config, '--strict-mcp-config',
     '--allowedTools', 'mcp__tandem', 'Read', 'Glob', 'Grep', '--max-budget-usd', opt.budget!, '--output-format', 'json'],
     { cwd: resolve(opt.workdir!) });
   let stdout = ''; let stderr = '';
   child.stdout.on('data', d => { stdout += d; });
   child.stderr.on('data', d => { stderr += d; process.stderr.write(d); });
-  child.on('error', e => { stderr += String(e); done(1); });
+  child.on('error', e => {
+    // claude is not installed or not on PATH
+    console.log(`Could not plan: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'claude is not installed or not on PATH' : String(e)}`);
+    done(1);
+  });
   child.on('close', async c => {
     let json: { result?: string; total_cost_usd?: number; is_error?: boolean } = {};
     try { json = JSON.parse(stdout.trim().split('\n').pop() ?? '{}'); } catch { /* plain text */ }
     console.log(json.result ?? stdout);
+    // the last line watch.ts reads to tell the page why
+    if (c !== 0 || json.is_error) {
+      const why = [json.result, stderr, stdout].map(s => (s ?? '').trim().split('\n').filter(Boolean)[0]).find(Boolean);
+      console.log(`Could not plan: ${(why ?? `claude exited with ${c}`).slice(0, 200)}`);
+    }
     if (opt.log) writeFileSync(opt.log, `${json.result ?? stdout}\n${stderr}`);
     // the planning cost, split over the goals this run planned
     const usd = json.total_cost_usd ?? 0;

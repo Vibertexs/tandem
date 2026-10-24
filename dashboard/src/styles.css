@@ -70,7 +70,7 @@ pre { margin: 6px 0 2px; padding: 10px 12px; background: var(--bg); border: 1px 
 .chip.goal-planning { background: var(--accent-soft); color: var(--accent-strong); border-color: transparent; }
 .chip.goal-planned { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .chip.sev-high { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
-.chip.fail-chip, .stage-chip.is-failed { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+.chip.fail-chip, .stage-chip.is-failed, .chip.goal-failed { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
 .card.task.is-failed { border-color: var(--danger); border-left: 3px solid var(--danger); }
 .chip.sev-medium { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }

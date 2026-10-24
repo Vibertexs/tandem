@@ -44,6 +44,7 @@ import CompleteTaskReducer from "./complete_task_reducer";
 import CreateJobReducer from "./create_job_reducer";
 import CreateTaskReducer from "./create_task_reducer";
 import DismissRequestReducer from "./dismiss_request_reducer";
+import FailGoalReducer from "./fail_goal_reducer";
 import FinishGoalReducer from "./finish_goal_reducer";
 import GiveBackTaskReducer from "./give_back_task_reducer";
 import HeartbeatReducer from "./heartbeat_reducer";
@@ -215,6 +216,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_job", CreateJobReducer),
   __reducerSchema("create_task", CreateTaskReducer),
   __reducerSchema("dismiss_request", DismissRequestReducer),
+  __reducerSchema("fail_goal", FailGoalReducer),
   __reducerSchema("finish_goal", FinishGoalReducer),
   __reducerSchema("give_back_task", GiveBackTaskReducer),
   __reducerSchema("heartbeat", HeartbeatReducer),

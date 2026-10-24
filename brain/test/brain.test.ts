@@ -286,6 +286,12 @@ await admin.reducers.finishGoal({ sessionId: H, id: 'g1', branch: 'tandem/g1', n
 await sleep(300);
 check('finish: the goal is done and remembers its branch and how it went', goalRow('g1').status === 'done' && goalRow('g1').branch === 'tandem/g1' && goalRow('g1').note === 'Tests pass (python -m unittest).');
 check('finish: the log says where the work is', hv.events().some(e => e.message.includes('Goal done: Build the calculator') && e.message.includes('tandem/g1')));
+await admin.reducers.failGoal({ sessionId: H, id: 'g2', note: 'Claude is not logged in' });
+await sleep(300);
+check('fail goal: a goal the manager could not plan is failed, with the reason', goalRow('g2').status === 'failed' && goalRow('g2').note === 'Claude is not logged in');
+await admin.reducers.setGoalStatus({ sessionId: H, id: 'g2', status: 'new' });
+await sleep(300);
+check('fail goal: sending it again makes it new and forgets the reason', goalRow('g2').status === 'new' && goalRow('g2').note === '');
 await clients[0].reducers.ping({ sessionId: H, name: 'Manager Claude', kind: 'manager' });
 await sleep(200);
 const first = [...admin.db.presence.iter()].filter(p => p.sessionId === H);

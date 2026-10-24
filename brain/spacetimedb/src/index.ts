@@ -94,7 +94,7 @@ const goals = table(
     session_id: t.string().index('btree'),
     id: t.string(),
     text: t.string(),
-    status: t.string(), // new | planning | planned | done
+    status: t.string(), // new | planning | planned | done | failed (could not be planned)
     created_at: t.timestamp(),
     branch: t.string().default(''), // when done: the branch with all of its work merged
     note: t.string().default(''), // when done: how it went ("Tests pass", what could not be merged)
@@ -660,7 +660,21 @@ export const setGoalStatus = spacetimedb.reducer(
     }
     const goal = ctx.db.goals.pk.find(pk(session_id, id));
     if (!goal) throw new SenderError('unknown goal');
-    ctx.db.goals.pk.update({ ...goal, status });
+    // back to `new` (Try again): forget why it failed last time
+    ctx.db.goals.pk.update({ ...goal, status, note: status === 'new' ? '' : goal.note });
+  }
+);
+
+// The manager could not plan a goal (for example, Claude is not logged in). It waits as `failed`
+// with the reason until someone sends it again (set_goal_status new).
+export const failGoal = spacetimedb.reducer(
+  { session_id: t.string(), id: t.string(), note: t.string() },
+  (ctx, { session_id, id, note }) => {
+    requireOperator(ctx, session_id);
+    const goal = ctx.db.goals.pk.find(pk(session_id, id));
+    if (!goal) throw new SenderError('unknown goal');
+    ctx.db.goals.pk.update({ ...goal, status: 'failed', note: note.slice(0, 500) });
+    addEvent(ctx, session_id, undefined, 'task_failed', `Could not plan: ${goal.text.slice(0, 80)}`);
   }
 );
 

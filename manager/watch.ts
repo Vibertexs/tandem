@@ -53,23 +53,51 @@ if (!brain.isOperator()) {
 
 // ---------- planning ----------
 const tries = new Map<string, number>();
+const failed = new Set<string>(); // goals this watcher marked failed
 const tsx = pathToFileURL(join(here, 'node_modules', 'tsx', 'dist', 'esm', 'index.mjs')).href;
-const plan = () => new Promise<number>(done => {
+// One planning run. `why` is plan.ts's "Could not plan: ..." line, if it failed.
+const plan = () => new Promise<{ code: number; why: string }>(done => {
   const child = spawn(process.execPath, ['--import', tsx, join(here, 'plan.ts'),
     '--uri', URI, '--db', DB, '--session', SESSION, '--token-file', process.env.TANDEM_TOKEN_FILE!,
-    '--workdir', REPO, '--model', opt.model!, '--budget', opt.budget!], { stdio: 'inherit' });
-  child.on('close', code => done(code ?? 1));
+    '--workdir', REPO, '--model', opt.model!, '--budget', opt.budget!], { stdio: ['ignore', 'pipe', 'inherit'] });
+  let why = '';
+  child.stdout.on('data', d => {
+    process.stdout.write(d);
+    for (const m of String(d).matchAll(/^Could not plan: (.*)$/gm)) why = m[1].trim();
+  });
+  child.on('close', code => done({ code: code ?? 1, why }));
 });
+const TRIES = 2;
 
 // ---------- loop ----------
 for (;;) {
-  // A goal that failed to plan twice is skipped, so one bad goal cannot burn quota forever.
-  const waiting = brain.getGoals().filter(g => (tries.get(g.id) ?? 0) < 2);
+  // A goal that failed to plan twice is marked failed with the reason, so one bad goal cannot
+  // burn quota forever and the page can say what is wrong. Try again on the page makes it new.
+  for (const g of brain.getGoals()) if (failed.delete(g.id)) tries.delete(g.id);
+  const waiting = brain.getGoals().filter(g => (tries.get(g.id) ?? 0) < TRIES);
   if (waiting.length > 0) {
     for (const g of waiting) tries.set(g.id, (tries.get(g.id) ?? 0) + 1);
     log(`planning ${waiting.length} goal(s): ${waiting.map(g => `"${g.text.slice(0, 50)}"`).join(', ')}`);
-    const code = await plan();
-    log(code === 0 ? 'planning run finished' : `planning run exited with ${code}`);
+    const { code, why } = await plan();
+    log(code === 0 ? 'planning run finished' : `planning run exited with ${code}${why ? `: ${why}` : ''}`);
+    await sleep(500); // let the last updates arrive
+    const planned = brain.getStatus().tasks;
+    for (const g of waiting) {
+      const now = brain.listGoals().find(x => x.id === g.id);
+      if (!now || now.status === 'planned' || now.status === 'done') continue;
+      try {
+        if (planned.some(t => t.goal_id === g.id)) {
+          // the run stopped after creating tasks: let that work go ahead
+          await brain.markGoal(g.id, 'planned');
+        } else if ((tries.get(g.id) ?? 0) >= TRIES) {
+          await brain.failGoal(g.id, `The manager could not plan this${why ? `: ${why}` : '.'} Check that \`claude -p "hi"\` works in a terminal on the host, then press Try again.`);
+          failed.add(g.id);
+          log(`goal ${g.id}: could not plan it, marked failed`);
+        } else if (now.status === 'planning') {
+          await brain.markGoal(g.id, 'new'); // try once more
+        }
+      } catch (e) { log(`could not update goal ${g.id}: ${(e as Error).message}`); }
+    }
   }
   const tasks = brain.getStatus().tasks;
   for (const g of brain.listGoals().filter(x => x.status === 'planned')) {

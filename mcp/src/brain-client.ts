@@ -240,6 +240,10 @@ export class BrainClient implements Brain {
     await this.conn.reducers.finishGoal({ sessionId: this.session, id: goalId, branch, note });
   }
 
+  async failGoal(goalId: string, note: string) {
+    await this.conn.reducers.failGoal({ sessionId: this.session, id: goalId, note });
+  }
+
   async recordCost(workerId: string, taskId: string, usd: number) {
     await this.conn.reducers.recordCost({ sessionId: this.session, workerId, taskId, usd });
   }

@@ -228,6 +228,13 @@ try {
   check('retry: Try again puts it back for any worker', await seen(A, 'Back on the board for any worker.', 4000) &&
     await until(() => A.getByText('needs you').count().then(n => n === 0), 4000));
   await A.keyboard.press('Escape');
+  // a goal the manager could not plan says why, and Try again sends it back
+  await manager.reducers.postGoal({ sessionId: 'live', id: 'g-bad', text: 'Something the manager cannot plan' });
+  await manager.reducers.failGoal({ sessionId: 'live', id: 'g-bad', note: 'The manager could not plan this: Invalid API key · Please run /login' });
+  check('could not plan: the board says so, with the reason', await seen(A, 'The manager could not plan "Something the manager cannot plan".', 5000) && await seen(A, 'Invalid API key', 1000));
+  await A.locator('.next').getByRole('button', { name: 'Try again' }).click();
+  check('could not plan: Try again sends it to the manager again', await seen(A, 'Sent to the manager again.', 4000) &&
+    await until(async () => [...manager.db.goals.iter()].find(g => g.id === 'g-bad')?.status === 'new', 4000));
   // a worker that hit its usage limit says until when
   await x1.reducers.updateCapacity({ sessionId: 'live', workerId: 'w-kim', usage5H: 100, usageWeek: undefined, resetAt: Timestamp.fromDate(new Date(Date.now() + 3600_000)), status: undefined });
   await nav(A, 'Team');
