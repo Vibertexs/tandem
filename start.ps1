@@ -10,6 +10,8 @@
 #   .\start.ps1 -Model auto     real workers pick the model by task difficulty (launcher/routing.json)
 #                               instead of always using haiku (the cheap default)
 #   .\start.ps1 -Notify <url>   post "goal done" to a Slack or Discord incoming webhook
+#   .\start.ps1 -Simulate -SimLimit 60   for demos: the first worker hits a usage limit on its first
+#                               task (it moves to another worker) and comes back after 60 seconds
 # Join someone else's team from this computer (starts workers here that work for that team):
 #   .\start.ps1 -Join ws://192.168.1.20:3001 -Db tandem-local
 # Stop:
@@ -28,6 +30,7 @@ param(
   [string]$ManagerModel = 'haiku',
   [string]$Budget = '0.50',
   [string]$Notify = '',
+  [int]$SimLimit = 0,
   [switch]$NoBrowser
 )
 $ErrorActionPreference = 'Stop'
@@ -178,6 +181,7 @@ if ($Workers -gt 0) {
     $env:LAUNCHER_BUDGET_USD = $Budget
     $nodeArgs = @('--import', (Tsx 'launcher'), (Join-Path $root 'launcher\launcher.ts'), '--name', $name, '--repo', $Repo)
     if ($Simulate) { $nodeArgs += @('--simulate', '--sim-ms', '3000') }
+    if ($Simulate -and $SimLimit -gt 0 -and $i -eq 0) { $nodeArgs += @('--sim-limit', "$SimLimit") }
     if ($Push) { $nodeArgs += '--push' }
     Spawn "worker $name" 'node' $nodeArgs "worker-$name"
     Write-Host "  $name"

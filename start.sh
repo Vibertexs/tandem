@@ -13,16 +13,17 @@
 # Join someone else's team:
 #   ./start.sh --join ws://192.168.1.20:3001 --db tandem-local
 # More: --workers N  --repo PATH  --no-manager  --no-browser  --manager-model M  --budget USD
+#       --sim-limit SECONDS (with --simulate: the first worker hits a usage limit, for demos)
 # Stop: ./stop.sh   (--all also stops the brain)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 DB=tandem-local JOIN="" REPO="" WORKERS=2 SIM=0 NOMGR=0 LAN=0 FRESH=0 PUSH=0 NOBROWSER=0
-MODEL=haiku MGRMODEL=haiku BUDGET=0.50 NOTIFY=""
+MODEL=haiku MGRMODEL=haiku BUDGET=0.50 NOTIFY="" SIMLIMIT=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --db) DB="$2"; shift ;; --join) JOIN="$2"; shift ;; --repo) REPO="$2"; shift ;;
     --workers) WORKERS="$2"; shift ;; --model) MODEL="$2"; shift ;; --manager-model) MGRMODEL="$2"; shift ;;
-    --budget) BUDGET="$2"; shift ;; --notify) NOTIFY="$2"; shift ;; --simulate) SIM=1 ;; --no-manager) NOMGR=1 ;; --lan) LAN=1 ;;
+    --budget) BUDGET="$2"; shift ;; --notify) NOTIFY="$2"; shift ;; --sim-limit) SIMLIMIT="$2"; shift ;; --simulate) SIM=1 ;; --no-manager) NOMGR=1 ;; --lan) LAN=1 ;;
     --fresh) FRESH=1 ;; --push) PUSH=1 ;; --no-browser) NOBROWSER=1 ;;
     -h|--help) sed -n '2,/^# Stop/p' "$0"; exit 0 ;;
     *) echo "unknown option: $1 (see ./start.sh --help)"; exit 2 ;;
@@ -129,6 +130,7 @@ if [ "$WORKERS" -gt 0 ]; then
     name="${names[$(( (i + offset) % 6 ))]}$suffix"
     if running "worker-$name"; then echo "  $name (already running)"; continue; fi
     flags=(); [ $SIM = 1 ] && flags+=(--simulate --sim-ms 3000); [ $PUSH = 1 ] && flags+=(--push)
+    if [ $SIM = 1 ] && [ "$SIMLIMIT" -gt 0 ] && [ "$i" = 0 ]; then flags+=(--sim-limit "$SIMLIMIT"); fi
     if [ "$MODEL" = auto ]; then unset LAUNCHER_MODEL; else export LAUNCHER_MODEL="$MODEL"; fi
     LAUNCHER_BUDGET_USD="$BUDGET" TANDEM_TOKEN_FILE="$ROOT/mcp/.tandem/worker-$name-$DB" spawn "worker-$name" "worker-$name" "$ROOT" \
       node --import "$(fileurl "$ROOT/launcher/node_modules/tsx/dist/esm/index.mjs")" "$ROOT/launcher/launcher.ts" \
