@@ -215,3 +215,41 @@ export const completeTask = spacetimedb.reducer(
     }
   }
 );
+
+// All paths or none: if any path is held by another task, the whole call
+// fails and the transaction rolls back, so no partial locks are left behind.
+export const takeLocks = spacetimedb.reducer(
+  { worker_id: t.string(), task_id: t.string(), paths: t.array(t.string()) },
+  (ctx, { worker_id, task_id, paths }) => {
+    const task = ctx.db.tasks.id.find(task_id);
+    if (!task || task.status !== 'claimed' || task.assignee !== worker_id) {
+      throw new SenderError('task is not claimed by this worker');
+    }
+    for (const path of paths) {
+      const held = ctx.db.locks.path.find(path);
+      if (held && held.task_id !== task_id) {
+        throw new SenderError(`${path} is held by task ${held.task_id}`);
+      }
+    }
+    for (const path of paths) {
+      if (!ctx.db.locks.path.find(path)) {
+        ctx.db.locks.insert({ path, task_id, worker_id, created_at: ctx.timestamp });
+      }
+    }
+    addEvent(ctx, worker_id, 'lock_taken', `Locked ${paths.length} file(s) for ${task.title}`);
+  }
+);
+
+export const releaseLocks = spacetimedb.reducer(
+  { worker_id: t.string(), task_id: t.string() },
+  (ctx, { worker_id, task_id }) => {
+    const task = ctx.db.tasks.id.find(task_id);
+    if (!task || task.assignee !== worker_id) {
+      throw new SenderError('task is not assigned to this worker');
+    }
+    for (const lock of [...ctx.db.locks.task_id.filter(task_id)]) {
+      ctx.db.locks.path.delete(lock.path);
+    }
+    addEvent(ctx, worker_id, 'lock_released', `Released locks for ${task.title}`);
+  }
+);

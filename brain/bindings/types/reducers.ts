@@ -10,9 +10,13 @@ import ClaimTaskReducer from "../claim_task_reducer";
 import CompleteTaskReducer from "../complete_task_reducer";
 import CreateTaskReducer from "../create_task_reducer";
 import RegisterWorkerReducer from "../register_worker_reducer";
+import ReleaseLocksReducer from "../release_locks_reducer";
+import TakeLocksReducer from "../take_locks_reducer";
 
 export type ClaimTaskParams = __Infer<typeof ClaimTaskReducer>;
 export type CompleteTaskParams = __Infer<typeof CompleteTaskReducer>;
 export type CreateTaskParams = __Infer<typeof CreateTaskReducer>;
 export type RegisterWorkerParams = __Infer<typeof RegisterWorkerReducer>;
+export type ReleaseLocksParams = __Infer<typeof ReleaseLocksReducer>;
+export type TakeLocksParams = __Infer<typeof TakeLocksReducer>;
 

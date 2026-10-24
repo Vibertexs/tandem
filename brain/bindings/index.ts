@@ -38,6 +38,8 @@ import ClaimTaskReducer from "./claim_task_reducer";
 import CompleteTaskReducer from "./complete_task_reducer";
 import CreateTaskReducer from "./create_task_reducer";
 import RegisterWorkerReducer from "./register_worker_reducer";
+import ReleaseLocksReducer from "./release_locks_reducer";
+import TakeLocksReducer from "./take_locks_reducer";
 
 // Import all procedure arg schemas
 
@@ -106,6 +108,8 @@ const reducersSchema = __reducers(
   __reducerSchema("complete_task", CompleteTaskReducer),
   __reducerSchema("create_task", CreateTaskReducer),
   __reducerSchema("register_worker", RegisterWorkerReducer),
+  __reducerSchema("release_locks", ReleaseLocksReducer),
+  __reducerSchema("take_locks", TakeLocksReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */

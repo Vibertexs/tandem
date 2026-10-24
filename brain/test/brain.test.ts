@@ -89,6 +89,30 @@ const unblocks = [...admin.db.events.iter()].filter(e => e.type === 'merge_unblo
 check('mapreduce: merge is open', merge.status === 'open', merge.status);
 check('mapreduce: merge_unblocked logged exactly once', unblocks.length === 1, String(unblocks.length));
 
+// 4. take_locks is all-or-none; release_locks frees only that task's locks.
+await clients[0].reducers.claimTask({ workerId: ids[0] }); // takes the open merge task
+await sleep(300);
+await clients[0].reducers.completeTask({ workerId: ids[0], taskId: 'merge', branch: 'b', summary: 's', result: undefined });
+await admin.reducers.createTask(task('t-lk1', ['a.txt']));
+await admin.reducers.createTask(task('t-lk2', ['b.txt']));
+await sleep(300);
+await clients[0].reducers.claimTask({ workerId: ids[0] });
+await sleep(300);
+await clients[1].reducers.claimTask({ workerId: ids[1] });
+await sleep(300);
+const lockPaths = () => [...admin.db.locks.iter()].map(l => l.path).sort().join(',');
+check('take_locks: setup holds a.txt and b.txt', lockPaths() === 'a.txt,b.txt', lockPaths());
+const rejected = await clients[1].reducers.takeLocks({ workerId: ids[1], taskId: 't-lk2', paths: ['x.txt', 'a.txt'] }).then(() => false, () => true);
+await sleep(300);
+check('take_locks: conflict is rejected', rejected);
+check('take_locks: no partial locks after conflict', lockPaths() === 'a.txt,b.txt', lockPaths());
+await clients[1].reducers.takeLocks({ workerId: ids[1], taskId: 't-lk2', paths: ['x.txt', 'y.txt'] });
+await sleep(300);
+check('take_locks: free paths are taken', lockPaths() === 'a.txt,b.txt,x.txt,y.txt', lockPaths());
+await clients[1].reducers.releaseLocks({ workerId: ids[1], taskId: 't-lk2' });
+await sleep(300);
+check('release_locks: frees only that task', lockPaths() === 'a.txt', lockPaths());
+
 for (const c of [admin, ...clients]) c.disconnect();
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);
