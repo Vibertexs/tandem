@@ -28,6 +28,11 @@ const repo = mkdtempSync(join(tmpdir(), 'tandem-cli-repo-'));
 const git = (...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@x', ...a], { cwd: repo, stdio: 'pipe' });
 git('init', '-q'); writeFileSync(join(repo, 'README.md'), '# x\n'); git('add', '-A'); git('commit', '-q', '-m', 'start');
 
+const { tooOld, oldNodeMessage } = await import('./node-check.mjs');
+check('Node versions: 18, 20, 22.6 and 22.17 are too old; 22.18, 22.20, 24 and 26 are fine',
+  ['18.20.4', '20.11.0', '22.6.0', '22.17.9'].every(v => tooOld(v)) && ['22.18.0', '22.20.1', '24.11.0', '26.0.0'].every(v => !tooOld(v)));
+check('an old Node gets a message that says which version it has and where to get a new one',
+  /needs Node\.js 22\.18/.test(oldNodeMessage('20.11.0')) && oldNodeMessage('20.11.0').includes('20.11.0') && oldNodeMessage().includes('nodejs.org'));
 check('outside a git repo, tandem start says what to do', /is not a git repository/.test(tandem(['start'], tmpdir())));
 check('no accounts yet: account list says how to add one', /No accounts yet/.test(tandem(['account', 'list'], repo)));
 tandem(['account', 'add', 'work1', '--no-login'], repo);

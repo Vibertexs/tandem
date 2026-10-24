@@ -93,6 +93,8 @@ On the board click **Make me the owner** (it also approves the manager), then de
 
 (`npm install -g .` in the Tandem folder, once, lets them type just `tandem join "<invite>"` instead. It is optional.)
 
+**Node.js 22.18 or newer is required** (`node --version`). On an older Node, `tandem` stops with a clear message and where to get a new one (https://nodejs.org, or `winget install OpenJS.NodeJS.LTS` on Windows).
+
 Everyone's agent runs under their own login and quota. Without a shared repo, teammates can add simulated workers or just watch.
 
 **On public wifi (a hackathon, a cafe), use Tailscale.** Venue wifi often stops devices talking to each other, and anyone on it could reach an open brain. [Tailscale](https://tailscale.com/download) makes a private network between your devices:

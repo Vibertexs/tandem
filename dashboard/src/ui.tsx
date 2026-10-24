@@ -132,7 +132,7 @@ export function JoinSteps({ link, repoUrl, say }: { link: string; repoUrl: strin
   if (!repoUrl) {
     return (
       <div className="join-steps">
-        <p className="small muted">1. Get Tandem (once):</p>
+        <p className="small muted">1. Get Tandem (once). It needs Node.js 22.18 or newer (check with <code className="mono">node --version</code>) and Git:</p>
         <CodeLine code={`git clone ${TANDEM_REPO}`} say={say} />
         <p className="small muted">2. In the new <code className="mono">tandem</code> folder, run it (fake workers, no project needed):</p>
         <CodeLine code={`.\\tandem.cmd join "${link}" --simulate`} say={say} />
@@ -144,7 +144,7 @@ export function JoinSteps({ link, repoUrl, say }: { link: string; repoUrl: strin
   const folder = repoUrl.replace(/\/+$/, '').split(/[/:]/).pop()?.replace(/\.git$/, '') || 'project';
   return (
     <div className="join-steps">
-      <p className="small muted">1. Get Tandem and the project, side by side (once):</p>
+      <p className="small muted">1. Get Tandem and the project, side by side (once). Needs Node.js 22.18 or newer (<code className="mono">node --version</code>) and Git:</p>
       <CodeLine code={`git clone ${TANDEM_REPO}\ngit clone ${repoUrl}`} say={say} />
       <p className="small muted">2. In the project's folder, run:</p>
       <CodeLine code={`cd ${folder}\n..\\tandem\\tandem.cmd join "${link}"`} say={say} />
