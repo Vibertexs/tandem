@@ -194,7 +194,8 @@ function Invite({ team, say }: { team: Team; say: (m: string) => void }) {
           <p className="small"><strong>Send this link.</strong> <span className="muted">In a browser it shows this board.</span></p>
           <CodeLine code={share.page} say={say} />
           <p className="small muted">To add their computer's workers, in their clone of the project:</p>
-          <CodeLine code={`tandem join ${share.page}`} say={say} />
+          <CodeLine code={`tandem join "${share.page}"`} say={say} />
+          <p className="small muted">No clone of the project yet? Add <code className="mono">--simulate</code> to try it with fake workers.</p>
         </div>
       )}
     </div>

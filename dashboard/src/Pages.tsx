@@ -61,11 +61,11 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
                 <p className="muted small">1. Get the project:</p>
                 <CodeLine code={`git clone ${repoUrl}`} say={say} />
                 <p className="muted small">2. In that folder:</p>
-                <CodeLine code={`tandem join ${share.page}`} say={say} />
+                <CodeLine code={`tandem join "${share.page}"`} say={say} />
               </>
             ) : (
               <>
-                <CodeLine code={`tandem join ${share.page} --simulate`} say={say} />
+                <CodeLine code={`tandem join "${share.page}" --simulate`} say={say} />
                 <p className="small muted">This project has no GitHub remote (origin), so workers on other computers can only fake the coding. Add a remote to the repo and run <code className="mono">tandem start</code> again, and they can do real work.</p>
               </>
             )}
