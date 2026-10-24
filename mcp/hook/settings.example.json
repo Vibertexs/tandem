@@ -1,13 +1,13 @@
 {
-  "_note": "Verify this format against the Claude Code hooks docs before relying on it.",
+  "_note": "Checked against https://code.claude.com/docs/en/hooks: PreToolUse command hook, exit 2 blocks the call and shows stderr to Claude. Put this in the worked repo's .claude/settings.json, or pass it for one run with claude --settings <file>. Set TANDEM_WORKER_ID (and STDB_URI, STDB_DB, TANDEM_SESSION if not the defaults) in the environment Claude Code runs in.",
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 mcp/hook/check_lock.py"
+            "command": "node <path-to-repo>/mcp/hook/check-lock.mjs"
           }
         ]
       }

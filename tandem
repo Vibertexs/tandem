@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Runs the tandem command (cli/tandem.ts). Put this folder on your PATH, or run once:
+#   npm install -g .
+exec node "$(dirname "$0")/cli/tandem.ts" "$@"

@@ -9,3 +9,4 @@ __pycache__/
 dist/
 target/
 .claude/settings.local.json
+.tandem/

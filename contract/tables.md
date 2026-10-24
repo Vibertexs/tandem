@@ -1,6 +1,6 @@
-# Tables (PROPOSED)
+# Tables
 
-Every table has `session_id` (string). Judge mode uses one session per judge. Live mode uses `live`.
+Every table has `session_id` (string). The team and the page use `live`; the tests use their own sessions to stay isolated. The module is `brain/spacetimedb/src/index.ts`.
 
 ## workers
 | Column | Type | Notes |
@@ -13,6 +13,9 @@ Every table has `session_id` (string). Judge mode uses one session per judge. Li
 | usage_week_pct | number 0-100 or null | |
 | reset_at | timestamp or null | when the cap lifts |
 | last_seen | timestamp | treat old values as unknown |
+| owner | identity (hex) | who registered it; only they (or an operator) may act for it. '' = anyone (sample rows) |
+| agent | `claude` or `codex` | the coding agent it runs (set by `describe_worker`) |
+| account | string | a label for the login it uses, like `work1`; '' = the default login |
 
 ## tasks
 | Column | Type | Notes |
@@ -32,6 +35,9 @@ Every table has `session_id` (string). Judge mode uses one session per judge. Li
 | depends_on | task id[] | |
 | result | JSON or null | map tasks: see result-format.json |
 | result_summary | string or null | |
+| goal_id | string | the goal it was planned for ('' if none); set by the brain while that goal is `planning` |
+| cost_usd | number | what its Claude runs cost, as reported by `claude -p` |
+| tried_by | string | comma-separated workers that gave it back (`give_back_task`); they are not given it again. After two, `status` is `failed` and `result_summary` holds the reason |
 
 ## locks
 | Column | Type |
@@ -55,6 +61,18 @@ Every table has `session_id` (string). Judge mode uses one session per judge. Li
 | worker_id | string or null | |
 | type | string | PROPOSED: task_created, task_assigned, task_claimed, progress, task_done, task_failed, lock_taken, lock_blocked, lock_released, worker_capped, worker_idle, job_progress, merge_unblocked |
 | message | string | plain English; shown in the dashboard log |
+
+## goals
+| Column | Type | Notes |
+|---|---|---|
+| id | string | |
+| text | string | what the operator asked for, in plain words |
+| status | `new`, `planning`, `planned`, `done`, `failed`, `cancelled` | the manager moves it along; one goal is `planning` at a time. `failed`: two planning runs failed, `note` says why; setting it back to `new` tries again. `cancelled`: an operator cancelled it; its tasks that had not started were removed |
+| created_at | timestamp | |
+| branch | string | when done: the branch with all of the goal's work merged (`tandem/<goal id>`) |
+
+## operators, operator_requests, presence
+Who may manage the team (`operators`, the first one is the owner), who is asking to (`operator_requests`, approved or dismissed on the page), and who is connected (`presence`, the manager pings it every 15 seconds). Identities, names and timestamps only.
 
 ## Rules
 - Claiming a task and taking locks are atomic: one winner, no partial locks.

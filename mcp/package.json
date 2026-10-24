@@ -1,0 +1,25 @@
+{
+  "name": "tandem-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "test": "tsx test/mcp.test.ts",
+    "test:mock": "tsx test/mock.test.ts",
+    "whoami": "tsx src/whoami.ts",
+    "test:operator": "tsx test/operator.test.ts",
+    "test:hook": "tsx test/hook.test.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "spacetimedb": "2.13.*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.6.2"
+  }
+}

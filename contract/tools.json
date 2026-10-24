@@ -86,6 +86,18 @@
       "does": "Marks done; map tasks include their structured result; may unblock dependents or the merge task"
     },
     {
+      "name": "give_back_task",
+      "side": "worker",
+      "params": {
+        "task_id": "string",
+        "reason": "string"
+      },
+      "returns": {
+        "ok": "boolean"
+      },
+      "does": "Hands an unfinished task back with a reason; frees its locks; a different worker gets it next; after two workers give it back it is failed for a person"
+    },
+    {
       "name": "get_context",
       "side": "worker",
       "params": {},
@@ -162,6 +174,27 @@
         "ok": "boolean"
       },
       "does": "Updates shared decisions and interfaces"
+    },
+    {
+      "name": "get_goals",
+      "side": "manager",
+      "params": {},
+      "returns": {
+        "goals": "goal[]"
+      },
+      "does": "Returns the goals the operator typed that are still waiting (status new)"
+    },
+    {
+      "name": "mark_goal",
+      "side": "manager",
+      "params": {
+        "goal_id": "string",
+        "status": "planning|planned"
+      },
+      "returns": {
+        "ok": "boolean"
+      },
+      "does": "Marks a goal as being planned, or planned once its tasks exist"
     }
   ]
 }

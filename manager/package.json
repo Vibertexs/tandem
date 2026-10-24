@@ -1,0 +1,16 @@
+{
+  "name": "tandem-manager",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "watch": "tsx watch.ts",
+    "test": "tsx test/merge.test.ts && tsx test/verify.test.ts && tsx test/finish.test.ts && tsx test/notify.test.ts && tsx test/watch.test.ts",
+    "test:two": "tsx test/two-computers.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.6.2"
+  }
+}
