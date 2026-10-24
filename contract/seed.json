@@ -1,0 +1,388 @@
+{
+  "note": "Demo data. Timestamps are placeholders. Names are demo teammates, not the real team.",
+  "session_id": "demo",
+  "workers": [
+    {
+      "id": "w-alex",
+      "name": "Alex",
+      "plan": "pro",
+      "status": "idle",
+      "usage_5h_pct": 62,
+      "usage_week_pct": 30,
+      "reset_at": null,
+      "last_seen": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "w-sam",
+      "name": "Sam",
+      "plan": "pro",
+      "status": "idle",
+      "usage_5h_pct": 40,
+      "usage_week_pct": 20,
+      "reset_at": null,
+      "last_seen": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "w-jordan",
+      "name": "Jordan",
+      "plan": "max",
+      "status": "idle",
+      "usage_5h_pct": 10,
+      "usage_week_pct": 5,
+      "reset_at": null,
+      "last_seen": "2026-01-01T00:00:00Z"
+    }
+  ],
+  "context": {
+    "project_summary": "Demo web app with a Python API and a React front end.",
+    "interfaces": "",
+    "decisions": ""
+  },
+  "tasks": [
+    {
+      "id": "t-login-1",
+      "job_id": null,
+      "kind": "normal",
+      "title": "Define auth API spec",
+      "description": "",
+      "files": [
+        "docs/api.md"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-login-2",
+      "job_id": null,
+      "kind": "normal",
+      "title": "Implement /login endpoint",
+      "description": "",
+      "files": [
+        "src/api/login.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "blocked",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [
+        "t-login-1"
+      ],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-login-3",
+      "job_id": null,
+      "kind": "normal",
+      "title": "Build login form",
+      "description": "",
+      "files": [
+        "web/LoginForm.jsx"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "blocked",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [
+        "t-login-1"
+      ],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-login-4",
+      "job_id": null,
+      "kind": "normal",
+      "title": "Write login tests",
+      "description": "",
+      "files": [
+        "tests/test_login.py"
+      ],
+      "difficulty": "easy",
+      "model": "haiku",
+      "effort": "default",
+      "status": "blocked",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [
+        "t-login-2",
+        "t-login-3"
+      ],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-01",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 01",
+      "description": "",
+      "files": [
+        "src/module_01.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-02",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 02",
+      "description": "",
+      "files": [
+        "src/module_02.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-03",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 03",
+      "description": "",
+      "files": [
+        "src/module_03.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-04",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 04",
+      "description": "",
+      "files": [
+        "src/module_04.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-05",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 05",
+      "description": "",
+      "files": [
+        "src/module_05.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-06",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 06",
+      "description": "",
+      "files": [
+        "src/module_06.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-07",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 07",
+      "description": "",
+      "files": [
+        "src/module_07.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-08",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 08",
+      "description": "",
+      "files": [
+        "src/module_08.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-09",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 09",
+      "description": "",
+      "files": [
+        "src/module_09.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-10",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 10",
+      "description": "",
+      "files": [
+        "src/module_10.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-11",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 11",
+      "description": "",
+      "files": [
+        "src/module_11.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-12",
+      "job_id": "job-review",
+      "kind": "map",
+      "title": "Review module 12",
+      "description": "",
+      "files": [
+        "src/module_12.py"
+      ],
+      "difficulty": "normal",
+      "model": "sonnet",
+      "effort": "default",
+      "status": "open",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [],
+      "result": null,
+      "result_summary": null
+    },
+    {
+      "id": "t-review-merge",
+      "job_id": "job-review",
+      "kind": "reduce",
+      "title": "Merge review findings",
+      "description": "",
+      "files": [
+        "docs/review-report.md"
+      ],
+      "difficulty": "hard",
+      "model": "opus",
+      "effort": "high",
+      "status": "blocked",
+      "assignee": null,
+      "branch": null,
+      "depends_on": [
+        "t-review-01",
+        "t-review-02",
+        "t-review-03",
+        "t-review-04",
+        "t-review-05",
+        "t-review-06",
+        "t-review-07",
+        "t-review-08",
+        "t-review-09",
+        "t-review-10",
+        "t-review-11",
+        "t-review-12"
+      ],
+      "result": null,
+      "result_summary": null
+    }
+  ],
+  "locks": [],
+  "events": []
+}

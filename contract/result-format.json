@@ -1,0 +1,26 @@
+{
+  "note": "PROPOSED fixed format for a map task's `result`. Keep it small: the merge task reads all of them.",
+  "example": {
+    "status": "ok",
+    "files_touched": [
+      "src/module_03.py"
+    ],
+    "findings": [
+      {
+        "file": "src/module_03.py",
+        "severity": "medium",
+        "note": "Unchecked input on line 41"
+      }
+    ],
+    "notes": ""
+  },
+  "status_values": [
+    "ok",
+    "failed"
+  ],
+  "severity_values": [
+    "low",
+    "medium",
+    "high"
+  ]
+}

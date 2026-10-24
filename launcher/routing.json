@@ -1,0 +1,34 @@
+{
+  "_note": "PROPOSED. Aliases and effort levels vary by Claude Code version and plan. Check /model and /effort on each machine. 'default' means do not pass the flag.",
+  "by_difficulty": {
+    "easy": {
+      "model": "haiku",
+      "effort": "default"
+    },
+    "normal": {
+      "model": "sonnet",
+      "effort": "default"
+    },
+    "hard": {
+      "model": "opus",
+      "effort": "high"
+    }
+  },
+  "by_kind": {
+    "map": {
+      "model": "sonnet",
+      "effort": "default"
+    },
+    "reduce": {
+      "model": "opus",
+      "effort": "high"
+    }
+  },
+  "downgrade_above_usage_pct": 80,
+  "downgrade_order": [
+    "opus",
+    "sonnet",
+    "haiku"
+  ],
+  "retry_effort": "high"
+}

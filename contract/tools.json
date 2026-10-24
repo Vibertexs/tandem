@@ -1,0 +1,167 @@
+{
+  "note": "PROPOSED. Reducers return no data, so the MCP server calls the reducer, then reads the result from the tables and returns it to Claude.",
+  "tools": [
+    {
+      "name": "register_worker",
+      "side": "worker",
+      "params": {
+        "name": "string",
+        "plan": "pro|max"
+      },
+      "returns": {
+        "worker_id": "string"
+      },
+      "does": "Adds the teammate to the brain"
+    },
+    {
+      "name": "report_capacity",
+      "side": "worker",
+      "params": {
+        "usage_5h": "number|null",
+        "usage_week": "number|null",
+        "reset_at": "timestamp|null"
+      },
+      "returns": {
+        "ok": "boolean"
+      },
+      "does": "Updates this worker's capacity row and last_seen"
+    },
+    {
+      "name": "claim_task",
+      "side": "worker",
+      "params": {},
+      "returns": {
+        "task": "task|null"
+      },
+      "does": "Atomically claims the best open task for this worker"
+    },
+    {
+      "name": "lock_files",
+      "side": "worker",
+      "params": {
+        "task_id": "string",
+        "paths": "string[]"
+      },
+      "returns": {
+        "ok": "boolean",
+        "held_by": "task_id|null"
+      },
+      "does": "Takes locks for all paths or none; fails if anyone else holds one"
+    },
+    {
+      "name": "release_files",
+      "side": "worker",
+      "params": {
+        "task_id": "string"
+      },
+      "returns": {
+        "ok": "boolean"
+      },
+      "does": "Releases this task's locks"
+    },
+    {
+      "name": "report_progress",
+      "side": "worker",
+      "params": {
+        "task_id": "string",
+        "message": "string"
+      },
+      "returns": {
+        "ok": "boolean"
+      },
+      "does": "Adds an event"
+    },
+    {
+      "name": "complete_task",
+      "side": "worker",
+      "params": {
+        "task_id": "string",
+        "branch": "string",
+        "summary": "string",
+        "result": "json?"
+      },
+      "returns": {
+        "ok": "boolean"
+      },
+      "does": "Marks done; map tasks include their structured result; may unblock dependents or the merge task"
+    },
+    {
+      "name": "get_context",
+      "side": "worker",
+      "params": {},
+      "returns": {
+        "context": "object"
+      },
+      "does": "Returns the shared project summary, interfaces, and decisions"
+    },
+    {
+      "name": "get_job_results",
+      "side": "worker",
+      "params": {
+        "job_id": "string"
+      },
+      "returns": {
+        "results": "result[]"
+      },
+      "does": "Returns the structured results of a job's map tasks (used by the merge task)"
+    },
+    {
+      "name": "assign_task",
+      "side": "manager",
+      "params": {
+        "task": "task fields",
+        "model": "string",
+        "effort": "string",
+        "assignee": "worker_id?"
+      },
+      "returns": {
+        "task_id": "string"
+      },
+      "does": "Creates a task row for a worker's launcher to pick up"
+    },
+    {
+      "name": "create_job",
+      "side": "manager",
+      "params": {
+        "goal": "string",
+        "map_tasks": "task[]",
+        "merge_task": "task"
+      },
+      "returns": {
+        "job_id": "string"
+      },
+      "does": "Creates the map tasks and a blocked merge task in one call"
+    },
+    {
+      "name": "get_capacity",
+      "side": "manager",
+      "params": {},
+      "returns": {
+        "workers": "worker[]"
+      },
+      "does": "Everyone's usage, status, and last_seen"
+    },
+    {
+      "name": "get_status",
+      "side": "manager",
+      "params": {},
+      "returns": {
+        "tasks": "task[]",
+        "locks": "lock[]"
+      },
+      "does": "Task board and locks"
+    },
+    {
+      "name": "set_context",
+      "side": "manager",
+      "params": {
+        "key": "string",
+        "value": "string"
+      },
+      "returns": {
+        "ok": "boolean"
+      },
+      "does": "Updates shared decisions and interfaces"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "brain_url": "",
+  "session_id": "live",
+  "worker_name": "",
+  "plan": "pro",
+  "repo_path": "",
+  "worktree_dir": ".worktrees",
+  "poll_seconds": 5,
+  "simulate": false
+}

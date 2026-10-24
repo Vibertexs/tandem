@@ -1,0 +1,16 @@
+{
+  "_note": "Verify this format against the Claude Code hooks docs before relying on it.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 mcp/hook/check_lock.py"
+          }
+        ]
+      }
+    ]
+  }
+}
