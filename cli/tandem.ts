@@ -33,7 +33,7 @@ const SIM_LIMIT = Number(process.env.TANDEM_SIM_LIMIT ?? 0);
 const HELP = `tandem: your team's Claude Codes, working as one.
 
   tandem start              Start a team for the git repo you are in. Prints the invite address.
-    --workers N             workers on this computer (default 2; 0 = none)
+    --workers N             workers on this computer (default 1, one Claude per person; 0 = none)
     --local                 only this computer can join (default: your network can)
     --team NAME             the team's name (default: this folder's name)
     --fresh                 wipe the team's board first
@@ -290,7 +290,7 @@ async function start(argv: string[]) {
     fail('There is no demo project. Run tandem start in a Git project you want built.');
   }
   const { values: o } = parseArgs({ args: argv, options: {
-    workers: { type: 'string', default: '2' },
+    workers: { type: 'string', default: '1' },
     local: { type: 'boolean', default: false }, team: { type: 'string' }, fresh: { type: 'boolean', default: false },
     push: { type: 'boolean', default: false }, review: { type: 'boolean', default: false },
     model: { type: 'string', default: 'haiku' }, 'manager-model': { type: 'string', default: 'haiku' },
@@ -444,7 +444,7 @@ function workClone(url: string, team: string): string {
 
 async function joinTeam(argv: string[]) {
   const { values: o, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
-    workers: { type: 'string', default: '2' },
+    workers: { type: 'string', default: '1' },
     team: { type: 'string' }, model: { type: 'string', default: 'haiku' }, budget: { type: 'string', default: '0.50' },
     'no-browser': { type: 'boolean', default: false }, accounts: { type: 'string' },
     repo: { type: 'string' }, // use your own clone of the project instead of the one Tandem makes

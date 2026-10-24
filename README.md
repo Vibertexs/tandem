@@ -13,7 +13,7 @@ Describe what you want built. A manager plans it, every teammate's coding agent 
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex-d97757)
 ![Tests](https://img.shields.io/badge/tests-362%20passing-2ea44f)
 
-![The board while two workers are on it](docs/img/board.png)
+![The board while workers are on it](docs/img/board.png)
 
 </div>
 
@@ -74,7 +74,7 @@ That is the whole setup. There is nothing to install globally and no PATH to edi
   ✓ page     started
   ✓ project  shared from this computer: no GitHub needed
   ✓ manager  started: it plans every goal you type
-  ✓ workers  Alex, Sam (Claude, haiku)
+  ✓ workers  Alex (Claude, haiku)
 
   Open     http://localhost:5173/?db=your-project
   Invite   http://100.x.y.z:5173/?db=your-project
