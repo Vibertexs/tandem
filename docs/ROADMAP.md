@@ -15,12 +15,13 @@ Every person runs Claude Code under their own account on their own machine. Tand
 - Merge conflicts as tasks: a worker Claude resolves the conflict markers and the launcher commits the merge.
 - Usage limits: a capped worker waits for the reset and comes back by itself.
 - A "goal done" post to Slack or Discord (`-Notify`).
+- A review before done (`-Review`): a worker Claude reads the merged branch with read-only tools and its findings go on the goal card and in the PR.
 - Workers that reconnect on their own, worker ownership, and `start.sh` for macOS and Linux.
 
 ## Next steps, in the order that adds the most
 1. **Host it for real.** Publish the brain to SpacetimeDB Maincloud and log in with GitHub (SpacetimeDB supports OIDC). Then every identity is a real account, and teammates join with a link instead of an IP address.
 2. **Real capacity.** Feed real usage numbers into `report_capacity` (from Claude Code's statusLine), and route work to whoever has headroom. The brain already caps a worker at 100% and requeues its task.
-3. **A reviewer worker.** A task kind run with a stronger model that only reviews a goal branch and leaves findings, before the PR is opened.
+3. **Act on the review.** Today the review's findings are reported. Next: turn "high" findings into fix tasks, like failing tests are.
 4. **Bigger plans.** Map-reduce goals ("review every module") are built into the brain and tools; they need a real trial with real Claude.
 
 ## Ideas worth trying

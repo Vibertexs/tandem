@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const REAL = process.env.FLOW_REAL === '1';
+const REVIEW = REAL && process.env.FLOW_REVIEW === '1'; // also -Review: one more run per goal
 const DB = REAL ? 'bilal-real' : 'bilal-start';
 const REPO = REAL ? 'C:\\Code\\scratch\\real-repo' : 'C:\\Code\\scratch\\start-repo';
 const URL_ = `http://localhost:5173/?db=${DB}`;
@@ -37,7 +38,7 @@ const ps = (script: string, args: string) => {
   return readFileSync(log, 'utf8');
 };
 
-const started = ps('start.ps1', `-Db ${DB} ${REAL ? '' : '-Simulate'} -Fresh -NoBrowser -Repo ${REPO}`);
+const started = ps('start.ps1', `-Db ${DB} ${REAL ? '' : '-Simulate'} ${REVIEW ? '-Review' : ''} -Fresh -NoBrowser -Repo ${REPO}`);
 console.log(started.split('\n').filter(l => /==|started|ready|worker|Open/i.test(l)).join('\n'));
 check('start.ps1 finishes and says Ready', /== Ready/.test(started), started.slice(-400));
 
@@ -84,6 +85,7 @@ try {
     await page.locator('.nav a', { hasText: 'Goals' }).click();
     const card = await page.locator('.goal-card').first().innerText().catch(() => '');
     check('the goal card says the tests passed and what it cost', /Tests pass/.test(card) && /\$\d+\.\d+ of Claude usage/.test(card), card);
+    if (REVIEW) check('with -Review, a worker reviewed the branch and its findings are on the goal card', /Review the goal's work/.test(card) && /Review: \S/.test(card), card);
     await page.locator('.nav a', { hasText: 'Board' }).click();
   }
   check('the board shows the goal at 100%', await page.locator('.goal-row').first().innerText().then(t => /(\d+)\/\1/.test(t)).catch(() => false));

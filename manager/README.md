@@ -17,6 +17,7 @@ The planner: a Claude Code session with the tandem MCP that turns the operator's
    - If the tests fail, it adds one "Fix the failing tests" task to the goal. The launcher starts that task from the goal branch.
    - With `--push`, the goal branch is pushed to origin and, if the GitHub CLI is set up, a PR is opened. The watcher also tells the page the repo's remote, so the Team page can show a teammate what to clone.
    - With `--notify <url>` (or `TANDEM_WEBHOOK`), "goal done" is posted to a Slack or Discord incoming webhook.
+   - With `--review`, one "Review the goal's work" task runs before the goal is done (read-only tools, on the goal branch). Its findings go into the note and the PR.
 
 Tests: `npm test` here (merge, conflicts, verify, finish, push, notify, and the watcher with a fake Claude; no Claude calls). `npm run test:two` is the real two-computers test (about 4 haiku runs).
 

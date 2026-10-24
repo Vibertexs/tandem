@@ -25,7 +25,8 @@ Env: `STDB_URI`, `STDB_DB`, `TANDEM_SESSION` (default `live`), `LAUNCHER_BUDGET_
 4. Commit the changes on the task branch, then `complete_task` with that branch. When every task of a goal is done, the manager merges these branches into one `tandem/<goal id>` branch.
 5. A usage-limit message caps the worker (usage 100), and the brain puts the task back in the queue. The launcher reads when the limit resets (`limits.ts`: an epoch after `|`, or "resets 3pm"; else 30 minutes), stays online, then reports usage 0 and takes work again.
 6. A failed run is retried once at `retry_effort`. If it fails again, the task is given back with the reason (`give_back_task`) and a different worker gets it.
-7. A "Resolve the merge conflict with task/X" task is special: the launcher starts that merge in the worktree, Claude only edits out the conflict markers, and the launcher commits the merge (retrying if markers are left).
+7. A "Review the goal's work" task (manager `--review`) runs with read-only tools (Read, Glob, Grep), and its whole reply is kept as the result.
+8. A "Resolve the merge conflict with task/X" task is special: the launcher starts that merge in the worktree, Claude only edits out the conflict markers, and the launcher commits the merge (retrying if markers are left).
 
 `.worktrees/` is kept out of your repo's `git status` through `.git/info/exclude`, so nothing is committed to your repo.
 

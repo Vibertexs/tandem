@@ -10,6 +10,8 @@
 #   .\start.ps1 -Model auto     real workers pick the model by task difficulty (launcher/routing.json)
 #                               instead of always using haiku (the cheap default)
 #   .\start.ps1 -Notify <url>   post "goal done" to a Slack or Discord incoming webhook
+#   .\start.ps1 -Review         before a goal is done, one worker reviews its merged branch (one
+#                               more Claude run per goal; the findings go in the goal's note and PR)
 #   .\start.ps1 -Simulate -SimLimit 60   for demos: the first worker hits a usage limit on its first
 #                               task (it moves to another worker) and comes back after 60 seconds
 # Join someone else's team from this computer (starts workers here that work for that team):
@@ -31,6 +33,7 @@ param(
   [string]$Budget = '0.50',
   [string]$Notify = '',
   [int]$SimLimit = 0,
+  [switch]$Review,
   [switch]$NoBrowser
 )
 $ErrorActionPreference = 'Stop'
@@ -165,6 +168,7 @@ if ($hosting -and -not $NoManager -and (Running 'manager')) {
   $managerArgs = @('--import', (Tsx 'manager'), (Join-Path $root 'manager\watch.ts'), '--repo', $Repo, '--model', $ManagerModel, '--budget', $Budget)
   if ($Push) { $managerArgs += '--push' }
   if ($Notify) { $managerArgs += @('--notify', $Notify) }
+  if ($Review) { $managerArgs += '--review' }
   Spawn 'manager' 'node' $managerArgs 'manager'
   Write-Host '  started. The first time, "Make me the owner" on the page approves it too.'
 }

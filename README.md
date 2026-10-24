@@ -55,6 +55,7 @@ For real work, drop `-Simulate`. Each task becomes a real headless Claude Code r
 | `.\start.ps1 -Workers 4 -Repo C:\path\to\repo` | More workers, working on your own repo |
 | `.\start.ps1 -Model auto` | Real workers pick the model by task difficulty (`launcher/routing.json`) instead of always using haiku |
 | `.\start.ps1 -Notify <webhook url>` | Post "goal done" (branch, test result, cost) to a Slack or Discord channel |
+| `.\start.ps1 -Review` | Before a goal is done, a worker Claude reviews its merged branch (read only); the findings go on the goal card and in the PR |
 | `.\stop.ps1` | Stop what `start.ps1` started (`-All` stops the brain too) |
 
 The page also works on a phone.

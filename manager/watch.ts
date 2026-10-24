@@ -7,6 +7,7 @@
 //   npx tsx watch.ts [--repo <path>] [--budget 0.50] [--model haiku] [--push]
 // --push: push each finished goal branch to origin (and open a PR if the GitHub CLI is set up).
 // --notify <url>: post "goal done" to a Slack or Discord incoming webhook (or set TANDEM_WEBHOOK).
+// --review: before a goal is done, one worker reviews its merged branch; the findings go in the note.
 //
 // The first time, it asks to become an operator. Click Approve on "Manager Claude" on the page.
 // Its login is saved, so this happens once.
@@ -27,6 +28,7 @@ const { values: opt } = parseArgs({
     poll: { type: 'string', default: '3' },
     push: { type: 'boolean', default: false },
     notify: { type: 'string', default: process.env.TANDEM_WEBHOOK },
+    review: { type: 'boolean', default: false },
   },
 });
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -118,8 +120,8 @@ for (;;) {
           markGoal: (id, status) => brain.markGoal(id, status),
           assignTask: t => brain.assignTask(t),
         };
-        const outcome = await finishGoal(finisher, REPO, g, mine, undefined, opt.push);
-        log(outcome === 'done' ? `goal ${g.id} done` : `goal ${g.id}: added a task to resolve a merge conflict or fix the tests`);
+        const outcome = await finishGoal(finisher, REPO, g, mine, { push: opt.push, review: opt.review });
+        log(outcome === 'done' ? `goal ${g.id} done` : `goal ${g.id}: added a task (a merge conflict, failing tests or the review)`);
         if (outcome === 'done' && opt.notify) {
           const sent = await notify(opt.notify, goalDoneMessage(g, mine, finished.branch, finished.note));
           log(sent ? 'posted to the webhook' : 'could not post to the webhook');

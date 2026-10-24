@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Goal, Task, TaskDraft } from '../../mcp/src/brain-client.js';
-import { FIX_TITLE, conflictBranch, conflictTitle, finishGoal, type FinishBrain } from '../finish.js';
+import { FIX_TITLE, REVIEW_TITLE, conflictBranch, conflictTitle, finishGoal, type FinishBrain } from '../finish.js';
 import { filesWithMarkers, mergeInProgress, startConflictMerge } from '../merge.js';
 
 let failures = 0;
@@ -67,9 +67,23 @@ function repoWith(testExpect: number) {
   execFileSync('git', ['init', '-q', '--bare', bare], { stdio: 'pipe' });
   execFileSync('git', ['remote', 'add', 'origin', bare], { cwd: repo, stdio: 'pipe' });
   const { brain, calls } = fakeBrain();
-  const out = await finishGoal(brain, repo, goal, [task('a', 'task/a', ['calc.py']), task('b', 'task/b', ['test_calc.py'])], undefined, true);
+  const out = await finishGoal(brain, repo, goal, [task('a', 'task/a', ['calc.py']), task('b', 'task/b', ['test_calc.py'])], { push: true });
   const onOrigin = execFileSync('git', ['--git-dir', bare, 'branch', '--list', 'tandem/g1'], { encoding: 'utf8' }).trim();
   check('with push: the goal branch is on origin and the note says "Pushed to origin"', out === 'done' && onOrigin.includes('tandem/g1') && /Pushed to origin/.test(calls.finish?.note ?? ''), calls.finish);
+}
+{
+  // with review on: one review task before the goal is done, then its findings are in the note
+  const repo = repoWith(5);
+  const tasks = [task('a', 'task/a', ['calc.py']), task('b', 'task/b', ['test_calc.py'])];
+  const { brain, calls } = fakeBrain();
+  const out = await finishGoal(brain, repo, goal, tasks, { review: true });
+  check('review: not done yet; one review task that touches no files', out === 'fixing' && !calls.finish && calls.tasks.length === 1 &&
+    calls.tasks[0].title === REVIEW_TITLE && calls.tasks[0].files.length === 0 && /Do not edit/.test(calls.tasks[0].description ?? ''), calls);
+  const second = fakeBrain();
+  const reviewTask = { ...task('r', 'task/r-none', []), title: REVIEW_TITLE, result_summary: 'Looks good' };
+  const out2 = await finishGoal(second.brain, repo, goal, [...tasks, reviewTask], { review: true });
+  check('review: once reviewed, the goal is done and the note has the tests and the review', out2 === 'done' && second.calls.tasks.length === 0 &&
+    /Tests pass/.test(second.calls.finish?.note ?? '') && /Review: Looks good/.test(second.calls.finish?.note ?? ''), second.calls);
 }
 {
   // two tasks changed the same line: the second branch conflicts

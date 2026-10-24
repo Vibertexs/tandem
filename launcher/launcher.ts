@@ -18,7 +18,7 @@ import { BrainClient, type Task } from '../mcp/src/brain-client.js';
 import { loadRouting, route } from './routing.js';
 import { isRateLimit, resetTime } from './limits.js';
 import { filesWithMarkers, ignoreWorktrees, mergeInProgress, pushIfRemote, startConflictMerge, startFromBranches } from '../manager/merge.js';
-import { conflictBranch } from '../manager/finish.js';
+import { REVIEW_TITLE, conflictBranch } from '../manager/finish.js';
 
 const { values: opt } = parseArgs({
   options: {
@@ -85,7 +85,10 @@ async function simulate(t: Task) {
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
 
-function runClaude(cwd: string, prompt: string, model: string, effort: string, extraEnv: Record<string, string>) {
+const EDIT_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep'];
+const READ_TOOLS = ['Read', 'Glob', 'Grep']; // for the review task: it must not change anything
+
+function runClaude(cwd: string, prompt: string, model: string, effort: string, extraEnv: Record<string, string>, tools = EDIT_TOOLS) {
   const tsxEsm = 'file:///' + join(mcpDir, 'node_modules/tsx/dist/esm/index.mjs').split('\\').join('/');
   const mcpConfig = join(cwd, '..', `.tandem-mcp-${workerId}.json`);
   writeFileSync(mcpConfig, JSON.stringify({ mcpServers: { tandem: {
@@ -97,7 +100,7 @@ function runClaude(cwd: string, prompt: string, model: string, effort: string, e
   writeFileSync(settings, JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Edit|Write|MultiEdit|NotebookEdit',
     hooks: [{ type: 'command', command: `"${process.execPath}" "${join(mcpDir, 'hook', 'check-lock.mjs')}"` }] }] } }));
   const args = ['-p', '--model', model, '--mcp-config', mcpConfig, '--strict-mcp-config', '--settings', settings,
-    '--allowedTools', 'mcp__tandem', 'Read', 'Write', 'Edit', 'Glob', 'Grep', '--permission-mode', 'acceptEdits',
+    '--allowedTools', 'mcp__tandem', ...tools, '--permission-mode', 'acceptEdits',
     '--max-budget-usd', BUDGET, '--output-format', 'json'];
   if (effort && effort !== 'default') args.push('--effort', effort);
   return new Promise<{ code: number; out: string; result: string; cost: number; isError: boolean }>(done => {
@@ -135,6 +138,7 @@ async function realRun(t: Task) {
   }
   // A "resolve the merge conflict" task: start the merge here, so Claude only edits out the markers.
   const resolving = conflictBranch(t.title);
+  const reviewing = t.title === REVIEW_TITLE;
   let conflicted = t.files;
   if (resolving && !mergeInProgress(tree)) {
     try { conflicted = startConflictMerge(tree, resolving); } catch (e) {
@@ -156,13 +160,14 @@ async function realRun(t: Task) {
     `task_id: ${t.id}\ntitle: ${t.title}\ndescription: ${t.description || '(none)'}\nfiles: ${t.files.join(', ')}\n` +
     (resolving ? `The merge of ${resolving} is already in progress in this worktree. Do not run git. Conflict markers are in: ${conflicted.join(', ')}.\n` : '') +
     (startedFrom.length ? `This worktree already has the work of the tasks this one waited for (${startedFrom.join(', ')}): read their files before you start.\n` : '') +
-    `You are in a git worktree of the repo; paths are relative to it. When finished, reply with one line saying what you did.`;
+    `You are in a git worktree of the repo; paths are relative to it. ` +
+    (reviewing ? 'You can only read files. When finished, reply with the findings as the description says.' : 'When finished, reply with one line saying what you did.');
 
   let lastError = '';
   for (let attempt = 1; attempt <= 2; attempt++) {
     log(`running ${t.id} with ${model}${effort !== 'default' ? `/${effort}` : ''} (attempt ${attempt})`);
     await brain.reportProgress(workerId, t.id, `started (${model})`);
-    const { code, out, result, cost, isError } = await runClaude(tree, prompt, model, effort, {});
+    const { code, out, result, cost, isError } = await runClaude(tree, prompt, model, effort, {}, reviewing ? READ_TOOLS : EDIT_TOOLS);
     // Claude may have given the task back itself (give_back_task): then it is no longer ours.
     if (brain.getStatus().tasks.find(x => x.id === t.id)?.assignee !== workerId) return 'given back';
     if (cost > 0) await brain.recordCost(workerId, t.id, cost).catch(() => {});
@@ -183,7 +188,9 @@ async function realRun(t: Task) {
         const pushed = pushIfRemote(tree, branch);
         if (pushed !== 'pushed') await brain.reportProgress(workerId, t.id, pushed === 'no-remote' ? 'no origin remote: branch not pushed' : 'could not push the branch');
       }
-      const summary = result.trim().split('\n').filter(Boolean).pop()?.slice(0, 200) ?? 'done';
+      // a review's whole reply is its result; any other task is summed up by its last line
+      const lines = result.trim().split('\n').map(l => l.trim()).filter(Boolean);
+      const summary = (reviewing ? lines.join(' · ').slice(0, 300) : lines.pop()?.slice(0, 200)) || 'done';
       await brain.completeTask(workerId, t.id, branch, summary, t.kind === 'map' ? { status: 'ok', files_touched: t.files, findings: [], notes: summary } : undefined);
       return 'done';
     }

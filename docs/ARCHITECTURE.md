@@ -49,6 +49,7 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 - **A worker cannot finish a task:** it calls `give_back_task` with a reason (the launcher does this after two failed runs). The locks are freed and a different worker gets it. If a second worker gives it back too, it is marked failed: the page says "needs you" with the reason, and an operator presses **Try again**.
 - **Two task branches conflict:** the manager adds a "Resolve the merge conflict with task/X" task for the files that conflict. The launcher starts that merge in the worker's worktree, Claude edits out the conflict markers, and the launcher commits the merge. The goal is finished once it is merged. A conflict that is still there after its fix task is left for a person ("merge by hand").
 - **The tests fail on the goal branch:** the manager adds one "Fix the failing tests" task to the goal and checks again when it is done.
+- **With `-Review`:** before the goal is done, the manager adds one "Review the goal's work" task. The launcher runs it with read-only tools on the goal branch, and its findings go into the goal's note and the PR.
 
 ## How teammates join
 A teammate does not need approval to work. On their computer they run `.\start.ps1 -Join ws://<host>:3001 -Db <team>` (the Team page shows the exact command), or connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Ask to make changes**, and the owner clicks **Approve**. The manager asks the same way.

@@ -10,6 +10,7 @@
 #   ./start.sh --push           push task and goal branches to the repo's origin
 #   ./start.sh --model auto     real workers pick the model by task difficulty
 #   ./start.sh --notify URL     post "goal done" to a Slack or Discord incoming webhook
+#   ./start.sh --review         one worker reviews each goal's merged branch before it is done
 # Join someone else's team:
 #   ./start.sh --join ws://192.168.1.20:3001 --db tandem-local
 # More: --workers N  --repo PATH  --no-manager  --no-browser  --manager-model M  --budget USD
@@ -18,13 +19,13 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 DB=tandem-local JOIN="" REPO="" WORKERS=2 SIM=0 NOMGR=0 LAN=0 FRESH=0 PUSH=0 NOBROWSER=0
-MODEL=haiku MGRMODEL=haiku BUDGET=0.50 NOTIFY="" SIMLIMIT=0
+MODEL=haiku MGRMODEL=haiku BUDGET=0.50 NOTIFY="" SIMLIMIT=0 REVIEW=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --db) DB="$2"; shift ;; --join) JOIN="$2"; shift ;; --repo) REPO="$2"; shift ;;
     --workers) WORKERS="$2"; shift ;; --model) MODEL="$2"; shift ;; --manager-model) MGRMODEL="$2"; shift ;;
     --budget) BUDGET="$2"; shift ;; --notify) NOTIFY="$2"; shift ;; --sim-limit) SIMLIMIT="$2"; shift ;; --simulate) SIM=1 ;; --no-manager) NOMGR=1 ;; --lan) LAN=1 ;;
-    --fresh) FRESH=1 ;; --push) PUSH=1 ;; --no-browser) NOBROWSER=1 ;;
+    --fresh) FRESH=1 ;; --push) PUSH=1 ;; --no-browser) NOBROWSER=1 ;; --review) REVIEW=1 ;;
     -h|--help) sed -n '2,/^# Stop/p' "$0"; exit 0 ;;
     *) echo "unknown option: $1 (see ./start.sh --help)"; exit 2 ;;
   esac
@@ -115,9 +116,10 @@ if [ $HOSTING = 1 ] && [ $NOMGR = 0 ]; then
   step 'Manager (plans every goal you type)'
   if running manager; then echo '  already running'; else
     pushflag=""; [ $PUSH = 1 ] && pushflag=--push
+    reviewflag=""; [ $REVIEW = 1 ] && reviewflag=--review
     TANDEM_WEBHOOK="$NOTIFY" TANDEM_TOKEN_FILE="$ROOT/mcp/.tandem/manager-token-$DB" spawn manager manager "$ROOT" \
       node --import "$(fileurl "$ROOT/manager/node_modules/tsx/dist/esm/index.mjs")" "$ROOT/manager/watch.ts" \
-      --repo "$REPO" --model "$MGRMODEL" --budget "$BUDGET" $pushflag
+      --repo "$REPO" --model "$MGRMODEL" --budget "$BUDGET" $pushflag $reviewflag
     echo '  started. The first time, "Make me the owner" on the page approves it too.'
   fi
 fi
