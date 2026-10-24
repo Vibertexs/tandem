@@ -117,7 +117,7 @@ textarea { resize: vertical; }
 .nav a:hover { background: var(--card); }
 .nav a[aria-current='page'] { background: var(--card); box-shadow: inset 3px 0 0 var(--accent-strong); }
 .nav-icon { width: 20px; text-align: center; color: var(--muted); }
-.badge-count { margin-left: auto; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--accent-strong); color: #fff; font-size: 0.75rem; display: grid; place-items: center; }
+.badge-count { margin-left: auto; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--accent-strong); color: var(--bg); font-size: 0.75rem; display: grid; place-items: center; }
 .you { margin-top: auto; padding: 0 6px; }
 .main { min-width: 0; display: flex; flex-direction: column; }
 .topbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 18px 28px 6px; }
@@ -193,7 +193,7 @@ span.goal-pick { cursor: default; }
 .goal-tasks li.stage-done { color: var(--muted); }
 .goal-tasks li.stage-doing span[aria-hidden] { color: var(--accent-strong); }
 .branch-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; background: var(--accent-soft); border-radius: 10px; }
-.chip.goal-done { background: var(--accent-strong); color: #fff; border-color: transparent; }
+.chip.goal-done { background: var(--accent-strong); color: var(--bg); border-color: transparent; }
 
 /* ---- task details drawer ---- */
 .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.18); z-index: 30; }

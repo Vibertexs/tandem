@@ -5,6 +5,8 @@
 #   .\start.ps1 -Simulate       workers fake the coding (no Claude calls for the work; good for demos)
 #   .\start.ps1 -Lan            also let other computers on your network join (prints the address)
 #   .\start.ps1 -Fresh          wipe the team's database first
+#   .\start.ps1 -Model auto     real workers pick the model by task difficulty (launcher/routing.json)
+#                               instead of always using haiku (the cheap default)
 # Join someone else's team from this computer (starts workers here that work for that team):
 #   .\start.ps1 -Join ws://192.168.1.20:3001 -Db tandem-local
 # Stop:
@@ -19,6 +21,7 @@ param(
   [switch]$Lan,
   [switch]$Fresh,
   [string]$Model = 'haiku',
+  [string]$ManagerModel = 'haiku',
   [string]$Budget = '0.50',
   [switch]$NoBrowser
 )
@@ -133,19 +136,20 @@ if ($hosting -and -not $NoManager -and (Running 'manager')) {
 } elseif ($hosting -and -not $NoManager) {
   Step 'Manager (plans every goal you type)'
   $env:TANDEM_TOKEN_FILE = Join-Path $root "mcp\.tandem\manager-token-$Db"
-  Spawn 'manager' 'node' @('--import', (Tsx 'manager'), (Join-Path $root 'manager\watch.ts'), '--repo', $Repo, '--model', $Model, '--budget', $Budget) 'manager'
+  Spawn 'manager' 'node' @('--import', (Tsx 'manager'), (Join-Path $root 'manager\watch.ts'), '--repo', $Repo, '--model', $ManagerModel, '--budget', $Budget) 'manager'
   Write-Host '  started. The first time, the page asks you to approve "Manager Claude".'
 }
 
 if ($Workers -gt 0) {
-  Step ("$Workers worker(s)" + $(if ($Simulate) { ' (simulated: no Claude calls)' } else { " (real Claude runs, $Model)" }))
+  Step ("$Workers worker(s)" + $(if ($Simulate) { ' (simulated: no Claude calls)' } elseif ($Model -eq 'auto') { ' (real Claude runs, model by difficulty)' } else { " (real Claude runs, $Model)" }))
   $names = 'Alex', 'Sam', 'Jordan', 'Taylor', 'Riley', 'Casey'
   $offset = if ($hosting) { 0 } else { 3 }   # joiners get other names than the host's workers
   for ($i = 0; $i -lt $Workers; $i++) {
     $name = $names[($i + $offset) % $names.Count] + $(if ($hosting) { '' } else { "-$env:COMPUTERNAME".ToLower() })
     if (Running "worker $name") { Write-Host "  $name (already running)"; continue }
     $env:TANDEM_TOKEN_FILE = Join-Path $root "mcp\.tandem\worker-$name-$Db"
-    $env:LAUNCHER_MODEL = $Model; $env:LAUNCHER_BUDGET_USD = $Budget
+    if ($Model -eq 'auto') { Remove-Item Env:LAUNCHER_MODEL -ErrorAction SilentlyContinue } else { $env:LAUNCHER_MODEL = $Model }
+    $env:LAUNCHER_BUDGET_USD = $Budget
     $nodeArgs = @('--import', (Tsx 'launcher'), (Join-Path $root 'launcher\launcher.ts'), '--name', $name, '--repo', $Repo)
     if ($Simulate) { $nodeArgs += @('--simulate', '--sim-ms', '3000') }
     Spawn "worker $name" 'node' $nodeArgs "worker-$name"

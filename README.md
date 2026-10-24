@@ -14,7 +14,8 @@ When a few people each run an AI coding agent on the same repo:
 - **One prompt for the whole team.** Type a goal. The manager Claude turns it into small tasks, with the exact files each one touches and what has to happen first.
 - **No collisions, guaranteed.** Claiming a task locks its files in one atomic step, so two agents can never get the same task or the same file. A hook stops a Claude that tries to edit a file someone else holds.
 - **Work goes to whoever has room.** Workers pull tasks themselves. A worker that hits its usage limit hands its task back, and a crashed one gives its files back after two minutes.
-- **A live board.** Waiting → To do → In progress → Done. You see who is on what, for how long, their latest note, and why each task is where it is.
+- **One checked branch per goal.** When a goal's tasks are done, the manager merges them into one branch, `tandem/<goal>`, and runs your tests on it. If they fail, it adds a task to fix them before calling the goal done.
+- **A live board.** Waiting → To do → In progress → Done, per goal or all together. You see who is on what, for how long, their latest note, and why each task is where it is.
 
 | Start | Approve the manager | A task's details |
 |---|---|---|
@@ -42,7 +43,7 @@ On the page:
 2. Click **Approve** on "Manager Claude".
 3. Describe what you want built, for example *"A tiny Python calculator with add and sub, tests, and a README"*. Watch the board.
 
-For real work, drop `-Simulate`: each task becomes a real headless Claude Code run in its own git worktree and branch. Stop everything with `.\stop.ps1`.
+For real work, drop `-Simulate`. Each task becomes a real headless Claude Code run in its own git worktree and branch. When the goal is done, its work is on one branch (the page shows it, with a copy-able `git checkout`). Stop everything with `.\stop.ps1`.
 
 | Command | What it does |
 |---|---|
@@ -51,6 +52,7 @@ For real work, drop `-Simulate`: each task becomes a real headless Claude Code r
 | `.\start.ps1 -Lan` | Let other computers on your network join; prints the address |
 | `.\start.ps1 -Join ws://<host>:3001 -Db <team>` | Add this computer's workers to someone else's team |
 | `.\start.ps1 -Workers 4 -Repo C:\path\to\repo` | More workers, working on your own repo |
+| `.\start.ps1 -Model auto` | Real workers pick the model by task difficulty (`launcher/routing.json`) instead of always using haiku |
 | `.\stop.ps1` | Stop what `start.ps1` started (`-All` stops the brain too) |
 
 The page also works on a phone.
@@ -73,14 +75,14 @@ Nothing talks to anything else directly. Every part reads and writes the brain, 
 |---|---|
 | `brain/` | The SpacetimeDB module (TypeScript): tables and the atomic rules |
 | `mcp/` | The MCP server: the 16 tools every Claude uses (`contract/tools.json`), the worker rules skill, the lock-check hook |
-| `manager/` | The manager's prompt and the watcher that plans each new goal |
+| `manager/` | The manager's prompt, the watcher that plans each new goal, and the merge-and-test step that finishes it |
 | `launcher/` | The worker: claims tasks, runs `claude -p` in a worktree, routes model and effort by difficulty |
 | `dashboard/` | The web page (React) |
 | `contract/` | The shared contract: tables, tools, result format |
 | `docs/` | Architecture, status, the original spec |
 
 ## Tested
-Every suite passes on the final commit. See [docs/STATUS.md](docs/STATUS.md) for the latest numbers and commands.
+Every suite passes on the final commit. See [docs/STATUS.md](docs/STATUS.md) for the latest numbers and commands, and [docs/ROADMAP.md](docs/ROADMAP.md) for where this goes next.
 - **Atomic rules:** 10 clients race for one task and exactly one wins. Lock conflicts leave no partial locks. A merge task opens exactly once.
 - **MCP tools:** all 16, through the real MCP protocol, plus a mock mode.
 - **The page:** the whole first-use journey in Chrome, on desktop and phone.
@@ -88,7 +90,7 @@ Every suite passes on the final commit. See [docs/STATUS.md](docs/STATUS.md) for
   - Goal → manager → two workers → done, and the workers' own tests pass.
   - A Claude blocked from editing a locked file.
   - The launcher committing work on its task branch.
-  - `start.ps1` from a goal on the page to a full board.
+  - `start.ps1` with real workers: a goal typed on the page, planned, built by two Claudes, merged into one branch, and its tests passing.
 
 ## Limits
 - The scripts are PowerShell (Windows). On macOS or Linux, run the same steps by hand (see each folder's README).
