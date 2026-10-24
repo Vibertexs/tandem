@@ -16,7 +16,8 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { BrainClient, type Task } from '../mcp/src/brain-client.js';
 import { loadRouting, route } from './routing.js';
-import { pushIfRemote } from '../manager/merge.js';
+import { filesWithMarkers, mergeInProgress, pushIfRemote, startConflictMerge } from '../manager/merge.js';
+import { conflictBranch } from '../manager/finish.js';
 
 const { values: opt } = parseArgs({
   options: {
@@ -108,6 +109,19 @@ async function realRun(t: Task) {
     if (t.goal_id) { try { git(repo, 'rev-parse', '--verify', '--quiet', `refs/heads/tandem/${t.goal_id}`); base = `tandem/${t.goal_id}`; } catch { /* no goal branch yet */ } }
     git(repo, 'worktree', 'add', '-q', '-b', branch, tree, base);
   }
+  // A "resolve the merge conflict" task: start the merge here, so Claude only edits out the markers.
+  const resolving = conflictBranch(t.title);
+  let conflicted = t.files;
+  if (resolving && !mergeInProgress(tree)) {
+    try { conflicted = startConflictMerge(tree, resolving); } catch (e) {
+      await brain.giveBackTask(workerId, t.id, (e as Error).message);
+      return 'given back';
+    }
+    if (conflicted.length === 0) {
+      await brain.completeTask(workerId, t.id, branch, `${resolving} merged cleanly`);
+      return 'done';
+    }
+  }
   const me = brain.getCapacity().find(w => w.id === workerId);
   const routing = loadRouting();
   let { model, effort } = route(t, me?.usage_5h_pct ?? null, routing);
@@ -116,6 +130,7 @@ async function realRun(t: Task) {
   const prompt = `${skill}\n\n## Your task (already claimed for you)\nThe launcher claimed this task for you and will complete it when you finish. ` +
     `Do NOT call register_worker, claim_task or complete_task. Do use report_progress and lock_files.\n` +
     `task_id: ${t.id}\ntitle: ${t.title}\ndescription: ${t.description || '(none)'}\nfiles: ${t.files.join(', ')}\n` +
+    (resolving ? `The merge of ${resolving} is already in progress in this worktree. Do not run git. Conflict markers are in: ${conflicted.join(', ')}.\n` : '') +
     `You are in a git worktree of the repo; paths are relative to it. When finished, reply with one line saying what you did.`;
 
   let lastError = '';
@@ -132,7 +147,14 @@ async function realRun(t: Task) {
       await brain.reportCapacity(workerId, 100, null, null);
       return 'capped';
     }
+    const leftover = resolving && code === 0 && !isError ? filesWithMarkers(tree, conflicted) : [];
+    if (leftover.length > 0) {
+      lastError = `conflict markers are still in ${leftover.join(', ')}`;
+      effort = routing.retry_effort;
+      continue;
+    }
     if (code === 0 && !isError) {
+      // (for a conflict task this commit also concludes the merge)
       git(tree, 'add', '-A');
       const dirty = git(tree, 'status', '--porcelain');
       if (dirty) git(tree, '-c', 'user.name=tandem', '-c', 'user.email=tandem@localhost', 'commit', '-q', '-m', `${t.title} (${t.id})`);

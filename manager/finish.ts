@@ -1,5 +1,6 @@
 // What happens when every task of a goal is done:
-//   1. merge the task branches into tandem/<goal id> (merge.ts);
+//   1. merge the task branches into tandem/<goal id> (merge.ts); a branch that conflicts gets ONE
+//      "resolve the merge conflict" task in the same goal, and the goal is finished when it is done;
 //   2. run the project's tests on that branch (verify.ts);
 //   3. tests pass (or there are none): the goal is done;
 //      tests fail: add ONE "fix the failing tests" task to the same goal, and try again when it
@@ -11,6 +12,10 @@ import { mergeGoal, mergeNote, openPullRequest, pushIfRemote } from './merge.js'
 import { testBranch, type TestRun } from './verify.js';
 
 export const FIX_TITLE = 'Fix the failing tests';
+// The launcher reads the branch back out of the title, starts the merge and lets Claude edit
+// out the conflict markers.
+export const conflictTitle = (branch: string) => `Resolve the merge conflict with ${branch}`;
+export const conflictBranch = (title: string) => /^Resolve the merge conflict with (task\/\S+)$/.exec(title)?.[1] ?? null;
 
 // The few brain calls this needs (BrainClient has them; tests pass a fake).
 export type FinishBrain = {
@@ -26,7 +31,9 @@ export async function finishGoal(
   test: (repo: string, branch: string) => TestRun = testBranch,
   push = false,
 ): Promise<Outcome> {
-  const branches = [...new Set(tasks.map(t => t.branch ?? '').filter(b => b.startsWith('task/')))];
+  // Conflict fixes first: each one already contains the branch it fixed, which then merges as a no-op.
+  const ordered = [...tasks.filter(t => conflictBranch(t.title)), ...tasks.filter(t => !conflictBranch(t.title))];
+  const branches = [...new Set(ordered.map(t => t.branch ?? '').filter(b => b.startsWith('task/')))];
   if (branches.length === 0) {
     const simulated = tasks.some(t => (t.branch ?? '').startsWith('sim/'));
     await brain.finishGoal(goal.id, '', simulated ? '(Simulated workers: there is no code to merge.)' : '');
@@ -37,6 +44,24 @@ export async function finishGoal(
     return 'done';
   }
   const merged = mergeGoal(repo, goal.id, goal.text, branches);
+  const toResolve = merged.failed.filter(b => !tasks.some(t => t.title === conflictTitle(b)));
+  if (toResolve.length > 0) {
+    // one task per conflicting branch, planned into the same goal; tests run once they are merged
+    await brain.markGoal(goal.id, 'planning');
+    for (const b of toResolve) {
+      const files = merged.conflicts[b]?.length ? merged.conflicts[b] : [...new Set(tasks.filter(t => t.branch === b).flatMap(t => t.files))];
+      await brain.assignTask({
+        title: conflictTitle(b),
+        description: `${b} conflicts with the rest of this goal's work on ${merged.target}, in: ${files.join(', ')}. ` +
+          'The merge is started for you and the files have conflict markers. Edit each one so both sides\' changes are kept, ' +
+          'and remove every <<<<<<<, ======= and >>>>>>> line. Change nothing else.',
+        files,
+        difficulty: 'normal',
+      });
+    }
+    await brain.markGoal(goal.id, 'planned');
+    return 'fixing';
+  }
   let note = mergeNote(merged);
   if (merged.merged.length > 0) {
     const run = test(repo, merged.target);

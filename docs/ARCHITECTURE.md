@@ -47,6 +47,7 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 - **A worker crashes:** no heartbeat for 2 minutes, so the brain frees its locks and reopens its task.
 - **A worker hits its limit (usage 100):** it is capped and its running task goes back to the queue.
 - **A worker cannot finish a task:** it calls `give_back_task` with a reason (the launcher does this after two failed runs). The locks are freed and a different worker gets it. If a second worker gives it back too, it is marked failed: the page says "needs you" with the reason, and an operator presses **Try again**.
+- **Two task branches conflict:** the manager adds a "Resolve the merge conflict with task/X" task for the files that conflict. The launcher starts that merge in the worker's worktree, Claude edits out the conflict markers, and the launcher commits the merge. The goal is finished once it is merged. A conflict that is still there after its fix task is left for a person ("merge by hand").
 - **The tests fail on the goal branch:** the manager adds one "Fix the failing tests" task to the goal and checks again when it is done.
 
 ## How teammates join
@@ -60,6 +61,5 @@ A teammate does not need approval to work. On their computer they run `.\start.p
 A team is one database on a brain (`-Db`, default `tandem-local`). The page and every Claude use its `live` session. The brain still supports other sessions (the tests use them to stay isolated).
 
 ## Open design questions
-- Merge conflicts: the manager merges a goal's `task/<id>` branches into `tandem/<goal>` and reports any branch it could not merge. Resolving those is still by hand. A "resolve the conflict" task for a worker Claude is the next step.
 - Identities are saved tokens, not accounts. A real login (GitHub through SpacetimeDB's OIDC support) is the next step before hosting publicly.
 - Hosting: teammates on other machines and judges need a public brain (Maincloud or a tunnel). Nothing is deployed.

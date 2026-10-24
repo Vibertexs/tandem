@@ -2,10 +2,11 @@
 // worktree, so the files you have open in the repo are never touched. A branch that conflicts
 // is skipped (the merge is aborted) and reported; nothing is ever forced.
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-export type MergeResult = { target: string; merged: string[]; failed: string[]; missing: string[] };
+// failed: branches that conflicted; conflicts: the files each one conflicted in.
+export type MergeResult = { target: string; merged: string[]; failed: string[]; missing: string[]; conflicts: Record<string, string[]> };
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.name=Tandem', '-c', 'user.email=tandem@localhost', ...args], { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
@@ -14,7 +15,7 @@ export function mergeGoal(repo: string, goalId: string, goalText: string, branch
   const hasBranch = (b: string) => { try { git(repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`); return true; } catch { return false; } };
   const target = `tandem/${goalId}`;
   const tree = join(repo, '.worktrees', `merge-${goalId}`);
-  const result: MergeResult = { target, merged: [], failed: [], missing: [] };
+  const result: MergeResult = { target, merged: [], failed: [], missing: [], conflicts: {} };
   try {
     git(repo, 'worktree', 'prune');
     if (existsSync(tree)) git(repo, 'worktree', 'remove', '--force', tree);
@@ -29,6 +30,7 @@ export function mergeGoal(repo: string, goalId: string, goalText: string, branch
         git(tree, 'merge', '--no-ff', '--no-edit', '-m', `Merge ${b} (${goalText.slice(0, 50)})`, b);
         result.merged.push(b);
       } catch {
+        result.conflicts[b] = conflictedFiles(tree);
         try { git(tree, 'merge', '--abort'); } catch { /* nothing to abort */ }
         result.failed.push(b);
       }
@@ -37,6 +39,36 @@ export function mergeGoal(repo: string, goalId: string, goalText: string, branch
     try { git(repo, 'worktree', 'remove', '--force', tree); } catch { /* already gone */ }
   }
   return result;
+}
+
+const conflictedFiles = (tree: string) => {
+  try { return git(tree, 'diff', '--name-only', '--diff-filter=U').split('\n').map(f => f.trim()).filter(Boolean); } catch { return []; }
+};
+
+// For a "resolve the conflict" task: starts merging `branch` into the worktree's branch and
+// leaves the conflict markers in place for Claude to edit out. Returns the conflicted files
+// ([] if it merged cleanly, so there is nothing left to do). Committing the worktree afterwards
+// concludes the merge. Throws if the branch cannot be merged at all (for example, it is missing).
+export function startConflictMerge(tree: string, branch: string): string[] {
+  try { git(tree, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`); } catch {
+    try { git(tree, 'fetch', '-q', 'origin', `${branch}:${branch}`); } catch { throw new Error(`${branch} is not on this computer`); }
+  }
+  try { git(tree, 'merge', '--no-ff', '--no-edit', '-m', `Merge ${branch}`, branch); return []; } catch {
+    const files = conflictedFiles(tree);
+    if (files.length === 0) throw new Error(`could not merge ${branch}`);
+    return files;
+  }
+}
+
+export const mergeInProgress = (tree: string) => {
+  try { git(tree, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD'); return true; } catch { return false; }
+};
+
+// The files that still have conflict markers in them.
+export function filesWithMarkers(tree: string, files: string[]): string[] {
+  return files.filter(f => {
+    try { return /^(<{7}|>{7}) /m.test(readFileSync(join(tree, f), 'utf8')); } catch { return false; }
+  });
 }
 
 export function mergeNote(r: MergeResult): string {
