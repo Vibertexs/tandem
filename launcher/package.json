@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx launcher.ts",
-    "test": "tsx test/routing.test.ts && tsx test/limits.test.ts && tsx test/simulate.test.ts",
+    "test": "tsx test/routing.test.ts && tsx test/limits.test.ts && tsx test/simulate.test.ts && tsx test/codex.test.ts",
     "test:real": "tsx test/real.ts",
     "test:conflict": "tsx test/conflict-real.ts"
   },

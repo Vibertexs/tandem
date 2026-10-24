@@ -238,6 +238,7 @@ textarea { resize: vertical; }
 .rows .row:last-child { border-bottom: 0; }
 ul.rows.card { padding: 6px 18px; }
 .who { display: inline-flex; align-items: center; gap: 8px; }
+.chip.agent-codex { background: var(--panel); color: var(--ink); }
 .filters { margin-bottom: 10px; }
 .filters .chip { cursor: pointer; font: inherit; font-size: 0.85rem; min-height: 32px; padding: 0 12px; }
 .filters .chip.on { background: var(--accent-soft); border-color: var(--accent-strong); color: var(--ink); }

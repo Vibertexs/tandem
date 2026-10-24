@@ -240,6 +240,11 @@ export class BrainClient implements Brain {
     await this.conn.reducers.finishGoal({ sessionId: this.session, id: goalId, branch, note });
   }
 
+  // which coding agent this worker runs and which login it uses (the launcher sends this)
+  async describeWorker(workerId: string, agent: string, account: string) {
+    await this.conn.reducers.describeWorker({ sessionId: this.session, workerId, agent, account });
+  }
+
   async failGoal(goalId: string, note: string) {
     await this.conn.reducers.failGoal({ sessionId: this.session, id: goalId, note });
   }

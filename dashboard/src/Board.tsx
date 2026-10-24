@@ -1,7 +1,7 @@
 // The main page: tell the team what to build, then watch the tasks move across the board.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Api, Goal, Snapshot, Task } from './brain';
-import { Avatar, EV_ICON, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, money, online, stageOf, took, why, type Stage } from './ui';
+import { Avatar, EV_ICON, agentLabel, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, money, online, stageOf, took, why, type Stage } from './ui';
 
 type Props = { snap: Snapshot; api: Api | null; isOp: boolean; now: number; say: (m: string) => void; present: boolean; go: (page: string) => void };
 
@@ -320,7 +320,7 @@ function Drawer({ t, snap, now, onClose, api, isOp, say }: { t: Task; snap: Snap
       <p className="muted mono small">{t.id}</p>
       <dl className="facts">
         {t.goalId && <><dt>Goal</dt><dd>{snap.goals.find(g => g.id === t.goalId)?.text ?? t.goalId}</dd></>}
-        <dt>Assignee</dt><dd>{who ? <span className="who"><Avatar name={who.name} size={22} /> {who.name}</span> : t.assignee ? `Reserved for ${t.assignee}` : 'Nobody yet'}</dd>
+        <dt>Assignee</dt><dd>{who ? <span className="who"><Avatar name={who.name} size={22} /> {who.name} <span className="small muted">{agentLabel(who)}</span></span> : t.assignee ? `Reserved for ${t.assignee}` : 'Nobody yet'}</dd>
         <dt>Files</dt><dd className="mono small">{t.files.map(f => <div key={f}>{snap.locks.some(l => l.path === f) ? '🔒 ' : ''}{f}</div>)}</dd>
         {deps.length > 0 && <><dt>After</dt><dd>{deps.map(d => <div key={d.id}>{d.status === 'done' ? '✓' : '○'} {d.title}</div>)}</dd></>}
         <dt>Model</dt><dd>{t.model || 'by difficulty'} · {t.difficulty}</dd>

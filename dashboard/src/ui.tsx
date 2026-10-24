@@ -142,6 +142,10 @@ export const EV_ICON: Record<string, string> = {
 };
 
 export const isManager = (name: string) => /manager/i.test(name);
+
+// "Claude · work1", "Codex · school", or just "Claude" on the default login
+export const agentLabel = (w: { agent: string; account: string }) =>
+  `${w.agent === 'codex' ? 'Codex' : 'Claude'}${w.account ? ` · ${w.account}` : ''}`;
 // "$0.04" (or "$0.004" for tiny amounts), what a Claude run cost as reported by claude -p
 export const money = (usd: number) => `$${usd > 0 && usd < 0.01 ? usd.toFixed(3) : usd.toFixed(2)}`;
 // The manager pings every 15 seconds while it runs.

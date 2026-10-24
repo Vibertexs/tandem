@@ -1,13 +1,18 @@
-// The launcher: one per teammate, on their own machine, logged in as themselves.
-// It pulls tasks from the brain and runs each as a fresh headless Claude Code run in its own git
-// worktree. The Python placeholder launcher.py is left untouched.
+// The launcher: one per worker, logged in as whoever runs it.
+// It pulls tasks from the brain and runs each as a fresh headless agent run in its own git
+// worktree: Claude Code (claude -p) or Codex (codex exec). The Python placeholder launcher.py is
+// left untouched.
 //
-//   tsx launcher.ts --name Sam [--plan pro] [--repo <path>] [--simulate] [--exit-when-idle] [--max-tasks N] [--push]
+//   tsx launcher.ts --name Sam [--agent claude|codex] [--account <label>] [--plan pro] [--repo <path>]
+//                   [--simulate] [--exit-when-idle] [--max-tasks N] [--push]
 // --push: push each task branch to origin, so a host on another computer can merge it.
+// --account: only a label for the page; the login itself is CLAUDE_CONFIG_DIR or CODEX_HOME.
 //
 // Env: STDB_URI, STDB_DB, TANDEM_SESSION (default live), TANDEM_TOKEN_FILE,
 //      LAUNCHER_BUDGET_USD  per-run cap for claude -p (default 0.50)
 //      LAUNCHER_MODEL       force one model for every run (for cheap tests), else routing.json decides
+//      CLAUDE_CONFIG_DIR    (claude) which login to use; CODEX_HOME (codex) which login, required
+//      TANDEM_CODEX         a node script standing in for codex (tests only)
 // --simulate makes no Claude calls: timed progress and canned results, so the demo works anywhere.
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -32,9 +37,16 @@ const { values: opt } = parseArgs({
     'sim-ms': { type: 'string', default: '1500' },
     push: { type: 'boolean', default: false },
     'sim-limit': { type: 'string', default: '0' }, // simulate: hit a usage limit on the first task, lasting N seconds
+    agent: { type: 'string', default: 'claude' },
+    account: { type: 'string', default: '' },
   },
 });
 if (!opt.name) { console.error('usage: tsx launcher.ts --name <name> [--simulate] ...'); process.exit(2); }
+if (opt.agent !== 'claude' && opt.agent !== 'codex') { console.error('--agent is claude or codex'); process.exit(2); }
+if (opt.agent === 'codex' && !opt.simulate && !process.env.CODEX_HOME) {
+  console.error('A Codex worker needs its own login folder (CODEX_HOME). Add one with: tandem account add <label> --agent codex');
+  process.exit(2);
+}
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const mcpDir = resolve(here, '..', 'mcp');
@@ -48,8 +60,9 @@ const log = (m: string) => console.log(`[${opt.name}] ${m}`);
 
 const brain = await BrainClient.connect(URI, DB, SESSION);
 await brain.registerWorker(workerId, opt.name, opt.plan!);
+await brain.describeWorker(workerId, opt.agent!, opt.account!);
 const beat = setInterval(() => { brain.heartbeat(workerId).catch(() => {}); }, 30_000);
-log(`registered as ${workerId} in ${DB}/${SESSION}${opt.simulate ? ' (simulate)' : ''}`);
+log(`registered as ${workerId} in ${DB}/${SESSION}, ${opt.agent}${opt.account ? ` (${opt.account})` : ''}${opt.simulate ? ' (simulate)' : ''}`);
 
 const cannedResult = (t: Task) => ({
   status: 'ok', files_touched: t.files,
@@ -119,6 +132,51 @@ function runClaude(cwd: string, prompt: string, model: string, effort: string, e
   });
 }
 
+// Codex reads its MCP servers from config.toml in its login folder (CODEX_HOME). The tandem
+// server goes between two marker lines, so anything else you set there is kept.
+function writeCodexConfig(home: string) {
+  const tsxEsm = 'file:///' + join(mcpDir, 'node_modules/tsx/dist/esm/index.mjs').split('\\').join('/');
+  const s = (v: string) => JSON.stringify(v); // a JSON string is a valid TOML string
+  const env: Record<string, string> = { STDB_URI: URI, STDB_DB: DB, TANDEM_SESSION: SESSION, TANDEM_WORKER_ID: workerId };
+  if (process.env.TANDEM_TOKEN_FILE) env.TANDEM_TOKEN_FILE = process.env.TANDEM_TOKEN_FILE;
+  const block = ['# tandem begin (written by the Tandem launcher)', '[mcp_servers.tandem]',
+    `command = ${s(process.execPath)}`,
+    `args = [${[ '--import', tsxEsm, join(mcpDir, 'src', 'server.ts') ].map(s).join(', ')}]`,
+    `env = { ${Object.entries(env).map(([k, v]) => `${k} = ${s(v)}`).join(', ')} }`, '# tandem end'].join('\n');
+  const file = join(home, 'config.toml');
+  mkdirSync(home, { recursive: true });
+  const old = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  const kept = old.replace(/# tandem begin[\s\S]*?# tandem end\n?/, '').trimEnd();
+  writeFileSync(file, `${kept ? `${kept}\n\n` : ''}${block}\n`);
+}
+
+// One codex exec run in the worktree, the prompt on stdin. Reviews run read-only.
+function runCodex(cwd: string, prompt: string, readOnly: boolean) {
+  writeCodexConfig(process.env.CODEX_HOME!);
+  const last = join(cwd, '..', `.tandem-codex-${workerId}.txt`);
+  const args = ['exec', '--skip-git-repo-check', '--cd', cwd, '--output-last-message', last,
+    ...(readOnly ? ['--sandbox', 'read-only'] : ['--full-auto']), '-'];
+  // npm installs codex as a .cmd shim on Windows, which needs a shell
+  const fake = process.env.TANDEM_CODEX;
+  const shell = !fake && process.platform === 'win32';
+  const cmd = fake ? process.execPath : 'codex';
+  const argv = fake ? [fake, ...args] : shell ? args.map(a => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a)) : args;
+  return new Promise<{ code: number; out: string; result: string; cost: number; isError: boolean }>(done => {
+    const child = spawn(cmd, argv, { cwd, shell, env: { ...process.env, TANDEM_WORKER_ID: workerId } });
+    let out = '';
+    child.stdout.on('data', d => { out += d; });
+    child.stderr.on('data', d => { out += d; });
+    child.on('error', e => { out += String(e); });
+    child.on('close', code => {
+      let result = '';
+      try { result = readFileSync(last, 'utf8').trim(); } catch { /* no final message */ }
+      // a ChatGPT plan has no per-run price to report
+      done({ code: code ?? 1, out, result: result || out, cost: 0, isError: code !== 0 });
+    });
+    child.stdin.end(prompt);
+  });
+}
+
 async function realRun(t: Task) {
   const repo = resolve(opt.repo!);
   const tree = join(repo, '.worktrees', t.id);
@@ -165,9 +223,12 @@ async function realRun(t: Task) {
 
   let lastError = '';
   for (let attempt = 1; attempt <= 2; attempt++) {
-    log(`running ${t.id} with ${model}${effort !== 'default' ? `/${effort}` : ''} (attempt ${attempt})`);
-    await brain.reportProgress(workerId, t.id, `started (${model})`);
-    const { code, out, result, cost, isError } = await runClaude(tree, prompt, model, effort, {}, reviewing ? READ_TOOLS : EDIT_TOOLS);
+    const runs = opt.agent === 'codex' ? 'codex' : `${model}${effort !== 'default' ? `/${effort}` : ''}`;
+    log(`running ${t.id} with ${runs} (attempt ${attempt})`);
+    await brain.reportProgress(workerId, t.id, `started (${opt.agent === 'codex' ? 'codex' : model})`);
+    const { code, out, result, cost, isError } = opt.agent === 'codex'
+      ? await runCodex(tree, prompt, reviewing)
+      : await runClaude(tree, prompt, model, effort, {}, reviewing ? READ_TOOLS : EDIT_TOOLS);
     // Claude may have given the task back itself (give_back_task): then it is no longer ours.
     if (brain.getStatus().tasks.find(x => x.id === t.id)?.assignee !== workerId) return 'given back';
     if (cost > 0) await brain.recordCost(workerId, t.id, cost).catch(() => {});

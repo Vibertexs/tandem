@@ -13,7 +13,7 @@ export function seedSnapshot(): Snapshot {
     ...emptySnapshot,
     workers: seed.workers.map(w => ({
       id: w.id, name: w.name, plan: w.plan, status: w.status, usage5h: w.usage_5h_pct, usageWeek: w.usage_week_pct,
-      resetAt: null, lastSeen: now,
+      resetAt: null, lastSeen: now, agent: 'claude', account: '',
     })),
     tasks: seed.tasks.slice(0, 8).map(t => ({
       id: t.id, jobId: t.job_id, kind: t.kind, title: t.title, description: t.description, files: t.files,

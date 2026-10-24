@@ -122,6 +122,8 @@ export const Workers = __t.object("Workers", {
   resetAt: __t.option(__t.timestamp()),
   lastSeen: __t.timestamp(),
   owner: __t.string(),
+  agent: __t.string(),
+  account: __t.string(),
 });
 export type Workers = __Infer<typeof Workers>;
 

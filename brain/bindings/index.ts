@@ -44,6 +44,7 @@ import ClearBoardReducer from "./clear_board_reducer";
 import CompleteTaskReducer from "./complete_task_reducer";
 import CreateJobReducer from "./create_job_reducer";
 import CreateTaskReducer from "./create_task_reducer";
+import DescribeWorkerReducer from "./describe_worker_reducer";
 import DismissRequestReducer from "./dismiss_request_reducer";
 import FailGoalReducer from "./fail_goal_reducer";
 import FinishGoalReducer from "./finish_goal_reducer";
@@ -217,6 +218,7 @@ const reducersSchema = __reducers(
   __reducerSchema("complete_task", CompleteTaskReducer),
   __reducerSchema("create_job", CreateJobReducer),
   __reducerSchema("create_task", CreateTaskReducer),
+  __reducerSchema("describe_worker", DescribeWorkerReducer),
   __reducerSchema("dismiss_request", DismissRequestReducer),
   __reducerSchema("fail_goal", FailGoalReducer),
   __reducerSchema("finish_goal", FinishGoalReducer),

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import type { Api, Snapshot } from './brain';
 import { shareable, type Team } from './config';
-import { Avatar, Bar, CodeLine, EV_ICON, WorkerStatus, ago, copy, isManager, money, online, took, liveInfo } from './ui';
+import { Avatar, Bar, CodeLine, EV_ICON, WorkerStatus, agentLabel, ago, copy, isManager, money, online, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
 
@@ -41,7 +41,7 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
           const spent = snap.tasks.filter(t => t.assignee === w.id).reduce((sum, t) => sum + t.costUsd, 0);
           return (
             <article key={w.id} className={`card worker ${online(w, now) ? '' : 'is-offline'}`} aria-label={w.name}>
-              <header><Avatar name={w.name} size={36} /><div><strong>{w.name}</strong><div className="small muted">{w.plan} plan · seen {ago(w.lastSeen, now)}</div></div><WorkerStatus w={w} now={now} /></header>
+              <header><Avatar name={w.name} size={36} /><div><strong>{w.name}</strong><div className="small muted"><span className={`chip agent-${w.agent}`}>{agentLabel(w)}</span> seen {ago(w.lastSeen, now)}</div></div><WorkerStatus w={w} now={now} /></header>
               <p className="small">{current ? <>On <strong>{current.title}</strong>{info?.since ? ` for ${took(info.since, now)}` : ''}</> : <span className="muted">No task right now</span>}</p>
               <Bar label="5 hours" value={w.usage5h} />
               <Bar label="Week" value={w.usageWeek} />

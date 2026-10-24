@@ -40,7 +40,8 @@ $suites = @(
   @('mcp: lock-check hook', 'mcp', 'npm.cmd run test:hook'),
   @('launcher: routing, limits, simulate', 'launcher', 'npm.cmd run test'),
   @('manager: merge, conflicts, test, finish, notify', 'manager', 'npm.cmd run test'),
-  @('page in Chrome', 'dashboard', 'npx.cmd tsx test/ui.test.ts')
+  @('page in Chrome', 'dashboard', 'npx.cmd tsx test/ui.test.ts'),
+  @('tandem command: accounts, start, stop', '.', 'node cli/cli.test.ts')
 )
 if ($Restart) { $suites += , @('page + worker survive a brain restart', 'dashboard', 'npx.cmd tsx test/reconnect.test.ts') }
 if ($Real) {

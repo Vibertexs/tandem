@@ -9,7 +9,7 @@
 // Run `tandem help` for the options. Every person's Claude Code runs under their own login.
 import { spawn, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
-import { existsSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { hostname, networkInterfaces } from 'node:os';
 import { basename, delimiter, dirname, join, resolve } from 'node:path';
@@ -17,7 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const STATE = join(ROOT, '.tandem');
+const STATE = process.env.TANDEM_STATE ?? join(ROOT, '.tandem'); // (tests use their own)
 const LOGS = join(STATE, 'logs');
 const PIDS = join(STATE, 'pids.json');
 const WIN = process.platform === 'win32';
@@ -38,11 +38,17 @@ const HELP = `tandem: your team's Claude Codes, working as one.
     --model auto            pick the model by task difficulty (default: haiku for everything)
     --notify URL            post "goal done" to a Slack or Discord webhook
     --demo                  use a sample project instead of this folder (good for a first try)
+    --accounts all|a,b      one worker per saved account (see tandem account), instead of --workers
+    --manager-account A     the Claude account the manager plans with
     --no-browser            do not open the page
 
   tandem join <address>     In your clone of the team's repo: add this computer's workers.
                             <address> is the invite the host's page shows, like http://192.168.1.20:5173/?db=shop
-    --simulate, --workers N as above
+    --simulate, --workers N, --accounts as above
+
+  tandem account add <label> [--agent codex]   A login for workers (opens that CLI to sign in).
+  tandem account list | remove <label>          Each account gets its own login folder in the
+                                                Tandem folder; your own login is not touched.
 
   tandem stop               Stop what this computer started (the brain keeps running).
     --all                   also stop the brain
@@ -186,15 +192,82 @@ function demoRepo(): string {
   return repo;
 }
 
-type WorkerOpts = { simulate: boolean; push: boolean; model: string; budget: string; suffix: string; offset: number; simLimit?: number };
-// Starts the workers that are not running yet. Returns all of their names.
+// ---------- accounts: one login folder per agent account, kept in the Tandem folder ----------
+// Claude Code keeps its login in CLAUDE_CONFIG_DIR, Codex in CODEX_HOME. Pointing a worker at its
+// own folder makes it use that account; nothing in your home folder changes.
+type Agent = 'claude' | 'codex';
+type Account = { label: string; agent: Agent; dir: string };
+const ACCOUNTS = join(STATE, 'accounts.json');
+function accounts(): Account[] { try { return JSON.parse(readFileSync(ACCOUNTS, 'utf8')); } catch { return []; } }
+function saveAccounts(list: Account[]) { mkdirSync(STATE, { recursive: true }); writeFileSync(ACCOUNTS, JSON.stringify(list, null, 2)); }
+const loginEnv = (a: Account) => (a.agent === 'codex' ? { CODEX_HOME: a.dir } : { CLAUDE_CONFIG_DIR: a.dir });
+const loggedIn = (a: Account) => existsSync(join(a.dir, a.agent === 'codex' ? 'auth.json' : '.credentials.json'));
+
+// "work1,school" or "all" -> the saved accounts, in that order
+function pickAccounts(spec: string | undefined): Account[] {
+  if (!spec) return [];
+  const all = accounts();
+  if (spec === 'all') { if (!all.length) fail('No accounts yet. Add one: tandem account add <label>'); return all; }
+  return spec.split(',').map(s => s.trim()).filter(Boolean).map(l =>
+    all.find(a => a.label === l) ?? fail(`No account "${l}". Add it: tandem account add ${l}   (tandem account list shows them)`));
+}
+
+// Runs a CLI in this terminal (its login screen), with the account's folder.
+function interactive(cmd: string, args: string[], env: Record<string, string>) {
+  const exe = which(cmd) ?? fail(cmd === 'codex' ? 'The Codex CLI (codex) is not installed. See https://github.com/openai/codex' : 'Claude Code (claude) is not installed or not on PATH.');
+  const shell = /\.(cmd|bat)$/i.test(exe);
+  spawnSync(shell ? `"${exe}"` : exe, args, { stdio: 'inherit', env: { ...process.env, ...env }, shell });
+}
+
+async function accountCmd(argv: string[]) {
+  const [sub, ...more] = argv;
+  const { values: o, positionals } = parseArgs({ args: more, allowPositionals: true, options: {
+    agent: { type: 'string', default: 'claude' }, 'no-login': { type: 'boolean', default: false },
+  } });
+  const label = positionals[0]?.trim();
+  if (sub === 'add') {
+    if (!label) fail('Name it: tandem account add <label>   (for example: tandem account add work1, or tandem account add school --agent codex)');
+    if (o.agent !== 'claude' && o.agent !== 'codex') fail('--agent is claude or codex');
+    const agent = o.agent as Agent;
+    const acct: Account = { label: label!, agent, dir: join(STATE, 'accounts', slug(label!)) };
+    mkdirSync(acct.dir, { recursive: true });
+    saveAccounts([...accounts().filter(a => a.label !== label), acct]);
+    say(`  ${green('✓')} account ${bold(label!)} ${dim(`(${agent}, ${acct.dir})`)}`);
+    if (o['no-login']) return;
+    if (agent === 'codex') {
+      say(dim(`  Sign in with the account you want as "${label}".`));
+      interactive('codex', ['login'], loginEnv(acct));
+    } else {
+      say(dim(`  Claude Code opens. Type /login, sign in with the account you want as "${label}", then /exit.`));
+      interactive('claude', [], loginEnv(acct));
+    }
+    say(loggedIn(acct) ? `  ${green('✓')} signed in` : dim(`  Not signed in yet? Run tandem account add ${label}${agent === 'codex' ? ' --agent codex' : ''} again.`));
+  } else if (sub === 'list' || !sub) {
+    const all = accounts();
+    if (!all.length) { say(dim('  No accounts yet. Workers use your default Claude Code login. Add one: tandem account add <label>')); return; }
+    for (const a of all) say(`  ${loggedIn(a) ? green('●') : dim('○')} ${bold(a.label.padEnd(12))} ${a.agent.padEnd(7)} ${loggedIn(a) ? 'signed in' : dim('not signed in')}`);
+    say(dim('\n  Use them: tandem start --accounts all   (or --accounts work1,school)'));
+  } else if (sub === 'remove') {
+    const a = accounts().find(x => x.label === label) ?? fail(`No account "${label}".`);
+    saveAccounts(accounts().filter(x => x.label !== label));
+    rmSync(a.dir, { recursive: true, force: true });
+    say(`  ${green('✓')} removed ${label} and its login folder`);
+  } else fail('tandem account add <label> [--agent codex] | tandem account list | tandem account remove <label>');
+}
+
+type WorkerOpts = { simulate: boolean; push: boolean; model: string; budget: string; suffix: string; offset: number; simLimit?: number; accounts?: Account[] };
+// Starts the workers that are not running yet: `count` on the default login, or one per account.
+// Returns how each is described ("Alex", or "Alex (work1, claude)").
 function startWorkers(team: string, uri: string, repo: string, count: number, opts: WorkerOpts): string[] {
   const names: string[] = [];
-  for (let i = 0; i < count; i++) {
+  const accts = opts.accounts?.length ? opts.accounts : null;
+  for (let i = 0; i < (accts ? accts.length : count); i++) {
+    const acct = accts?.[i];
     const name = NAMES[(i + opts.offset) % NAMES.length] + opts.suffix;
-    names.push(name);
+    names.push(acct ? `${name} (${acct.label}, ${acct.agent})` : name);
     if (running(`worker ${name}`, team)) continue;
     const args = ['--import', tsx('launcher'), join(ROOT, 'launcher', 'launcher.ts'), '--name', name, '--repo', repo];
+    if (acct) args.push('--agent', acct.agent, '--account', acct.label);
     if (opts.simulate) args.push('--simulate', '--sim-ms', '3000');
     // for demos: the first worker hits a usage limit on its first task, then comes back
     if (opts.simulate && opts.simLimit && i === 0) args.push('--sim-limit', String(opts.simLimit));
@@ -203,6 +276,7 @@ function startWorkers(team: string, uri: string, repo: string, count: number, op
       STDB_URI: uri, STDB_DB: team, TANDEM_SESSION: 'live',
       TANDEM_TOKEN_FILE: join(ROOT, 'mcp', '.tandem', `worker-${name}-${team}`),
       LAUNCHER_MODEL: opts.model === 'auto' ? undefined : opts.model, LAUNCHER_BUDGET_USD: opts.budget,
+      ...(acct ? loginEnv(acct) : {}),
     });
   }
   return names;
@@ -218,8 +292,12 @@ async function start(argv: string[]) {
     budget: { type: 'string', default: '0.50' }, notify: { type: 'string' }, demo: { type: 'boolean', default: false },
     'no-browser': { type: 'boolean', default: false }, 'no-manager': { type: 'boolean', default: false },
     'sim-limit': { type: 'string', default: '0' }, // demos: the first simulated worker hits a usage limit
+    accounts: { type: 'string' }, 'manager-account': { type: 'string' },
   } });
-  const workers = Number(o.workers);
+  const accts = pickAccounts(o.accounts);
+  const workers = accts.length || Number(o.workers);
+  const mgrAcct = o['manager-account'] ? pickAccounts(o['manager-account'])[0] : undefined;
+  if (mgrAcct && mgrAcct.agent !== 'claude') fail('The manager plans with Claude Code: --manager-account must be a Claude account.');
 
   // the project: this folder's git repo
   let repo = o.demo ? demoRepo() : repoAt(process.cwd());
@@ -229,10 +307,13 @@ async function start(argv: string[]) {
   if (!git(repo, 'rev-parse', '--verify', '--quiet', 'HEAD').ok) fail(`${repo} has no commits yet. Make a first commit, then run tandem start again.`);
   const team = slug(o.team ?? basename(repo));
 
-  const needClaude = (!o.simulate && workers > 0) || !o['no-manager'];
-  for (const t of ['git', 'spacetime', ...(needClaude ? ['claude'] : [])]) {
+  // which agent CLIs the real (not simulated) workers and the manager need
+  const realAgents = o.simulate ? [] : accts.length ? accts.map(a => a.agent) : workers > 0 ? ['claude'] : [];
+  const needClaude = realAgents.includes('claude') || !o['no-manager'];
+  for (const t of ['git', 'spacetime', ...(needClaude ? ['claude'] : []), ...(realAgents.includes('codex') ? ['codex'] : [])]) {
     if (!which(t)) fail(t === 'spacetime' ? 'The SpacetimeDB CLI is not installed. See https://spacetimedb.com/install'
-      : t === 'claude' ? 'Claude Code (claude) is not installed or not on PATH. Or try: tandem start --simulate --no-manager' : `${t} is not installed.`);
+      : t === 'claude' ? 'Claude Code (claude) is not installed or not on PATH. Or try: tandem start --simulate --no-manager'
+      : t === 'codex' ? 'The Codex CLI (codex) is not installed. See https://github.com/openai/codex' : `${t} is not installed.`);
   }
   say();
   say(`  ${bold('Tandem')} ${dim(`· team "${team}" · ${repo}`)}`);
@@ -270,13 +351,14 @@ async function start(argv: string[]) {
       if (o.notify) args.push('--notify', o.notify);
       background('manager', team, process.execPath, args, ROOT, {
         STDB_URI: uri, STDB_DB: team, TANDEM_SESSION: 'live', TANDEM_TOKEN_FILE: join(ROOT, 'mcp', '.tandem', `manager-token-${team}`),
+        ...(mgrAcct ? loginEnv(mgrAcct) : {}),
       });
-      done('manager', 'started: it plans every goal you type');
+      done('manager', `started: it plans every goal you type${mgrAcct ? ` (${mgrAcct.label})` : ''}`);
     }
   }
   if (workers > 0) {
-    const names = startWorkers(team, uri, repo, workers, { simulate: o.simulate, push: o.push, model: o.model!, budget: o.budget!, suffix: '', offset: 0, simLimit: Number(o['sim-limit']) });
-    done('workers', `${names.join(', ')}${o.simulate ? ' (simulated: no Claude usage)' : o.model === 'auto' ? ' (Claude, model by difficulty)' : ` (Claude, ${o.model})`}`);
+    const names = startWorkers(team, uri, repo, workers, { simulate: o.simulate, push: o.push, model: o.model!, budget: o.budget!, suffix: '', offset: 0, simLimit: Number(o['sim-limit']), accounts: accts });
+    done('workers', `${names.join(', ')}${o.simulate ? ' (simulated: no Claude usage)' : accts.length ? '' : o.model === 'auto' ? ' (Claude, model by difficulty)' : ` (Claude, ${o.model})`}`);
   }
 
   const page = `http://localhost:${PAGE_PORT}/?db=${team}${shared ? `&lan=${ip}` : ''}`;
@@ -328,8 +410,9 @@ async function joinTeam(argv: string[]) {
   const { values: o, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
     simulate: { type: 'boolean', default: false }, workers: { type: 'string', default: '2' },
     team: { type: 'string' }, model: { type: 'string', default: 'haiku' }, budget: { type: 'string', default: '0.50' },
-    'no-browser': { type: 'boolean', default: false },
+    'no-browser': { type: 'boolean', default: false }, accounts: { type: 'string' },
   } });
+  const accts = pickAccounts(o.accounts);
   if (!positionals[0]) fail('Which team? tandem join <invite>, using the link the host\'s page shows (Invite, top right).');
   const { host, team } = parseAddress(positionals[0], o.team);
   say();
@@ -340,7 +423,7 @@ async function joinTeam(argv: string[]) {
   }
   done('host', 'reachable');
 
-  const workers = Number(o.workers);
+  const workers = accts.length || Number(o.workers);
   let repo = repoAt(process.cwd());
   const repoUrl = await teamRepo(host, team);
   if (!o.simulate && workers > 0) {
@@ -350,7 +433,9 @@ async function joinTeam(argv: string[]) {
         : 'Run tandem join inside your clone of the team\'s repo (ask the host for it).\nOr add --simulate for workers that fake the coding.');
     }
     if (!git(repo!, 'remote', 'get-url', 'origin').ok) fail(`${repo} has no origin remote. The workers push their branches there for the host to merge.`);
-    if (!which('claude')) fail('Claude Code (claude) is not installed or not on PATH. Or add --simulate.');
+    for (const agent of new Set(accts.length ? accts.map(a => a.agent) : ['claude'])) {
+      if (!which(agent)) fail(agent === 'codex' ? 'The Codex CLI (codex) is not installed. See https://github.com/openai/codex' : 'Claude Code (claude) is not installed or not on PATH. Or add --simulate.');
+    }
     done('repo', repo!);
     if (!repoUrl) say(dim('  note: the host\'s repo has no origin remote, so it cannot fetch the branches your workers push. Ask them to add one.'));
   }
@@ -359,9 +444,9 @@ async function joinTeam(argv: string[]) {
 
   if (workers > 0) {
     const names = startWorkers(team, `ws://${host}:${BRAIN_PORT}`, repo, workers, {
-      simulate: o.simulate, push: !o.simulate, model: o.model!, budget: o.budget!, suffix: `-${slug(hostname())}`, offset: 3,
+      simulate: o.simulate, push: !o.simulate, model: o.model!, budget: o.budget!, suffix: `-${slug(hostname())}`, offset: 3, accounts: accts,
     });
-    done('workers', `${names.join(', ')}${o.simulate ? ' (simulated: no Claude usage)' : ` (Claude, ${o.model}; they push their branches)`}`);
+    done('workers', `${names.join(', ')}${o.simulate ? ' (simulated: no Claude usage)' : accts.length ? ' (they push their branches)' : ` (Claude, ${o.model}; they push their branches)`}`);
   }
   const page = `http://${host}:${PAGE_PORT}/?db=${team}`;
   remember(team, { page, repo, host });
@@ -465,5 +550,6 @@ else if (cmd === 'stop') await stop(rest);
 else if (cmd === 'status') await status();
 else if (cmd === 'open') openPage(rest);
 else if (cmd === 'logs') logs(rest);
+else if (cmd === 'account' || cmd === 'accounts') await accountCmd(rest);
 else if (!cmd && loadProcs().some(p => p.team)) await status(); // just `tandem`: what is running
 else { say(HELP); if (cmd && cmd !== 'help' && cmd !== '--help' && cmd !== '-h') process.exit(2); }

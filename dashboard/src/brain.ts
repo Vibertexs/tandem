@@ -8,6 +8,7 @@ export const SESSION = 'live'; // the real team session
 export type Worker = {
   id: string; name: string; plan: string; status: string;
   usage5h: number | null; usageWeek: number | null; resetAt: Date | null; lastSeen: Date;
+  agent: string; account: string; // claude | codex, and the login's label ('' = the default)
 };
 export type Task = {
   id: string; jobId: string | null; kind: string; title: string; description: string; files: string[];
@@ -35,7 +36,7 @@ export function readSnapshot(conn: DbConnection): Snapshot {
     workers: mine(conn.db.workers.iter()).map(r => ({
       id: r.id, name: r.name, plan: r.plan, status: r.status,
       usage5h: r.usage5HPct ?? null, usageWeek: r.usageWeekPct ?? null,
-      resetAt: r.resetAt ? date(r.resetAt) : null, lastSeen: date(r.lastSeen),
+      resetAt: r.resetAt ? date(r.resetAt) : null, lastSeen: date(r.lastSeen), agent: r.agent, account: r.account,
     })),
     tasks: mine(conn.db.tasks.iter()).map(r => ({
       id: r.id, jobId: r.jobId ?? null, kind: r.kind, title: r.title, description: r.description,

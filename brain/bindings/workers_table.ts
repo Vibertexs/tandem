@@ -22,4 +22,6 @@ export default __t.row({
   resetAt: __t.option(__t.timestamp()).name("reset_at"),
   lastSeen: __t.timestamp().name("last_seen"),
   owner: __t.string(),
+  agent: __t.string(),
+  account: __t.string(),
 });

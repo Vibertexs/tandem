@@ -21,6 +21,8 @@ const workers = table(
     reset_at: t.option(t.timestamp()),
     last_seen: t.timestamp(),
     owner: t.string().default(''), // identity (hex) that registered it; '' = anyone (demo rows)
+    agent: t.string().default('claude'), // the coding agent it runs: claude | codex
+    account: t.string().default(''), // a label for the login it uses ("work 1"), '' = the default login
   }
 );
 
@@ -258,9 +260,21 @@ export const registerWorker = spacetimedb.reducer(
       ctx.db.workers.insert({
         pk: pk(session_id, id), session_id, id, name, plan, status: 'idle',
         usage_5h_pct: undefined, usage_week_pct: undefined, reset_at: undefined, last_seen: ctx.timestamp, owner: me,
+        agent: 'claude', account: '',
       });
       addEvent(ctx, session_id, id, 'worker_idle', `${name} joined the team`);
     }
+  }
+);
+
+// Which coding agent a worker runs and which login it uses, shown on the page. Only its owner may say.
+export const describeWorker = spacetimedb.reducer(
+  { session_id: t.string(), worker_id: t.string(), agent: t.string(), account: t.string() },
+  (ctx, { session_id, worker_id, agent, account }) => {
+    const worker = requireWorkerOwner(ctx, session_id, worker_id);
+    if (!worker) throw new SenderError('unknown worker');
+    if (!['claude', 'codex'].includes(agent)) throw new SenderError('agent must be claude or codex');
+    ctx.db.workers.pk.update({ ...worker, agent, account: account.trim().slice(0, 40), last_seen: ctx.timestamp });
   }
 );
 
@@ -578,7 +592,7 @@ export const resetSession = spacetimedb.reducer(
       ctx.db.workers.insert({
         pk: pk(session_id, w.id), session_id, id: w.id, name: w.name, plan: w.plan, status: w.status,
         usage_5h_pct: w.usage_5h_pct ?? undefined, usage_week_pct: w.usage_week_pct ?? undefined,
-        reset_at: undefined, last_seen: ctx.timestamp, owner: '',
+        reset_at: undefined, last_seen: ctx.timestamp, owner: '', agent: 'claude', account: '',
       });
     }
     for (const [key, value] of Object.entries(seed.context)) {
