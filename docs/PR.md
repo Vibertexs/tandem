@@ -26,7 +26,7 @@ You run `tandem start` in your project and type a goal on the board it opens. A 
   - Routes model and effort by difficulty, records the run's cost and commits.
   - Gives a task back after two failed runs. At a usage limit it waits for the reset and comes back.
   - Resolves merge conflicts: it starts the merge, Claude edits out the markers, it commits.
-  - Has a `--simulate` mode (with `--sim-limit`), and pushes with `--push`.
+  - Pushes with `--push`. Fake-coding workers exist only for the automated tests (an environment variable, no option).
 - **Page** (`dashboard/`, React + Vite)
   - A host-or-join start screen that takes a pasted invite link.
   - One board: each goal is a swimlane with its tasks in Waiting, To do, In progress and Done; finished goals fold. Also Team, Shared memory, Activity, Settings.
@@ -40,7 +40,7 @@ You run `tandem start` in your project and type a goal on the board it opens. A 
   - `docs/SPEC.md` is the original plan, and `docs/DEMO.md` is the presenter script.
 
 ## Test plan
-- [x] `.\test.ps1`: 11 suites, 361 checks, all pass. It covers:
+- [x] `.\test.ps1`: 11 suites, 362 checks, all pass. It covers:
   - the brain, access and worker ownership
   - MCP in mock mode, MCP against the real brain, and the manager identity
   - the hook, and the launcher with a usage limit and a restart while capped
@@ -53,7 +53,7 @@ You run `tandem start` in your project and type a goal on the board it opens. A 
   - The same flow with `--review`: a worker reviewed the merged branch and its findings were on the board.
   - A real merge conflict resolved by a worker Claude, with the merged code running.
   - A teammate on another computer: the worker on a second clone pushes its branches, and the host merges them from origin, tests them and pushes the goal branch.
-  - `tandem start --simulate` in a test project, end to end through the page (one real planning run).
+  - `tandem start` in a test project, end to end through the page, with fake-coding workers (tests only) and one real planning run.
   - The full loop, twice.
   - The hook blocking a real Claude.
   - The launcher in a worktree.

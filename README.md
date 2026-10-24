@@ -11,7 +11,7 @@ Describe what you want built. A manager plans it, every teammate's coding agent 
 ![SpacetimeDB](https://img.shields.io/badge/shared%20brain-SpacetimeDB-7c3aed)
 ![MCP](https://img.shields.io/badge/tools-MCP-1f2937)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex-d97757)
-![Tests](https://img.shields.io/badge/tests-361%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-362%20passing-2ea44f)
 
 ![The board while two workers are on it](docs/img/board.png)
 
@@ -143,7 +143,6 @@ Run the start command in each project's folder. Each project is its own team wit
 | `tandem open` / `tandem logs` | Open the board / show the latest log lines |
 | `tandem stop` | Stop what this computer started (`--all` stops the brain too) |
 
-For development, `tandem start --simulate` uses workers that fake the coding, so the coding workers need no Claude usage. Run it from a disposable Git project rather than the Tandem source folder.
 ### Several accounts, Claude and Codex
 ```
 tandem account add work1                  # opens Claude Code: /login, sign in, /exit
@@ -190,7 +189,7 @@ Nothing talks to anything else directly. Every part reads and writes the brain, 
 | `docs/` | Architecture, status, roadmap, demo script |
 
 ## Tested
-`.\test.ps1` runs **11 suites, 361 checks**, none of which call an AI. [docs/STATUS.md](docs/STATUS.md) has the numbers and [docs/ROADMAP.md](docs/ROADMAP.md) what is next.
+`.\test.ps1` runs **11 suites, 362 checks**, none of which call an AI. [docs/STATUS.md](docs/STATUS.md) has the numbers and [docs/ROADMAP.md](docs/ROADMAP.md) what is next.
 - **Atomic rules:** 10 clients race for one task and exactly one wins. Lock conflicts leave no partial locks.
 - **Tools:** all 17, through the real MCP protocol, plus a mock mode.
 - **The board:** the whole first-use journey in Chrome, on desktop and phone, including failures.

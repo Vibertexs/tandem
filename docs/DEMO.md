@@ -6,7 +6,7 @@ The product is the demo: one command starts it, and the page shows real Claude C
 - [ ] `tandem start --fresh` in the demo project runs clean on the presenting laptop (brain, page, manager, 2 workers)
 - [ ] `claude` is logged in on that laptop
 - [ ] A second computer (or phone) on the same wifi can open the invite link
-- [ ] Backup: in a prepared disposable Git project, `tandem start --simulate --fresh` works too (no Claude calls for workers, same page). Add `--sim-limit 60` to show a worker hitting its usage limit.
+- [ ] Backup: a recorded video of a full real run is on the laptop
 - [ ] Backup video of a full run is on the laptop
 
 ## Presenter script (about 3 minutes)
@@ -20,7 +20,7 @@ The product is the demo: one command starts it, and the page shows real Claude C
 8. **Invite** (top right): the link a teammate opens to watch, plus the one copyable clone-and-join block that adds their computer's workers.
 
 If there is time, show what happens when things go wrong:
-- **A usage limit** (`--simulate --sim-limit 60`): the first worker goes "Out of quota until …", its task moves to the other worker, and a minute later it comes back by itself.
+- **A usage limit:** a worker that hits its plan limit goes "Out of quota until …", its task moves to another worker, and it comes back by itself after the reset.
 - **Cancel a goal:** in the goal's lane, Cancel goal removes its tasks that had not started.
 - **The page on a phone:** scan the QR code in Settings.
 
