@@ -274,6 +274,8 @@ try {
   check('limit: a worker out of quota says until when', await seen(A, /Out of quota until \d/, 4000));
   // which agent and login each worker runs
   await x2.reducers.describeWorker({ sessionId: 'live', workerId: 'w-lee', agent: 'codex', account: 'school' });
+  check('team: the simulated workers started for this test say "Simulated", not Claude',
+    (await A.locator('.worker', { hasText: 'Alex' }).innerText()).includes('Simulated') || (await A.locator('.worker', { hasText: 'Sam' }).count()) === 0);
   check('team: each worker says which agent and login it runs (Claude, or Codex · school)',
     await until(async () => (await A.locator('.worker', { hasText: 'Lee' }).innerText()).includes('Codex · school'), 4000) &&
     (await A.locator('.worker', { hasText: 'Kim' }).innerText()).includes('Claude'));

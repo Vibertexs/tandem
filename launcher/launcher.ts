@@ -37,13 +37,16 @@ const { values: opt } = parseArgs({
     'sim-ms': { type: 'string', default: '1500' },
     push: { type: 'boolean', default: false },
     'sim-limit': { type: 'string', default: '0' }, // simulate: hit a usage limit on the first task, lasting N seconds
-    agent: { type: 'string', default: 'claude' },
+    agent: { type: 'string' }, // claude (default) or codex
     account: { type: 'string', default: '' },
   },
 });
+const AGENT = opt.agent ?? 'claude';
+// what the page shows: a worker that fakes the coding says so, instead of passing as Claude
+const SHOWN_AS = opt.agent ?? (opt.simulate ? 'simulated' : 'claude');
 if (!opt.name) { console.error('usage: tsx launcher.ts --name <name> [--simulate] ...'); process.exit(2); }
-if (opt.agent !== 'claude' && opt.agent !== 'codex') { console.error('--agent is claude or codex'); process.exit(2); }
-if (opt.agent === 'codex' && !opt.simulate && !process.env.CODEX_HOME) {
+if (AGENT !== 'claude' && AGENT !== 'codex') { console.error('--agent is claude or codex'); process.exit(2); }
+if (AGENT === 'codex' && !opt.simulate && !process.env.CODEX_HOME) {
   console.error('A Codex worker needs its own login folder (CODEX_HOME). Add one with: tandem account add <label> --agent codex');
   process.exit(2);
 }
@@ -60,9 +63,9 @@ const log = (m: string) => console.log(`[${opt.name}] ${m}`);
 
 const brain = await BrainClient.connect(URI, DB, SESSION);
 await brain.registerWorker(workerId, opt.name, opt.plan!);
-await brain.describeWorker(workerId, opt.agent!, opt.account!);
+await brain.describeWorker(workerId, SHOWN_AS, opt.account!);
 const beat = setInterval(() => { brain.heartbeat(workerId).catch(() => {}); }, 30_000);
-log(`registered as ${workerId} in ${DB}/${SESSION}, ${opt.agent}${opt.account ? ` (${opt.account})` : ''}${opt.simulate ? ' (simulate)' : ''}`);
+log(`registered as ${workerId} in ${DB}/${SESSION}, ${SHOWN_AS}${opt.account ? ` (${opt.account})` : ''}${opt.simulate ? ' (simulate)' : ''}`);
 
 const cannedResult = (t: Task) => ({
   status: 'ok', files_touched: t.files,
@@ -223,10 +226,10 @@ async function realRun(t: Task) {
 
   let lastError = '';
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const runs = opt.agent === 'codex' ? 'codex' : `${model}${effort !== 'default' ? `/${effort}` : ''}`;
+    const runs = AGENT === 'codex' ? 'codex' : `${model}${effort !== 'default' ? `/${effort}` : ''}`;
     log(`running ${t.id} with ${runs} (attempt ${attempt})`);
-    await brain.reportProgress(workerId, t.id, `started (${opt.agent === 'codex' ? 'codex' : model})`);
-    const { code, out, result, cost, isError } = opt.agent === 'codex'
+    await brain.reportProgress(workerId, t.id, `started (${AGENT === 'codex' ? 'codex' : model})`);
+    const { code, out, result, cost, isError } = AGENT === 'codex'
       ? await runCodex(tree, prompt, reviewing)
       : await runClaude(tree, prompt, model, effort, {}, reviewing ? READ_TOOLS : EDIT_TOOLS);
     // Claude may have given the task back itself (give_back_task): then it is no longer ours.

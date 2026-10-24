@@ -273,7 +273,7 @@ export const describeWorker = spacetimedb.reducer(
   (ctx, { session_id, worker_id, agent, account }) => {
     const worker = requireWorkerOwner(ctx, session_id, worker_id);
     if (!worker) throw new SenderError('unknown worker');
-    if (!['claude', 'codex'].includes(agent)) throw new SenderError('agent must be claude or codex');
+    if (!['claude', 'codex', 'simulated'].includes(agent)) throw new SenderError('agent must be claude, codex or simulated');
     ctx.db.workers.pk.update({ ...worker, agent, account: account.trim().slice(0, 40), last_seen: ctx.timestamp });
   }
 );
