@@ -82,7 +82,12 @@ export function GoalsPage({ snap, now, say, api, isOp }: Common) {
 export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
   const share = shareable(team);
   const uri = share?.uri ?? team.uri;
-  const join = `.\\start.ps1 -Join ${uri} -Db ${team.db}`;
+  // The manager says which repo the team works on (only when branches are pushed, so work from
+  // other computers can reach it). Real workers elsewhere need a clone of it.
+  const repoUrl = snap.context.repo_url ?? '';
+  const folder = repoUrl.replace(/\/+$/, '').split(/[/:]/).pop()?.replace(/\.git$/, '') || 'project';
+  const join = repoUrl ? `.\\start.ps1 -Join ${uri} -Db ${team.db} -Repo ..\\${folder} -Push` : `.\\start.ps1 -Join ${uri} -Db ${team.db} -Simulate`;
+  const joinUnix = repoUrl ? `./start.sh --join ${uri} --db ${team.db} --repo ../${folder} --push` : `./start.sh --join ${uri} --db ${team.db} --simulate`;
   const mcp = `claude mcp add tandem -e STDB_URI=${uri} -e STDB_DB=${team.db} -e TANDEM_SESSION=live -- node --import tsx <tandem-folder>/mcp/src/server.ts`;
   const sorted = [...snap.workers].sort((a, b) => Number(online(b, now)) - Number(online(a, now)) || a.name.localeCompare(b.name));
   return (
@@ -112,9 +117,15 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
         <h2 id="connect-h">Connect a computer</h2>
         {share ? (
           <>
-            <p className="muted small">On the other computer, get the Tandem folder (clone the repo), then run:</p>
+            <p className="muted small">On the other computer, in the Tandem folder:</p>
+            {repoUrl && <>
+              <p className="muted small">1. Get the team's repo next to it:</p>
+              <CodeLine code={`git clone ${repoUrl} ../${folder}`} say={say} />
+              <p className="muted small">2. Start workers there that join this team:</p>
+            </>}
             <CodeLine code={join} say={say} />
-            <p className="small muted">It starts workers there that join this team. Add <code className="mono">-Simulate</code> for workers that fake the coding. On macOS or Linux: <code className="mono">./start.sh --join {uri} --db {team.db}</code></p>
+            <p className="small muted">On macOS or Linux: <code className="mono">{joinUnix}</code></p>
+            {!repoUrl && <p className="small muted">Those workers fake the coding: this team has no shared repo. For real work from other computers, host with a repo that has a GitHub remote: <code className="mono">{sh('.\\start.ps1 -Lan -Push -Repo <your clone>', './start.sh --lan --push --repo <your clone>')}</code></p>}
             <p className="small muted">They can watch the board at <a href={share.page}>{share.page}</a></p>
           </>
         ) : (

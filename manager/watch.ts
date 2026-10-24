@@ -11,7 +11,7 @@
 // The first time, it asks to become an operator. Click Approve on "Manager Claude" on the page.
 // Its login is saved, so this happens once.
 // Env: STDB_URI, STDB_DB, TANDEM_SESSION (default live), TANDEM_TOKEN_FILE
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -49,6 +49,14 @@ if (!brain.isOperator()) {
   log('asked to become an operator. On the page, click Approve on "Manager Claude".');
   while (!brain.isOperator()) await sleep(1000);
   log('approved.');
+}
+
+// Tell the page which repo the team works on, so it can show a teammate what to clone.
+// Only with --push: without it, task branches made on other computers never reach this one.
+{
+  let url = '';
+  if (opt.push) { try { url = execFileSync('git', ['-C', REPO, 'remote', 'get-url', 'origin'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch { /* no origin */ } }
+  await brain.setContext('repo_url', url).catch(() => {});
 }
 
 // ---------- planning ----------

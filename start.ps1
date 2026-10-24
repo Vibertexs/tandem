@@ -111,6 +111,10 @@ if ($hosting) {
 } else {
   $uri = $Join
   Step "Joining $Db at $uri"
+  # Real workers here only help if their branches reach the host: a clone of the team's repo, pushed.
+  if (-not $Simulate -and $Workers -gt 0 -and (-not $Repo -or -not $Push)) {
+    Write-Host '  note: for real work, use a clone of the team''s repo and push: -Repo <your clone> -Push (the Team page shows the exact command). Otherwise add -Simulate.' -ForegroundColor Yellow
+  }
 }
 
 Step 'The page (http://localhost:5173)'

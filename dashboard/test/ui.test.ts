@@ -177,6 +177,13 @@ try {
     await nav(L, 'Team');
     const lan = await L.locator('.connect').innerText().catch(() => '');
     check('team: opened with the network address, it gives that address to share', lan.includes(`-Join ws://10.1.2.3:3001 -Db ${DB}`) && lan.includes(`http://10.1.2.3:`) && !lan.includes('Right now only'), lan.slice(0, 300));
+    check('team: with no shared repo, the joiners\' workers are simulated and it says how to host for real work', lan.includes('-Simulate') && lan.includes('has no shared repo'), lan.slice(0, 400));
+    // the manager publishes the repo's remote when branches are pushed: then the steps are clone + join
+    await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: 'https://github.com/acme/shop.git' });
+    const withRepo = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/acme/shop.git ../shop'), 4000);
+    const lan2 = await L.locator('.connect').innerText();
+    check('team: with a shared repo, a joiner clones it and starts real workers that push', withRepo && lan2.includes(`-Join ws://10.1.2.3:3001 -Db ${DB} -Repo ..\\shop -Push`), lan2.slice(0, 400));
+    await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: '' });
     await L.context().close();
   }
   await shot(A, '07-team');

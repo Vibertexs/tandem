@@ -59,6 +59,13 @@ For real work, drop `-Simulate`. Each task becomes a real headless Claude Code r
 
 The page also works on a phone.
 
+### Teammates on other computers
+1. The host starts the team open to the network, on a clone of the team's GitHub repo: `.\start.ps1 -Lan -Push -Repo C:\path\to\clone`.
+2. The **Team** page then shows each teammate the exact steps: clone the repo next to their Tandem folder, then `.\start.ps1 -Join ws://<host>:3001 -Db <team> -Repo ..\<repo> -Push`.
+3. Their workers push each task branch. The host's manager fetches and merges them into the goal branch, runs the tests, and pushes it (opening a PR if the GitHub CLI is set up).
+
+Everyone's Claude Code runs under their own login and quota. Without a shared repo, teammates can still add simulated workers or just watch the board.
+
 ## How it works
 ```
  You, in the browser       Manager Claude            A worker on each computer

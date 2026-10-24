@@ -76,6 +76,10 @@ if [ $HOSTING = 1 ]; then
   URI=ws://127.0.0.1:3001
 else
   URI="$JOIN"; step "Joining $DB at $URI"
+  # real workers here only help if their branches reach the host: a clone of the team's repo, pushed
+  if [ $SIM = 0 ] && [ "$WORKERS" -gt 0 ] && { [ -z "$REPO" ] || [ $PUSH = 0 ]; }; then
+    echo "  note: for real work, use a clone of the team's repo and push: --repo <your clone> --push (the Team page shows the exact command). Otherwise add --simulate."
+  fi
 fi
 
 step 'The page (http://localhost:5173)'
