@@ -175,8 +175,8 @@ try {
   }, 4000));
   check('setup: the manager step ticks once the manager is online, the goal step once a goal exists',
     await steps.nth(1).evaluate(e => e.classList.contains('done')) && await steps.nth(5).evaluate(e => e.classList.contains('done')));
-  check('setup: workers that fake the coding are called out, with the command for real ones',
-    await steps.nth(2).innerText().then(t => /simulated/i.test(t)) && !(await steps.nth(2).evaluate(e => e.classList.contains('done'))));
+  check('setup: step 3 is not ticked while no Claude worker is online, and gives the command to start them',
+    await steps.nth(2).innerText().then(t => t.includes('No Claude worker is online yet') && t.includes('tandem start')) && !(await steps.nth(2).evaluate(e => e.classList.contains('done'))));
   check('setup: with no GitHub remote, step 4 says how to add one', await steps.nth(3).innerText().then(t => t.includes('git remote add origin')) && !(await steps.nth(3).evaluate(e => e.classList.contains('done'))));
   check('setup: a team only this computer can reach says how to open it up', await steps.nth(4).innerText().then(t => t.includes('tandem stop --all')));
   await shot(A, '06a-setup');
@@ -195,11 +195,11 @@ try {
     const invite = `http://10.1.2.3:${new URL(URL_).port}/?db=${DB}`;
     await L.getByRole('button', { name: 'Invite' }).click();
     const pop = await L.getByRole('dialog', { name: 'Invite' }).innerText().catch(() => '');
-    check('invite: on the network, every page has an Invite button with the link and the tandem join command', pop.includes(invite) && pop.includes(`join "${invite}"`) && pop.includes(`git clone https://github.com/Vibertexs/tandem`), pop);
+    check('invite: on the network, every page has an Invite button with the link, and without a GitHub remote it says to add one first', pop.includes(invite) && pop.includes('no GitHub remote'), pop);
     await L.keyboard.press('Escape');
     await nav(L, 'Team');
     const lan = await L.locator('.connect').innerText().catch(() => '');
-    check('team: with no shared repo, a joiner\'s workers are simulated, and it says how to get real work', lan.includes(`.\\tandem.cmd join "${invite}" --simulate`) && lan.includes('no GitHub remote'), lan.slice(0, 400));
+    check('team: with no GitHub remote it says to put the project on GitHub first, and shows no join command that could not work', lan.includes('no GitHub remote') && !lan.includes('tandem.cmd join'), lan.slice(0, 400));
     // the manager publishes the repo's origin: then the steps are clone + join
     await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: 'https://github.com/acme/shop.git' });
     const withRepo = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/acme/shop.git'), 4000);

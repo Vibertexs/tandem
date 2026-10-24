@@ -38,19 +38,21 @@ When a few people each run an AI coding agent on the same repo:
 |---|---|
 | ![Host or join](docs/img/start.png) | ![Task details](docs/img/task.png) |
 
-## Quick start
-You need [Node.js](https://nodejs.org) 22.18 or newer, Git, [Claude Code](https://claude.com/claude-code), and the [SpacetimeDB CLI](https://spacetimedb.com/install) (Windows: `iwr https://windows.spacetimedb.com -useb | iex`; macOS and Linux: `curl -sSf https://install.spacetimedb.com | sh`).
+## How to start
 
-Once, in the Tandem folder, put the `tandem` command on your PATH:
-```
-npm install -g .
-```
-(Or run `C:\path\to\tandem\tandem.cmd`, or `/path/to/tandem/tandem` on macOS and Linux.)
+### What you need (once per computer)
+- [Node.js](https://nodejs.org) **22.18 or newer** (`node --version`), and Git
+- [Claude Code](https://claude.com/claude-code), signed in (run `claude` once to check)
+- The host also needs the [SpacetimeDB CLI](https://spacetimedb.com/install) (Windows: `iwr https://windows.spacetimedb.com -useb | iex`; macOS and Linux: `curl -sSf https://install.spacetimedb.com | sh`). Teammates do not.
+- Get Tandem: `git clone https://github.com/Vibertexs/tandem`
 
-Then, in **your project's folder** (any git repo with a first commit):
+### 1. Start Tandem on your project
+Open a terminal **in your project's folder** (any git repo with a first commit) and run Tandem's launcher by its path:
 ```
-tandem start
+C:\path\to\tandem\tandem.cmd start          # Windows
+/path/to/tandem/tandem start                # macOS and Linux
 ```
+To type just `tandem start` from anywhere, run `npm install -g .` once in the Tandem folder.
 ```
   ✓ brain    started
   ✓ team     "shop"
@@ -62,17 +64,38 @@ tandem start
   Invite   http://192.168.1.20:5173/?db=shop
   Stop     tandem stop
 ```
-The board opens on its own. Its **Setup** page lists every step in order (put `tandem` on your PATH, the manager, real workers, the GitHub remote, inviting a teammate, sending a goal) with this computer's real folders in the commands, and ticks each one as it happens. You can follow that instead of this README.
+The board opens on its own. Click **Make me the owner** (it also approves the manager). The **Setup** page lists every step in order, with this computer's real folders in the commands, and ticks each one as it happens.
 
-On the board click **Make me the owner** (it also approves the manager), then describe what you want built. Each task runs as a headless agent in its own git worktree and branch. When the goal is done, its work is merged on one branch, `tandem/<goal>`, with your tests run on it.
+### 2. Send a goal
+On the **Board**, describe what you want built and send it. The manager splits it into tasks, and each task runs as a Claude Code run in its own git worktree and branch. When the goal is done, its work is merged on one branch, `tandem/<goal>`, with your tests run on it.
 
-**Just trying it out?** `tandem start --demo --simulate` uses a sample project and fake workers, so it costs no Claude usage beyond one small planning run per goal.
+### Several projects at once
+Run the same command in each project's folder. Every project is its own **team** with its own board and workers (`?db=<project folder name>`), all sharing one brain and one page. `tandem status` lists them, and `tandem stop` stops all of them.
+
+### 3. Add a teammate's computer
+Their work reaches yours through **GitHub**, so the project needs a GitHub remote first:
+```
+git remote add origin https://github.com/<you>/<repo>.git
+git push -u origin main
+```
+Add your teammate as a collaborator on the repo, then restart (`tandem stop`, `tandem start`). Then:
+1. Send them the **invite link** (top right of the board, **Invite**, or the `Invite` line in your terminal).
+2. They need Node 22.18+, Git, Claude Code signed in, and the invite. The **Invite** box shows the exact commands to copy: `git clone` Tandem and the project side by side, then in the *project's* folder `..\tandem\tandem.cmd join "<invite>"` (macOS and Linux: `../tandem/tandem join "<invite>"`).
+3. Their Claude runs under their own login and quota. Their workers push each task branch to GitHub, and your manager fetches and merges them into the goal branch and runs the tests.
+
+If Node is older than 22.18, `tandem` stops with a clear message and where to get a new one (https://nodejs.org, or `winget install OpenJS.NodeJS.LTS` on Windows).
+
+**On public wifi (a hackathon, a cafe), use Tailscale.** Venue wifi often stops devices talking to each other, and anyone on it could reach an open brain. [Tailscale](https://tailscale.com/download) makes a private network between your devices:
+1. Everyone installs Tailscale and signs in. The host shares their computer: Tailscale admin, **Machines**, **⋯** next to it, **Share**, and sends the link. Teammates **Accept**.
+2. The host runs `tandem start` as usual. If Tailscale is running, the **Invite** is the host's Tailscale address (`100.x.y.z`) instead of the wifi address, and the venue-wifi address is printed as the other way.
+3. Teammates use that invite.
+
+If you ever type an address by hand, use the host's Tailscale address (`tailscale ip -4` prints it), not the wifi one.
 
 ## Commands
 | Command | What it does |
 |---|---|
 | `tandem start` | Host a team for the project you are in, open to your network. The board opens |
-| `tandem start --simulate` | Same, with workers that fake the coding |
 | `tandem start --local` | Only this computer can join |
 | `tandem start --workers 4` | More workers here (run it again any time; what runs is kept) |
 | `tandem start --accounts all` | One worker per saved account (see below) |
@@ -86,26 +109,7 @@ On the board click **Make me the owner** (it also approves the manager), then de
 | `tandem open` / `tandem logs` | Open the board / show the latest log lines |
 | `tandem stop` | Stop what this computer started (`--all` stops the brain too) |
 
-### Teammates on other computers
-1. The host runs `tandem start` in the project and sends the **invite link** (also under **Invite**, top right).
-2. A teammate opens the link to watch. To add their computer's workers they need nothing installed beyond Node and Git, and the **Invite** box shows the exact commands to copy:
-   - **Trying it** (fake workers, no project needed): `git clone` Tandem, then in that folder `.\tandem.cmd join "<invite>" --simulate` (Mac and Linux: `./tandem join "<invite>" --simulate`).
-   - **Real work:** `git clone` Tandem and the project side by side, then in the *project's* folder `..\tandem\tandem.cmd join "<invite>"` (Mac and Linux: `../tandem/tandem join "<invite>"`).
-3. Their workers push each task branch to the repo's origin. The host's manager fetches and merges them into the goal branch and runs the tests.
-
-(`npm install -g .` in the Tandem folder, once, lets them type just `tandem join "<invite>"` instead. It is optional.)
-
-**Node.js 22.18 or newer is required** (`node --version`). On an older Node, `tandem` stops with a clear message and where to get a new one (https://nodejs.org, or `winget install OpenJS.NodeJS.LTS` on Windows).
-
-Everyone's agent runs under their own login and quota. Without a shared repo, teammates can add simulated workers or just watch.
-
-**On public wifi (a hackathon, a cafe), use Tailscale.** Venue wifi often stops devices talking to each other, and anyone on it could reach an open brain. [Tailscale](https://tailscale.com/download) makes a private network between your devices:
-1. Everyone installs Tailscale and signs in. The host shares their computer: Tailscale admin, **Machines**, **⋯** next to it, **Share**, and sends the link. Teammates **Accept**.
-2. The host runs `tandem start` as usual. If Tailscale is running, the **Invite** is the host's Tailscale address (`100.x.y.z`) instead of the wifi address, and the venue-wifi address is printed as the other way.
-3. Teammates use that invite: open it in a browser, or `tandem join "<invite>"`.
-
-If you ever type an address by hand, use the host's Tailscale address (`tailscale ip -4` prints it), not the wifi one.
-
+For development, `tandem start --simulate` (and `--demo`) use workers that fake the coding, so the tests need no Claude usage.
 ### Several accounts, Claude and Codex
 ```
 tandem account add work1                  # opens Claude Code: /login, sign in, /exit

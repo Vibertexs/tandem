@@ -25,8 +25,7 @@ export function SetupPage({ snap, team, now, say, go }: { snap: Snapshot; team: 
   const share = shareable(team);
   const live = snap.workers.filter(w => online(w, now));
   const real = live.filter(w => w.agent !== 'simulated');
-  const fake = live.filter(w => w.agent === 'simulated');
-  const joined = live.filter(w => w.name.includes('-')); // workers that joined from another computer are named <name>-<computer>
+  const joined = real.filter(w => w.name.includes('-')); // workers that joined from another computer are named <name>-<computer>
   const tailscale = !!share && /^http:\/\/100\./.test(share.page);
 
   return (
@@ -47,9 +46,13 @@ export function SetupPage({ snap, team, now, say, go }: { snap: Snapshot; team: 
           <CodeLine code={`cd ${projectDir}\ntandem start`} say={say} />
         </Step>
 
-        <Step done={real.length > 0} title="3. Workers that do the real coding">
-          {fake.length > 0 && real.length === 0 && <p className="small warn">Your workers are simulated: they fake the coding. For real Claude workers, restart without <code className="mono">--simulate</code>:</p>}
-          {real.length === 0 && <CodeLine code={`cd ${projectDir}\ntandem stop\ntandem start`} say={say} />}
+        <Step done={real.length > 0} title="3. Claude workers on this computer">
+          {real.length === 0 && (
+            <>
+              <p className="small muted">No Claude worker is online yet. Start Tandem from your project:</p>
+              <CodeLine code={`cd ${projectDir}\ntandem stop\ntandem start`} say={say} />
+            </>
+          )}
           {real.length > 0 && <p className="small muted">{real.map(w => `${w.name} (${w.agent === 'codex' ? 'Codex' : 'Claude'}${w.account ? `, ${w.account}` : ''})`).join(', ')} online. Each runs under its owner's own login.</p>}
           <p className="small muted">Claude Code has to be signed in on this computer. Check by running <code className="mono">claude</code> in a terminal.</p>
         </Step>

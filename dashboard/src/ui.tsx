@@ -126,18 +126,12 @@ export function why(task: Task, snap: Snapshot): string {
 export const TANDEM_REPO = 'https://github.com/Vibertexs/tandem';
 
 // What a teammate copies to add their computer's workers. It needs nothing installed globally:
-// the command is run from the cloned folder. Fake workers (no project) run from the Tandem
-// folder; real ones run from the project's clone, beside the Tandem folder.
+// the command is run from the project's clone, beside the Tandem folder.
 export function JoinSteps({ link, repoUrl, say }: { link: string; repoUrl: string; say: (m: string) => void }) {
   if (!repoUrl) {
     return (
       <div className="join-steps">
-        <p className="small muted">1. Get Tandem (once). It needs Node.js 22.18 or newer (check with <code className="mono">node --version</code>) and Git:</p>
-        <CodeLine code={`git clone ${TANDEM_REPO}`} say={say} />
-        <p className="small muted">2. In the new <code className="mono">tandem</code> folder, run it (fake workers, no project needed):</p>
-        <CodeLine code={`.\\tandem.cmd join "${link}" --simulate`} say={say} />
-        <p className="small muted">On Mac or Linux: <code className="mono">{`./tandem join "${link}" --simulate`}</code></p>
-        <p className="small muted">This project has no GitHub remote (origin), so workers on other computers can only fake the coding. Add a remote and run <code className="mono">tandem start</code> again for real work.</p>
+        <p className="small warn">Their work reaches yours through GitHub, and this project has no GitHub remote yet. Put the project on GitHub first (Setup, step 4), restart Tandem, and the commands for them appear here.</p>
       </div>
     );
   }
@@ -149,7 +143,7 @@ export function JoinSteps({ link, repoUrl, say }: { link: string; repoUrl: strin
       <p className="small muted">2. In the project's folder, run:</p>
       <CodeLine code={`cd ${folder}\n..\\tandem\\tandem.cmd join "${link}"`} say={say} />
       <p className="small muted">On Mac or Linux: <code className="mono">{`../tandem/tandem join "${link}"`}</code></p>
-      <p className="small muted">Their Claude Code runs under their own login and quota. Want fake workers instead? Add <code className="mono">--simulate</code>.</p>
+      <p className="small muted">Their Claude Code runs under their own login and quota.</p>
     </div>
   );
 }
