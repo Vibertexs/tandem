@@ -4,7 +4,7 @@ import seed from '../../../contract/seed.json';
 
 // Tables follow contract/tables.md.
 // Every row carries session_id. `pk` is "<session_id>/<id>" so ids only have to be
-// unique inside one session (each judge gets their own session).
+// unique inside one session (the team uses "live"; tests use their own).
 // Enum-like fields (plan, status, kind) are plain strings, checked in reducers.
 
 const workers = table(
@@ -158,8 +158,8 @@ function checkSession(session: string) {
 }
 
 // In the real team session ("live") only operators may create tasks, write notes, seed or reset.
-// Judge sandboxes (any other session) stay open to everyone. Worker actions (register, claim,
-// lock, complete, heartbeat, report) are open in every session for now: there is no per-worker auth.
+// Other sessions (the tests use them) stay open to everyone. Worker actions are guarded by
+// requireWorkerOwner instead: a worker belongs to the identity that registered it.
 function requireOperator(ctx: Ctx, session: string) {
   if (session === 'live' && !ctx.db.operators.identity.find(ctx.sender)) {
     throw new SenderError('operator only');
@@ -231,8 +231,7 @@ export const heartbeat = spacetimedb.reducer(
   }
 );
 
-// Test hook and manual cleanup. Anyone can call it, so the minimum is 1 second.
-// TODO: restrict who may call this before the database is shared.
+// Test hook and manual cleanup, for operators in the live session. The minimum is 1 second.
 export const reapStale = spacetimedb.reducer(
   { session_id: t.string(), ttl_seconds: t.u32() },
   (ctx, { session_id, ttl_seconds }) => {

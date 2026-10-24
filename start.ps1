@@ -111,6 +111,14 @@ if ($hosting) {
 } else {
   $uri = $Join
   Step "Joining $Db at $uri"
+  # Can we reach the host's brain at all? (2 seconds, then a clear message instead of workers that die)
+  $target = [uri]($uri -replace '^ws', 'http')
+  $client = New-Object System.Net.Sockets.TcpClient
+  $reached = $false
+  try { $reached = $client.ConnectAsync($target.Host, $(if ($target.Port -gt 0) { $target.Port } else { 3001 })).Wait(2000) } catch { $reached = $false } finally { $client.Close() }
+  if (-not $reached) {
+    throw "Cannot reach the team at $uri. Check the address on the host's Team page, that the host started with -Lan, and that both computers are on the same network."
+  }
   # Real workers here only help if their branches reach the host: a clone of the team's repo, pushed.
   if (-not $Simulate -and $Workers -gt 0 -and (-not $Repo -or -not $Push)) {
     Write-Host '  note: for real work, use a clone of the team''s repo and push: -Repo <your clone> -Push (the Team page shows the exact command). Otherwise add -Simulate.' -ForegroundColor Yellow
@@ -132,7 +140,7 @@ if ($hosting -and $Lan -and (Get-NetTCPConnection -LocalPort 3001 -State Listen 
 $url = "http://localhost:5173/?db=$Db" + $(if ($hosting) { '' } else { "&uri=$([uri]::EscapeDataString($uri))" }) + $(if ($ip) { "&lan=$ip" } else { '' })
 
 if (-not $Repo) { $Repo = Join-Path (Split-Path $root -Parent) 'tandem-playground' }
-if ($Workers -gt 0 -or ($hosting -and -not $NoManager)) {
+if ((-not $Simulate -and $Workers -gt 0) -or ($hosting -and -not $NoManager)) {
   if (-not (Test-Path (Join-Path $Repo '.git'))) {
     Step "Creating a playground repo for the workers: $Repo"
     New-Item -ItemType Directory -Force $Repo | Out-Null

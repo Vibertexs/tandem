@@ -76,6 +76,11 @@ if [ $HOSTING = 1 ]; then
   URI=ws://127.0.0.1:3001
 else
   URI="$JOIN"; step "Joining $DB at $URI"
+  # can we reach the host's brain at all? (a clear message instead of workers that die)
+  hostport="${URI#*://}"; hostport="${hostport%%/*}"; jhost="${hostport%%:*}"; jport="${hostport##*:}"; [ "$jport" = "$jhost" ] && jport=3001
+  if ! (exec 3<>"/dev/tcp/$jhost/$jport") 2>/dev/null; then
+    echo "Cannot reach the team at $URI. Check the address on the host's Team page, that the host started with --lan, and that both computers are on the same network."; exit 1
+  fi
   # real workers here only help if their branches reach the host: a clone of the team's repo, pushed
   if [ $SIM = 0 ] && [ "$WORKERS" -gt 0 ] && { [ -z "$REPO" ] || [ $PUSH = 0 ]; }; then
     echo "  note: for real work, use a clone of the team's repo and push: --repo <your clone> --push (the Team page shows the exact command). Otherwise add --simulate."
@@ -97,7 +102,7 @@ if [ $HOSTING = 1 ] && [ $LAN = 1 ]; then
 fi
 
 [ -n "$REPO" ] || REPO="$(dirname "$ROOT")/tandem-playground"
-if [ ! -d "$REPO/.git" ]; then
+if { { [ $SIM = 0 ] && [ "$WORKERS" -gt 0 ]; } || { [ $HOSTING = 1 ] && [ $NOMGR = 0 ]; }; } && [ ! -d "$REPO/.git" ]; then
   step "Creating a playground repo for the workers: $REPO"
   mkdir -p "$REPO"; git -C "$REPO" init -q
   echo '# Tandem playground' > "$REPO/README.md"; echo '.worktrees/' > "$REPO/.gitignore"
