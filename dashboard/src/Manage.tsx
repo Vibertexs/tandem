@@ -1,5 +1,6 @@
-// The operator panel for the real team session. Only shown in live mode.
-// Anyone can look. Only operators can change things: the brain enforces that, this page only reflects it.
+// "Manage": the by-hand controls for the real team session (add tasks yourself, shared notes, who
+// may operate). Everything here is optional: the normal path is the prompt box at the top.
+// Anyone can look. Only operators can change things: the brain enforces that, this page reflects it.
 import { useState } from 'react';
 import type { Api, Snapshot } from './brain';
 
@@ -9,9 +10,8 @@ const newId = () => 't-' + Math.random().toString(36).slice(2, 8);
 
 const NOTE_KEYS = ['project_summary', 'interfaces', 'decisions'];
 
-export function Control({ api, snap, me, say }: { api: Api | null; snap: Snapshot; me: string | null; say: (m: string) => void }) {
+export function Manage({ api, snap, me, say }: { api: Api | null; snap: Snapshot; me: string | null; say: (m: string) => void }) {
   const isOp = !!me && snap.operators.includes(me);
-  const noOperatorYet = snap.operators.length === 0;
   const off = !api || !isOp;
   const [busy, setBusy] = useState(false);
 
@@ -44,31 +44,15 @@ export function Control({ api, snap, me, say }: { api: Api | null; snap: Snapsho
   const note = noteDraft ?? snap.context[noteKey] ?? '';
 
   return (
-    <section className="panel control" aria-label="Operator controls">
-      <h2>Control</h2>
-
-      <div className="who-am-i">
-        {!me && <span className="muted">Connecting…</span>}
-        {me && isOp && <span className="chip st-busy">✓ You are an operator</span>}
-        {me && !isOp && <span className="chip">○ View only</span>}
-        {me && <span className="small muted">You are <code className="mono" title={me}>{short(me)}</code>
-          <button type="button" className="link" onClick={() => { void navigator.clipboard?.writeText(me); say('Identity copied.'); }}>copy</button></span>}
-        {me && !isOp && noOperatorYet && (
-          <button type="button" className="btn primary" disabled={busy || !api}
-            onClick={() => act(() => api!.claimOperator(), 'You are now the operator.')}>Become the operator</button>
-        )}
-        {me && !isOp && !noOperatorYet && (
-          <span className="small muted">An operator must authorize this identity before you can change anything.</span>
-        )}
-      </div>
-
+    <div className="manage">
+      {off && <p className="small muted">View only. {snap.operators.length === 0 ? 'Claim the team above to unlock these.' : 'An operator has to approve you first.'}</p>}
       <div className="control-grid">
         <form className="card form" onSubmit={e => {
           e.preventDefault();
           void act(() => api!.createTask({ id: newId(), title: title.trim(), description: desc.trim(), files: list(files), difficulty: diff }, who || undefined),
             'Task created.').then(ok => { if (ok) { setTitle(''); setFiles(''); setDesc(''); } });
         }}>
-          <h3>New task</h3>
+          <h3>Add a task by hand</h3>
           <label>Title<input value={title} onChange={e => setTitle(e.target.value)} disabled={off} required placeholder="Add a login endpoint" /></label>
           <label>Files it will touch<input value={files} onChange={e => setFiles(e.target.value)} disabled={off} required placeholder="src/api/login.py, tests/test_login.py" /></label>
           <label>What to do<textarea value={desc} onChange={e => setDesc(e.target.value)} disabled={off} rows={2} placeholder="One or two sentences for whoever picks it up" /></label>
@@ -95,7 +79,7 @@ export function Control({ api, snap, me, say }: { api: Api | null; snap: Snapsho
           void act(() => api!.createJob(goal.trim(), parsed, { title: mergeTitle.trim(), files: list(mergeFile) }),
             `Big job created: ${parsed.length} pieces and a merge task.`).then(ok => { if (ok) { setGoal(''); setPieces(''); } });
         }}>
-          <h3>New big job</h3>
+          <h3>Add a big job by hand</h3>
           <label>Goal<input value={goal} onChange={e => setGoal(e.target.value)} disabled={off} required placeholder="Review every module" /></label>
           <label>Pieces, one per line: title | files<textarea value={pieces} onChange={e => setPieces(e.target.value)} disabled={off} required rows={4}
             placeholder={'Review module a | src/a.py\nReview module b | src/b.py'} /></label>
@@ -123,8 +107,8 @@ export function Control({ api, snap, me, say }: { api: Api | null; snap: Snapsho
           e.preventDefault();
           void act(() => api!.addOperator(other), 'Identity authorized.').then(ok => { if (ok) setOther(''); });
         }}>
-          <h3>Authorize another identity</h3>
-          <p className="small muted">For a teammate's browser, or the terminal manager Claude (run <code className="mono">npm run whoami</code> in <code className="mono">mcp/</code>).</p>
+          <h3>Who can operate</h3>
+          <p className="small muted">An operator can send goals and change the team. To add one (a teammate's browser, or the terminal manager Claude), paste its identity. In a terminal, run <code className="mono">npm run whoami</code> in <code className="mono">mcp/</code>.</p>
           <label>Identity (64 hex characters)<input value={other} onChange={e => setOther(e.target.value)} disabled={off} className="mono" placeholder="c200a9…" /></label>
           <button type="submit" className="btn" disabled={off || busy || !other.trim()}>Authorize</button>
           <ul className="plain ops">
@@ -139,6 +123,6 @@ export function Control({ api, snap, me, say }: { api: Api | null; snap: Snapsho
           </ul>
         </form>
       </div>
-    </section>
+    </div>
   );
 }

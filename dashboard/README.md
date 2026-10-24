@@ -1,35 +1,42 @@
 # dashboard (owner: Omar; first version built by Bilal while solo)
 
-Live web page and judge mode. Spec: root README sections 11 and 12. Vite, React, TypeScript. It reads the brain directly through the generated bindings in `../brain/bindings`.
+One web page for Tandem. Spec: root README sections 11 and 12. Vite, React, TypeScript. It reads the brain directly through the generated bindings in `../brain/bindings`.
+
+## How it works
+One page, one flow: **say what you want, then watch it happen.**
+
+1. **Prompt box** at the top: "What should your team build?"
+2. **Progress summary**: "3 of 13 tasks done", a bar, and counts for waiting / ready / working / done.
+3. **Task board** in four stages, left to right: **Waiting** (needs other tasks first) → **Ready** (free) → **Working** (a teammate is on it: who, how long, a moving strip, their last progress note) → **Done** (finished by whom).
+4. Team (usage bars, current task), locked files, "Why this assignment?", and a plain-English log.
+
+A switch in the header chooses the session:
+- **Demo** (default): your own private sandbox with simulated workers, so anyone can try it with no setup. The coordination is real, only the coding is faked. Typing a goal makes one task; the example chips start a login build or a 12-piece review. "Make Sam hit a limit", "same file", "goes idle" and Reset are here.
+- **My team** (`?mode=team`): the real session. No simulation. The first visitor presses **Claim this team** and becomes the operator. Operators type goals into the prompt box; a goal is saved and waits for the manager Claude to plan it. **Add a teammate** shows the exact command for a teammate's Claude to join. **Manage** (collapsed) has the by-hand forms, shared notes and who can operate. Everyone else can watch but not change anything; the brain enforces that.
 
 ## Checklist
 - [x] Pick a stack: Vite + React + TypeScript, plain CSS, light and dark
 - [x] Mock mode (`?mock=1`) that loads `contract/seed.json` so you can build before the brain exists
-- [x] Team panel: name, plan badge, 5-hour and weekly bars, status chip (icon + text), current task, "updated Xs ago"
-- [x] Task board: Open / Running / Blocked / Done, with model and effort chips, assignee, job progress bar
+- [x] Team panel: name, plan badge, 5-hour and weekly bars, status chip (icon + text), current task with elapsed time, "updated Xs ago"
+- [x] Task board in stages, with model chips, assignee, live progress strip and note, and a job progress bar
 - [x] Locks panel and "Why this assignment?" panel
 - [x] Event log in plain English, newest first
-- [x] Scenario buttons and stepper (see `contract/scenarios.md`), plus Reset
-- [x] Judge mode (simulated workers) with a visible "Simulated workers" badge, and Live mode (`?mode=live`, read-only view of session `live`, nothing simulated). Live mode was not tried with real Claude workers feeding the page yet
-- [x] Per-judge sessions (`session_id`): each browser tab gets its own session and sandbox
-- [x] Mobile layout: tabs Team | Tasks | Locks | Log, sticky bottom scenario bar, tap targets of at least 44px
+- [x] Prompt box, progress summary, scenario buttons and stepper (Demo), Reset
+- [x] Demo (simulated workers, visible badge) and My team (real session) in one page
+- [x] Per-sandbox sessions (`session_id`): each browser tab gets its own demo sandbox
+- [x] Operator flow: claim, send goals, manage by hand, approve and remove other identities
+- [x] "Add a teammate": the exact `claude mcp add` command and the prompt to give their Claude
+- [x] Mobile layout: tabs, 44px tap targets, no sideways scroll
 - [x] `?view=present` for big type and no controls
-- [x] Operator panel (live mode): create a task or a big job, edit the shared notes, authorize or remove operators. Only operators can change the live session; everyone else is view only. The brain enforces it
-- [ ] Fallback: if the brain is unreachable, show a banner and play a prerecorded run. Done so far: the banner, and a still picture of the seed data. No prerecorded run plays
-- [x] QR code for the public URL (the Share button makes one for the current page URL)
-- [ ] After the base works (about hour 10): team-rules skill and lock-check hook in `/mcp`
+- [x] QR code for the page URL (the Share button)
+- [ ] Fallback: if the brain is unreachable, show a banner and play a prerecorded run. Done so far: the banner, and a still picture of the seed data
+- [ ] After the base works: team-rules skill and lock-check hook in `/mcp`
 
-## Checkpoint (about hour 6)
-A static dashboard with fake data that works on a phone. Done (`?mock=1`), and it also runs live against the brain.
-
-## Done when
-A stranger completes the judge flow on their phone with no help, and the page updates in real time with no refresh. Real-time updates and the flow are tested with a scripted browser. The "stranger on a phone with no help" part has not been tried with a real person.
-
-## How it works
-- Judge mode: a new tab gets a session id, the brain loads the seed teammates (Alex, Sam, Jordan), and simulated workers run in the browser. They claim, "work" for a few seconds and complete tasks through the real brain, so locks, queueing and unblocking are all real. Only the coding is faked.
-- The scenario buttons are a few brain calls each (`src/scenarios.ts`). "Run the demo" and "Run map-reduce" add the seed tasks. "Make Sam hit a limit" sets usage to 100, which caps Sam and requeues their task. "Same file" adds two tasks on one file. "Goes idle" frees the busiest teammate and reserves an urgent task for them.
-- Reset only wipes your own session.
-- Never a dead end: if the brain does not answer in 6 seconds, a banner appears and the seed data is shown with controls off.
+## Not done yet
+- **Nothing reads goals yet.** The manager Claude that plans a goal into tasks is not built. Until it is, a goal stays "Waiting for the manager". Use Manage to add tasks by hand.
+- No real Claude workers have fed this page yet.
+- No stranger has tried it on a phone with no help.
+- Nothing is deployed. "Add a teammate" shows `127.0.0.1` for now, so only this machine can join.
 
 ## Run it
 ```
@@ -38,16 +45,13 @@ cd brain && npm install && cd ../dashboard && npm install
 npm run dev                       # http://localhost:5173
 npm run build && npm run preview  # production build
 ```
-URL options: `?mode=live`, `?view=present`, `?mock=1`, `?uri=ws://host:3000&db=name`. Defaults can also be set with `VITE_STDB_URI` and `VITE_STDB_DB`.
+URL options: `?mode=team` (alias `?mode=live`), `?view=present`, `?mock=1`, `?uri=ws://host:3000&db=name`. Defaults can also be set with `VITE_STDB_URI` and `VITE_STDB_DB`.
 
 ## Tests
-- `npm test`: every scenario against the real brain, using the same simulator as the browser (24 checks).
-- `npm run test:ui`: the real page in Chrome via playwright-core, desktop and phone size (54 checks). Needs `npm run build && npm run preview -- --port 4173`, and Chrome. Set `SHOTS=<folder>` to save screenshots.
-
-## Live mode and operators
-`?mode=live` shows the real `live` session. Open it on a fresh database, press "Become the operator", and the forms switch on. Your browser keeps its login, so it stays an operator between visits. To let another browser or the terminal manager Claude in, paste its identity under "Authorize another identity".
+- `npm test`: every Demo scenario against the real brain, using the same simulator as the browser.
+- `npm run test:ui`: the real page in Chrome via playwright-core, desktop and phone size, Demo and My team. Needs `npm run build && npm run preview -- --port 4173`, Chrome, and `spacetime` on PATH (it publishes a fresh `bilal-auth` database for the My team checks). Set `SHOTS=<folder>` to save screenshots.
 
 ## Known limits
-- The simulator runs in the page. If a judge closes the tab mid-run, their sandbox stops moving until they come back.
+- The simulator runs in the page. If someone closes the tab mid-run, their sandbox stops moving until they come back.
 - Anyone can point `?uri=` at any server. Harmless, but not locked down.
-- Nothing is deployed. Judges need a public URL, so the brain and this page still need hosting.
+- Worker actions have no login (see `brain/README.md`).

@@ -21,6 +21,7 @@ function seedSnapshot(): Snapshot {
     })),
     locks: [],
     events: [],
+    goals: [],
     context: { ...seed.context },
     operators: [],
   };
@@ -59,8 +60,8 @@ export function useBrain() {
         setStatus('connected');
         const s = readSnapshot(conn!, config.session);
         setSnap(s);
-        // A new judge session starts with the seed teammates. Never auto-reset the live session.
-        if (!config.live && s.workers.length === 0) void a.reset().catch(() => {});
+        // A new demo sandbox starts with the seed teammates. Never auto-reset the real team session.
+        if (config.demo && s.workers.length === 0) void a.reset().catch(() => {});
       },
       error: () => {
         window.clearTimeout(timeout);
@@ -75,10 +76,10 @@ export function useBrain() {
     };
   }, []);
 
-  // Judge mode: simulated workers do the "coding". Live mode never simulates.
+  // Demo: simulated workers do the "coding". The real team never simulates.
   const simState = useMemo(newSimState, []);
   useEffect(() => {
-    if (!api || config.live) return;
+    if (!api || !config.demo) return;
     const id = window.setInterval(() => { void simStep(api, snapRef.current, simState, Date.now()); }, 1000);
     return () => window.clearInterval(id);
   }, [api, simState]);

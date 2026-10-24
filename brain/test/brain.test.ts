@@ -16,7 +16,7 @@ function connect(): Promise<DbConnection> {
       .onConnect(c => {
         c.subscriptionBuilder()
           .onApplied(() => resolve(c))
-          .subscribe([tables.workers, tables.tasks, tables.locks, tables.events, tables.context]);
+          .subscribe([tables.workers, tables.tasks, tables.locks, tables.events, tables.context, tables.goals]);
       })
       .onConnectError((_c, e) => reject(e))
       .build();
@@ -225,6 +225,23 @@ await admin.reducers.resetSession({ sessionId: R });
 await sleep(500);
 check('reset: wipes tasks, locks and events of that session', r.tasks().size === 0 && r.locks().length === 0 && r.events().length === 1);
 check('reset: other sessions are untouched', main.tasks().size > 5 && s2.tasks().size === 1);
+
+// 12. Goals: the operator's plain-words request, waiting for the manager.
+const G = `g-${run}`;
+const goals = () => [...admin.db.goals.iter()].filter(g => g.sessionId === G);
+await admin.reducers.postGoal({ sessionId: G, id: 'g1', text: '  Build a login page  ' });
+await sleep(400);
+check('goals: a posted goal is saved trimmed with status new', goals().length === 1 && goals()[0].text === 'Build a login page' && goals()[0].status === 'new', goals());
+check('goals: an empty goal is rejected', await rejects(admin.reducers.postGoal({ sessionId: G, id: 'g2', text: '   ' })));
+check('goals: the same id twice is rejected', await rejects(admin.reducers.postGoal({ sessionId: G, id: 'g1', text: 'again' })));
+await admin.reducers.setGoalStatus({ sessionId: G, id: 'g1', status: 'planned' });
+await sleep(300);
+check('goals: the manager can mark it planned', goals()[0].status === 'planned');
+check('goals: a bad status is rejected', await rejects(admin.reducers.setGoalStatus({ sessionId: G, id: 'g1', status: 'done' })));
+check('goals: a log line tells the team', [...admin.db.events.iter()].some(e => e.sessionId === G && e.message.startsWith('Goal sent to the manager')));
+await admin.reducers.resetSession({ sessionId: G });
+await sleep(400);
+check('goals: reset wipes them', goals().length === 0);
 
 for (const c of [admin, ...clients]) c.disconnect();
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);

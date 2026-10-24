@@ -25,8 +25,8 @@ Plain words. Three parts, one shared notebook.
 - **Brain** (`brain/`): the shared notebook. Holds tasks, file locks, workers, an event log and shared notes. Its rules are the point: claiming a task, locking its files and unblocking waiting tasks each happen as one indivisible step.
 - **MCP server** (`mcp/`): the buttons Claude can press. 14 tools from `contract/tools.json`. One file (`src/brain-client.ts`) talks to the database. `BRAIN_MODE=mock` swaps in an in-memory copy for building without a database.
 - **Dashboard** (`dashboard/`): a live page that reads the same tables. In judge mode, simulated workers in the browser press the same buttons so anyone can try it with no setup.
-- **How you control it**: the dashboard (live mode) has a Control panel for operators. The terminal manager Claude uses the same actions through the MCP tools. Both end up as rows in the brain; nothing talks to anything else directly.
-- **Not built yet**: the launcher (starts real Claude runs), the manager (turns a goal into tasks), the lock-check hook, and the team-rules skill.
+- **How you control it**: the dashboard's My team view has a prompt box for operators. What you type is saved as a goal; the manager Claude (not built yet) turns it into tasks. Manage has by-hand forms as a fallback. The terminal manager Claude uses the same actions through the MCP tools. Both end up as rows in the brain; nothing talks to anything else directly.
+- **Not built yet**: the launcher (starts real Claude runs), the manager (reads goals, creates tasks; needs `get_goals` and `mark_goal` tools, see `mcp/NOTES.md`), the lock-check hook, and the team-rules skill.
 
 ## One task, start to finish
 1. `register_worker`: the worker joins the team.
@@ -40,6 +40,9 @@ Plain words. Three parts, one shared notebook.
 - **A file is already locked:** the task waits (stays `open`) until the lock is freed.
 - **A worker crashes:** no heartbeat for 2 minutes, so the brain frees its locks and reopens its task.
 - **A worker hits its limit (usage 100):** it is capped and its running task goes back to the queue.
+
+## How teammates join
+A teammate does not need approval to work. On their machine they run one `claude mcp add` command (the dashboard's "Add a teammate" button shows it) pointing at this team's database and session, then tell their Claude to register and claim tasks. Only sending goals or changing the team needs an operator.
 
 ## Who may do what
 - **Worker actions** (register, claim, lock, complete, heartbeat, report): open to everyone, in every session. No per-worker login yet.

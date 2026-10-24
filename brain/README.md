@@ -9,6 +9,7 @@ SpacetimeDB module: the shared database and its atomic operations. TypeScript. S
 - [x] `complete_task` unblocks dependents, and opens a job's merge task when its last map task finishes, exactly once
 - [x] Seed loader from `contract/seed.json` (imported at build time, no copy); `reset_session` restores the seed workers and context for one session only. Tasks come from `seed_tasks` (see below)
 - [x] Every table carries `session_id` and every reducer is scoped to one session. Clients filter their subscriptions by it
+- [x] Goals: `post_goal` (operator) saves what the operator asked for in plain words; `set_goal_status` (new, planning, planned) is for the manager. The page shows them. Nothing reads them yet
 - [x] Operators: in the `live` session only operators may create tasks, jobs and notes, seed or reset. The first caller of `claim_operator` becomes the operator; operators authorize others with `add_operator`
 
 ## Checkpoint (about hour 6)

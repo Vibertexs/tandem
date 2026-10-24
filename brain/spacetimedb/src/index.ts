@@ -81,6 +81,20 @@ const context = table(
   }
 );
 
+// What the operator asked for, in plain words. The manager Claude reads new goals, splits each
+// into tasks, then marks it planned. status: new | planning | planned
+const goals = table(
+  { name: 'goals', public: true },
+  {
+    pk: t.string().primaryKey(),
+    session_id: t.string().index('btree'),
+    id: t.string(),
+    text: t.string(),
+    status: t.string(),
+    created_at: t.timestamp(),
+  }
+);
+
 // Who may control the real team session. Public so the dashboard can tell whether you are one.
 const operators = table(
   { name: 'operators', public: true },
@@ -90,7 +104,7 @@ const operators = table(
   }
 );
 
-const spacetimedb = schema({ workers, tasks, locks, events, context, operators });
+const spacetimedb = schema({ workers, tasks, locks, events, context, goals, operators });
 export default spacetimedb;
 
 type Ctx = ReducerCtx<InferSchema<typeof spacetimedb>>;
@@ -458,6 +472,7 @@ export const resetSession = spacetimedb.reducer(
     for (const r of [...ctx.db.locks.session_id.filter(session_id)]) ctx.db.locks.pk.delete(r.pk);
     for (const r of [...ctx.db.events.session_id.filter(session_id)]) ctx.db.events.id.delete(r.id);
     for (const r of [...ctx.db.context.session_id.filter(session_id)]) ctx.db.context.pk.delete(r.pk);
+    for (const r of [...ctx.db.goals.session_id.filter(session_id)]) ctx.db.goals.pk.delete(r.pk);
     for (const w of seed.workers) {
       ctx.db.workers.insert({
         pk: pk(session_id, w.id), session_id, id: w.id, name: w.name, plan: w.plan, status: w.status,
@@ -512,5 +527,30 @@ export const removeOperator = spacetimedb.reducer(
     if (!ctx.db.operators.identity.find(ctx.sender)) throw new SenderError('operator only');
     if ([...ctx.db.operators.iter()].length <= 1) throw new SenderError('cannot remove the last operator');
     ctx.db.operators.identity.delete(identity);
+  }
+);
+
+// The operator types a goal. It waits as `new` until the manager Claude picks it up.
+export const postGoal = spacetimedb.reducer(
+  { session_id: t.string(), id: t.string(), text: t.string() },
+  (ctx, { session_id, id, text }) => {
+    checkSession(session_id);
+    requireOperator(ctx, session_id);
+    const clean = text.trim();
+    if (clean.length === 0 || clean.length > 2000) throw new SenderError('a goal is 1 to 2000 characters');
+    if (ctx.db.goals.pk.find(pk(session_id, id))) throw new SenderError(`goal ${id} already exists`);
+    ctx.db.goals.insert({ pk: pk(session_id, id), session_id, id, text: clean, status: 'new', created_at: ctx.timestamp });
+    addEvent(ctx, session_id, undefined, 'task_created', `Goal sent to the manager: ${clean.slice(0, 80)}`);
+  }
+);
+
+export const setGoalStatus = spacetimedb.reducer(
+  { session_id: t.string(), id: t.string(), status: t.string() },
+  (ctx, { session_id, id, status }) => {
+    requireOperator(ctx, session_id);
+    if (!['new', 'planning', 'planned'].includes(status)) throw new SenderError('bad status');
+    const goal = ctx.db.goals.pk.find(pk(session_id, id));
+    if (!goal) throw new SenderError('unknown goal');
+    ctx.db.goals.pk.update({ ...goal, status });
   }
 );

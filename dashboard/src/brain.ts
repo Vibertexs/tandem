@@ -14,12 +14,13 @@ export type Task = {
 };
 export type Lock = { path: string; taskId: string; workerId: string; createdAt: Date };
 export type Ev = { id: number; time: Date; workerId: string | null; type: string; message: string };
+export type Goal = { id: string; text: string; status: string; createdAt: Date };
 export type Snapshot = {
-  workers: Worker[]; tasks: Task[]; locks: Lock[]; events: Ev[];
+  workers: Worker[]; tasks: Task[]; locks: Lock[]; events: Ev[]; goals: Goal[];
   context: Record<string, string>; operators: string[]; // operators are identity hex strings
 };
 
-export const emptySnapshot: Snapshot = { workers: [], tasks: [], locks: [], events: [], context: {}, operators: [] };
+export const emptySnapshot: Snapshot = { workers: [], tasks: [], locks: [], events: [], goals: [], context: {}, operators: [] };
 
 const date = (ts: { microsSinceUnixEpoch: bigint }) => new Date(Number(ts.microsSinceUnixEpoch / 1000n));
 
@@ -43,6 +44,9 @@ export function readSnapshot(conn: DbConnection, session: string): Snapshot {
     events: mine(conn.db.events.iter())
       .map(r => ({ id: Number(r.id), time: date(r.timestamp), workerId: r.workerId ?? null, type: r.type, message: r.message }))
       .sort((a, b) => b.id - a.id),
+    goals: mine(conn.db.goals.iter())
+      .map(r => ({ id: r.id, text: r.text, status: r.status, createdAt: date(r.createdAt) }))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
     context: Object.fromEntries(mine(conn.db.context.iter()).map(r => [r.key, r.value])),
     operators: [...conn.db.operators.iter()].map(r => r.identity.toHexString()),
   };
@@ -70,7 +74,7 @@ export function connect(
     .withAutomaticReconnect()
     .onConnect((c, identity, token) => {
       saveToken(key, token);
-      for (const t of [c.db.workers, c.db.tasks, c.db.locks, c.db.events, c.db.context, c.db.operators]) {
+      for (const t of [c.db.workers, c.db.tasks, c.db.locks, c.db.events, c.db.context, c.db.goals, c.db.operators]) {
         t.onInsert(on.change);
         t.onUpdate(on.change);
         t.onDelete(on.change);
@@ -83,6 +87,7 @@ export function connect(
           tables.locks.where(r => r.sessionId.eq(session)),
           tables.events.where(r => r.sessionId.eq(session)),
           tables.context.where(r => r.sessionId.eq(session)),
+          tables.goals.where(r => r.sessionId.eq(session)),
           tables.operators,
         ]);
     })
@@ -142,6 +147,7 @@ export function makeApi(conn: DbConnection, session: string) {
         mapTasks: pieces.map(p => toInput(newId('t'), p)),
         mergeTask: toInput(newId('t'), merge, 'hard'),
       }),
+    postGoal: (text: string) => conn.reducers.postGoal({ sessionId: session, id: newId('g'), text }),
     setContext: (key: string, value: string) => conn.reducers.setContext({ sessionId: session, key, value }),
   };
 }

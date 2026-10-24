@@ -22,7 +22,7 @@ function client() {
     DbConnection.builder().withUri(URI).withDatabaseName(DB)
       .onConnect((c, identity) => {
         c.subscriptionBuilder().onApplied(() => resolve({ conn: c, identity }))
-          .subscribe([tables.operators, tables.tasks, tables.context]);
+          .subscribe([tables.operators, tables.tasks, tables.context, tables.goals]);
       })
       .onConnectError((_c, e) => reject(e)).build();
   });
@@ -41,6 +41,9 @@ check('before any operator: a stranger cannot write notes or reset live',
   await rejects(a.conn.reducers.resetSession({ sessionId: 'live' })) &&
   await rejects(a.conn.reducers.seedTasks({ sessionId: 'live', group: 'demo' })));
 
+check('before any operator: a stranger cannot post a goal in live', await rejects(a.conn.reducers.postGoal({ sessionId: 'live', id: 'g0', text: 'hi' })));
+check('before any operator: goals are open in judge sandboxes', !(await rejects(a.conn.reducers.postGoal({ sessionId: 'judge-1', id: 'g0', text: 'hi' }))));
+
 await a.conn.reducers.claimOperator({});
 await sleep(300);
 check('claim_operator: the first caller becomes the operator', [...a.conn.db.operators.iter()].length === 1);
@@ -49,6 +52,10 @@ check('claim_operator: nobody else can claim afterwards', await rejects(b.conn.r
 check('operator: can create a task in live', !(await rejects(create(a.conn, 'live', 'x2'))));
 check('operator: can write notes in live', !(await rejects(a.conn.reducers.setContext({ sessionId: 'live', key: 'k', value: 'v' }))));
 check('non-operator: still cannot create a task in live', await rejects(create(b.conn, 'live', 'x3')));
+check('operator can post a goal in live, a non-operator cannot',
+  !(await rejects(a.conn.reducers.postGoal({ sessionId: 'live', id: 'g1', text: 'Build it' }))) &&
+  await rejects(b.conn.reducers.postGoal({ sessionId: 'live', id: 'g2', text: 'Build it' })) &&
+  await rejects(b.conn.reducers.setGoalStatus({ sessionId: 'live', id: 'g1', status: 'planned' })));
 check('non-operator: cannot add themselves as operator', await rejects(b.conn.reducers.addOperator({ identity: b.identity })));
 check('non-operator: worker actions stay open in live (register_worker)', !(await rejects(b.conn.reducers.registerWorker({ sessionId: 'live', id: 'w-b', name: 'B', plan: 'pro' }))));
 

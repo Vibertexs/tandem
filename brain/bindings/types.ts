@@ -28,6 +28,16 @@ export const Events = __t.object("Events", {
 });
 export type Events = __Infer<typeof Events>;
 
+export const Goals = __t.object("Goals", {
+  pk: __t.string(),
+  sessionId: __t.string(),
+  id: __t.string(),
+  text: __t.string(),
+  status: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type Goals = __Infer<typeof Goals>;
+
 export const Locks = __t.object("Locks", {
   pk: __t.string(),
   sessionId: __t.string(),

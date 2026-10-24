@@ -41,6 +41,7 @@ import CompleteTaskReducer from "./complete_task_reducer";
 import CreateJobReducer from "./create_job_reducer";
 import CreateTaskReducer from "./create_task_reducer";
 import HeartbeatReducer from "./heartbeat_reducer";
+import PostGoalReducer from "./post_goal_reducer";
 import ReapStaleReducer from "./reap_stale_reducer";
 import RegisterWorkerReducer from "./register_worker_reducer";
 import ReleaseLocksReducer from "./release_locks_reducer";
@@ -49,6 +50,7 @@ import ReportProgressReducer from "./report_progress_reducer";
 import ResetSessionReducer from "./reset_session_reducer";
 import SeedTasksReducer from "./seed_tasks_reducer";
 import SetContextReducer from "./set_context_reducer";
+import SetGoalStatusReducer from "./set_goal_status_reducer";
 import TakeLocksReducer from "./take_locks_reducer";
 import UpdateCapacityReducer from "./update_capacity_reducer";
 
@@ -57,6 +59,7 @@ import UpdateCapacityReducer from "./update_capacity_reducer";
 // Import all table schema definitions
 import ContextRow from "./context_table";
 import EventsRow from "./events_table";
+import GoalsRow from "./goals_table";
 import LocksRow from "./locks_table";
 import OperatorsRow from "./operators_table";
 import TasksRow from "./tasks_table";
@@ -94,6 +97,20 @@ const tablesSchema = __schema({
       { name: 'events_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, EventsRow),
+  goals: __table({
+    name: 'goals',
+    indexes: [
+      { accessor: 'pk', name: 'goals_pk_idx_btree', algorithm: 'btree', columns: [
+        'pk',
+      ] },
+      { accessor: 'session_id', name: 'goals_session_id_idx_btree', algorithm: 'btree', columns: [
+        'sessionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'goals_pk_key', constraint: 'unique', columns: ['pk'] },
+    ],
+  }, GoalsRow),
   locks: __table({
     name: 'locks',
     indexes: [
@@ -161,6 +178,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_job", CreateJobReducer),
   __reducerSchema("create_task", CreateTaskReducer),
   __reducerSchema("heartbeat", HeartbeatReducer),
+  __reducerSchema("post_goal", PostGoalReducer),
   __reducerSchema("reap_stale", ReapStaleReducer),
   __reducerSchema("register_worker", RegisterWorkerReducer),
   __reducerSchema("release_locks", ReleaseLocksReducer),
@@ -169,6 +187,7 @@ const reducersSchema = __reducers(
   __reducerSchema("reset_session", ResetSessionReducer),
   __reducerSchema("seed_tasks", SeedTasksReducer),
   __reducerSchema("set_context", SetContextReducer),
+  __reducerSchema("set_goal_status", SetGoalStatusReducer),
   __reducerSchema("take_locks", TakeLocksReducer),
   __reducerSchema("update_capacity", UpdateCapacityReducer),
 );
