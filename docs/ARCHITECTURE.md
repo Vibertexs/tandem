@@ -25,6 +25,7 @@ Plain words. Three parts, one shared notebook.
 - **Brain** (`brain/`): the shared notebook. Holds tasks, file locks, workers, an event log and shared notes. Its rules are the point: claiming a task, locking its files and unblocking waiting tasks each happen as one indivisible step.
 - **MCP server** (`mcp/`): the buttons Claude can press. 14 tools from `contract/tools.json`. One file (`src/brain-client.ts`) talks to the database. `BRAIN_MODE=mock` swaps in an in-memory copy for building without a database.
 - **Dashboard** (`dashboard/`): a live page that reads the same tables. In judge mode, simulated workers in the browser press the same buttons so anyone can try it with no setup.
+- **How you control it**: the dashboard (live mode) has a Control panel for operators. The terminal manager Claude uses the same actions through the MCP tools. Both end up as rows in the brain; nothing talks to anything else directly.
 - **Not built yet**: the launcher (starts real Claude runs), the manager (turns a goal into tasks), the lock-check hook, and the team-rules skill.
 
 ## One task, start to finish
@@ -40,11 +41,16 @@ Plain words. Three parts, one shared notebook.
 - **A worker crashes:** no heartbeat for 2 minutes, so the brain frees its locks and reopens its task.
 - **A worker hits its limit (usage 100):** it is capped and its running task goes back to the queue.
 
+## Who may do what
+- **Worker actions** (register, claim, lock, complete, heartbeat, report): open to everyone, in every session. No per-worker login yet.
+- **Manager actions** (create task or job, shared notes, seed, reset): in the `live` session only an **operator** may do them. The first person to claim becomes the operator and authorizes others (their browser, or the terminal manager Claude via `npm run whoami`). Judge sandboxes stay open.
+
 ## Sessions
 Every row has a `session_id`. The real team uses `live`. Each judge gets their own session, so ten judges never see each other's data, and Reset only clears your own.
 
 ## Open design questions
 - Who merges branches into `main`, and who resolves conflicts? Suggestion: an integrate task run by a worker Claude, escalating to a human, landing through a reviewed PR.
+- Where does the main (manager) Claude run? In a terminal, with the MCP server attached. The web page and the terminal are two windows on the same brain, so they never need to talk to each other.
 - Locks are not enforced yet. A Claude can still edit a locked file. That is the hook's job.
 - No per-worker authentication. Any client can claim to be any worker.
 - Hosting: judges need a public URL (Maincloud or a tunnel). Nothing is deployed.

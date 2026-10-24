@@ -21,6 +21,8 @@ function seedSnapshot(): Snapshot {
     })),
     locks: [],
     events: [],
+    context: { ...seed.context },
+    operators: [],
   };
 }
 
@@ -28,6 +30,7 @@ export function useBrain() {
   const [status, setStatus] = useState<Status>(config.mock ? 'offline' : 'connecting');
   const [snap, setSnap] = useState<Snapshot>(config.mock ? seedSnapshot() : emptySnapshot);
   const [api, setApi] = useState<Api | null>(null);
+  const [me, setMe] = useState<string | null>(null);
   const snapRef = useRef(snap);
   snapRef.current = snap;
 
@@ -48,8 +51,9 @@ export function useBrain() {
     };
     conn = connect(config.uri, config.db, config.session, {
       change: refresh,
-      connected: () => {
+      connected: identity => {
         window.clearTimeout(timeout);
+        setMe(identity);
         const a = makeApi(conn!, config.session);
         setApi(a);
         setStatus('connected');
@@ -79,5 +83,5 @@ export function useBrain() {
     return () => window.clearInterval(id);
   }, [api, simState]);
 
-  return { snap, api, status };
+  return { snap, api, status, me };
 }

@@ -9,6 +9,7 @@ SpacetimeDB module: the shared database and its atomic operations. TypeScript. S
 - [x] `complete_task` unblocks dependents, and opens a job's merge task when its last map task finishes, exactly once
 - [x] Seed loader from `contract/seed.json` (imported at build time, no copy); `reset_session` restores the seed workers and context for one session only. Tasks come from `seed_tasks` (see below)
 - [x] Every table carries `session_id` and every reducer is scoped to one session. Clients filter their subscriptions by it
+- [x] Operators: in the `live` session only operators may create tasks, jobs and notes, seed or reset. The first caller of `claim_operator` becomes the operator; operators authorize others with `add_operator`
 
 ## Checkpoint (about hour 6)
 Hello world published, and two clients claiming one task gives exactly one winner. Done (local only).
@@ -23,12 +24,15 @@ Hello world published, and two clients claiming one task gives exactly one winne
 - Column names are snake_case in the database (as in the contract). Generated client rows are camelCase (`usage5HPct`, `dependsOn`).
 
 ## Known limits
-- `reap_stale` can be called by anyone (TODO: restrict before the database is shared).
-- Any client can call any reducer and pass any `worker_id`. There is no per-worker auth yet.
+- Worker actions (register, claim, lock, complete, heartbeat, report) are open to everyone in every session. Any client can pass any `worker_id`. There is no per-worker auth yet.
+- Judge sandboxes (any session except `live`) are open to everyone on purpose.
+- `claim_operator` is first come, first served: claim it right after you publish a shared database.
 - Enum-like fields are strings, only some are validated.
 - Nothing is published to `tandem` or Maincloud.
 
 ## Tests
+`npm run test:auth`: operator rules, on a fresh `bilal-auth` database it publishes itself.
+
 `npm test`: 10-client race, locks, map-reduce, stale workers, session isolation, create_job, reservations, capacity, context, reset and seed.
 
 ## Run it locally

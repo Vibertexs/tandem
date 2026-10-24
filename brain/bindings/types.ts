@@ -38,6 +38,12 @@ export const Locks = __t.object("Locks", {
 });
 export type Locks = __Infer<typeof Locks>;
 
+export const Operators = __t.object("Operators", {
+  identity: __t.identity(),
+  addedAt: __t.timestamp(),
+});
+export type Operators = __Infer<typeof Operators>;
+
 export const TaskInput = __t.object("TaskInput", {
   id: __t.string(),
   title: __t.string(),

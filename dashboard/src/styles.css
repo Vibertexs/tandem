@@ -116,6 +116,19 @@ h3 { font: 500 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .panel.tasks { grid-area: tasks; }
 .panel.locks { grid-area: locks; display: flex; flex-direction: column; gap: 16px; }
 .panel.log { grid-area: log; }
+.grid.live { grid-template-areas: 'control control control' 'team tasks locks' 'log log log'; }
+.control-wrap { grid-area: control; min-width: 0; }
+.control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.who-am-i { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.form { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--muted); }
+.form input, .form select, .form textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-height: 44px; width: 100%; }
+.form textarea { resize: vertical; min-height: 64px; }
+.form input:disabled, .form select:disabled, .form textarea:disabled { opacity: 0.5; cursor: not-allowed; }
+.form .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form .btn { align-self: flex-start; }
+.ops li { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.link { background: none; border: 0; color: var(--accent-strong); font: inherit; font-size: 0.8rem; cursor: pointer; text-decoration: underline; padding: 6px 4px; min-height: 32px; }
 
 /* cards */
 .card { border: 1px solid transparent; border-radius: 14px; padding: 12px 14px; background: var(--card); transition: background 0.4s, border-color 0.4s; }
@@ -195,7 +208,11 @@ h3 { font: 500 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
   .tabs button.on { background: var(--accent); color: var(--accent-ink); }
   .grid { display: block; }
   .panel, .panel.team, .panel.locks { display: none; }
-  .panel.show { display: block; }
+  .panel.show, .panel.control { display: block; }
+  .control-wrap { display: none; }
+  .control-wrap.show { display: block; }
+  .tabs { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
+  .form .row { grid-template-columns: 1fr; }
   .panel.team.show, .panel.locks.show { display: flex; }
   .columns { grid-template-columns: 1fr !important; }
   .list.wrap { grid-template-columns: 1fr; }
@@ -207,6 +224,7 @@ h3 { font: 500 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 
 @media (min-width: 901px) and (max-width: 1200px) {
   .grid { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: 'team tasks' 'locks locks' 'log log'; }
+  .grid.live { grid-template-areas: 'control control' 'team tasks' 'locks locks' 'log log'; }
   .columns { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
 

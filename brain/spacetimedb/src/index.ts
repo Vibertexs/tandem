@@ -81,7 +81,16 @@ const context = table(
   }
 );
 
-const spacetimedb = schema({ workers, tasks, locks, events, context });
+// Who may control the real team session. Public so the dashboard can tell whether you are one.
+const operators = table(
+  { name: 'operators', public: true },
+  {
+    identity: t.identity().primaryKey(),
+    added_at: t.timestamp(),
+  }
+);
+
+const spacetimedb = schema({ workers, tasks, locks, events, context, operators });
 export default spacetimedb;
 
 type Ctx = ReducerCtx<InferSchema<typeof spacetimedb>>;
@@ -101,6 +110,15 @@ const pk = (session: string, id: string) => `${session}/${id}`;
 
 function checkSession(session: string) {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(session)) throw new SenderError('bad session_id');
+}
+
+// In the real team session ("live") only operators may create tasks, write notes, seed or reset.
+// Judge sandboxes (any other session) stay open to everyone. Worker actions (register, claim,
+// lock, complete, heartbeat, report) are open in every session for now: there is no per-worker auth.
+function requireOperator(ctx: Ctx, session: string) {
+  if (session === 'live' && !ctx.db.operators.identity.find(ctx.sender)) {
+    throw new SenderError('operator only');
+  }
 }
 
 function addEvent(ctx: Ctx, session: string, workerId: string | undefined, type: string, message: string) {
@@ -162,6 +180,7 @@ export const heartbeat = spacetimedb.reducer(
 export const reapStale = spacetimedb.reducer(
   { session_id: t.string(), ttl_seconds: t.u32() },
   (ctx, { session_id, ttl_seconds }) => {
+    requireOperator(ctx, session_id);
     reapStaleWorkers(ctx, session_id, BigInt(Math.max(1, ttl_seconds)));
   }
 );
@@ -209,6 +228,7 @@ export const createTask = spacetimedb.reducer(
   },
   (ctx, { session_id, task, kind, job_id, assignee }) => {
     checkSession(session_id);
+    requireOperator(ctx, session_id);
     if (!['normal', 'map', 'reduce'].includes(kind)) throw new SenderError('bad kind');
     for (const dep of task.depends_on) {
       if (!ctx.db.tasks.pk.find(pk(session_id, dep))) throw new SenderError(`unknown dependency ${dep}`);
@@ -232,6 +252,7 @@ export const createJob = spacetimedb.reducer(
   },
   (ctx, { session_id, job_id, goal, map_tasks, merge_task }) => {
     checkSession(session_id);
+    requireOperator(ctx, session_id);
     if (map_tasks.length === 0) throw new SenderError('a job needs at least one map task');
     for (const m of map_tasks) insertTask(ctx, session_id, { ...m, depends_on: [] }, 'map', job_id, undefined, 'open');
     insertTask(ctx, session_id, { ...merge_task, depends_on: map_tasks.map(m => m.id) }, 'reduce', job_id, undefined, 'blocked');
@@ -418,6 +439,7 @@ export const setContext = spacetimedb.reducer(
   { session_id: t.string(), key: t.string(), value: t.string() },
   (ctx, { session_id, key, value }) => {
     checkSession(session_id);
+    requireOperator(ctx, session_id);
     const row = ctx.db.context.pk.find(pk(session_id, key));
     if (row) ctx.db.context.pk.update({ ...row, value });
     else ctx.db.context.insert({ pk: pk(session_id, key), session_id, key, value });
@@ -430,6 +452,7 @@ export const resetSession = spacetimedb.reducer(
   { session_id: t.string() },
   (ctx, { session_id }) => {
     checkSession(session_id);
+    requireOperator(ctx, session_id);
     for (const r of [...ctx.db.workers.session_id.filter(session_id)]) ctx.db.workers.pk.delete(r.pk);
     for (const r of [...ctx.db.tasks.session_id.filter(session_id)]) ctx.db.tasks.pk.delete(r.pk);
     for (const r of [...ctx.db.locks.session_id.filter(session_id)]) ctx.db.locks.pk.delete(r.pk);
@@ -455,6 +478,7 @@ export const seedTasks = spacetimedb.reducer(
   { session_id: t.string(), group: t.string() },
   (ctx, { session_id, group }) => {
     checkSession(session_id);
+    requireOperator(ctx, session_id);
     if (group !== 'demo' && group !== 'review') throw new SenderError('group must be demo or review');
     const wanted = seed.tasks.filter(x => (group === 'review' ? x.job_id === 'job-review' : x.job_id === null));
     let added = 0;
@@ -465,5 +489,28 @@ export const seedTasks = spacetimedb.reducer(
     }
     addEvent(ctx, session_id, undefined, 'task_created',
       group === 'review' ? `Map-reduce job started: ${added} tasks` : `Demo goal started: ${added} tasks`);
+  }
+);
+
+// The first caller becomes the operator. After that, only operators can add or remove operators.
+export const claimOperator = spacetimedb.reducer(ctx => {
+  if ([...ctx.db.operators.iter()].length > 0) throw new SenderError('an operator already exists');
+  ctx.db.operators.insert({ identity: ctx.sender, added_at: ctx.timestamp });
+});
+
+export const addOperator = spacetimedb.reducer(
+  { identity: t.identity() },
+  (ctx, { identity }) => {
+    if (!ctx.db.operators.identity.find(ctx.sender)) throw new SenderError('operator only');
+    if (!ctx.db.operators.identity.find(identity)) ctx.db.operators.insert({ identity, added_at: ctx.timestamp });
+  }
+);
+
+export const removeOperator = spacetimedb.reducer(
+  { identity: t.identity() },
+  (ctx, { identity }) => {
+    if (!ctx.db.operators.identity.find(ctx.sender)) throw new SenderError('operator only');
+    if ([...ctx.db.operators.iter()].length <= 1) throw new SenderError('cannot remove the last operator');
+    ctx.db.operators.identity.delete(identity);
   }
 );

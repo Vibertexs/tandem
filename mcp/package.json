@@ -6,7 +6,9 @@
   "scripts": {
     "start": "tsx src/server.ts",
     "test": "tsx test/mcp.test.ts",
-    "test:mock": "tsx test/mock.test.ts"
+    "test:mock": "tsx test/mock.test.ts",
+    "whoami": "tsx src/whoami.ts",
+    "test:operator": "tsx test/operator.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "^2.4.0",

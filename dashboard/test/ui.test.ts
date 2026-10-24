@@ -3,6 +3,7 @@
 // Env: UI_URL (default http://localhost:4173), CHROME (path), SHOTS (folder for screenshots)
 import { chromium, type Page } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 
 const URL_ = process.env.UI_URL ?? 'http://localhost:4173';
@@ -116,10 +117,77 @@ try {
     await visible(live, 'Connected', 8000);
     check('live: shows the Live badge, not Simulated workers', await visible(live, 'Live', 2000) && !(await live.getByText('Simulated workers').isVisible()));
     check('live: no Reset button', await live.getByRole('button', { name: 'Reset' }).count() === 0);
-    check('live: scenario buttons are off', await live.getByRole('button', { name: 'Run map-reduce' }).first().isDisabled());
+    check('live: judge scenario buttons are not there', await live.getByRole('button', { name: 'Run map-reduce' }).count() === 0);
     await live.waitForTimeout(3000);
     check('live: nothing is simulated (no work appears by itself)', await live.locator('.task').count() === 0);
     await Promise.all([a.context().close(), b.context().close(), live.context().close()]);
+  }
+
+  // ---- operator control of the live session (fresh database, so the first visitor can claim it) ----
+  {
+    execSync('spacetime publish bilal-auth --server dev3001 --no-config --module-path ../brain/spacetimedb --delete-data=always --yes', { stdio: 'pipe' });
+    const LIVE = URL_ + '/?mode=live&db=bilal-auth';
+    const ctxA = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const A = await ctxA.newPage();
+    const errs: string[] = [];
+    A.on('pageerror', e => errs.push(String(e)));
+    await A.goto(LIVE);
+    check('control: a new visitor is view-only and the forms are disabled', await visible(A, 'View only', 8000) && await A.getByLabel('Title', { exact: true }).isDisabled());
+    await shot(A, '8-control-viewonly');
+    await A.getByRole('button', { name: 'Become the operator' }).click();
+    check('control: claiming the empty database makes you the operator', await visible(A, 'You are an operator', 5000) && await A.getByLabel('Title', { exact: true }).isEnabled());
+
+    await A.getByLabel('Title', { exact: true }).fill('Add the login endpoint');
+    await A.getByLabel('Files it will touch').fill('src/api/login.py, tests/test_login.py');
+    await A.getByRole('button', { name: 'Create task' }).click();
+    check('control: a new task shows up on the board', await visible(A, 'Add the login endpoint', 5000) && await visible(A, 'Task created.', 3000));
+
+    await A.getByLabel('Goal').fill('Review every module');
+    await A.getByLabel(/Pieces, one per line/).fill('Review module a | src/a.py\nReview module b | src/b.py');
+    await A.getByRole('button', { name: 'Create job' }).click();
+    check('control: a big job shows its progress bar (0/2) and a blocked merge task', await visible(A, '0/2 pieces done', 5000) && await A.locator('.column', { hasText: 'Blocked' }).getByText('Merge the results').isVisible());
+
+    await A.getByLabel(/Text \(keep it short/).fill('Use TypeScript everywhere.');
+    await A.getByRole('button', { name: 'Save notes' }).click();
+    check('control: notes are saved', await visible(A, 'Notes saved.', 4000));
+    await shot(A, '9-control-operator');
+
+    await A.reload();
+    check('control: the browser keeps its identity after a reload (still an operator)', await visible(A, 'You are an operator', 8000));
+    check('control: the saved notes are still there', await A.getByLabel(/Text \(keep it short/).inputValue() === 'Use TypeScript everywhere.');
+
+    // a second browser is a different identity
+    const ctxB = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const B = await ctxB.newPage();
+    await B.goto(LIVE);
+    check('control: a second browser is view-only and cannot claim', await visible(B, 'View only', 8000) && await B.getByRole('button', { name: 'Become the operator' }).count() === 0);
+    check('control: it can see the tasks the operator made', await visible(B, 'Add the login endpoint', 3000));
+    const bHex = await B.locator('.who-am-i code').first().getAttribute('title');
+    check('control: its identity is shown so it can be authorized', /^[0-9a-f]{64}$/i.test(bHex ?? ''), bHex);
+
+    await A.getByLabel(/Identity \(64 hex/).fill('not-an-identity');
+    await A.getByRole('button', { name: 'Authorize' }).click();
+    check('control: a bad identity is refused with a plain message', await visible(A, 'An identity is 64 hex characters.', 3000));
+    await A.getByLabel(/Identity \(64 hex/).fill(bHex!);
+    await A.getByRole('button', { name: 'Authorize' }).click();
+    check('control: after authorizing, the second browser becomes an operator without reloading', await visible(B, 'You are an operator', 6000) && await B.getByLabel('Title', { exact: true }).isEnabled());
+
+    await A.getByRole('button', { name: 'remove' }).first().click();
+    check('control: removing it takes the access away again', await visible(B, 'View only', 6000) && await B.getByLabel('Title', { exact: true }).isDisabled());
+    check('control: no page errors', errs.length === 0, errs);
+    await ctxA.close();
+    await ctxB.close();
+
+    // phone: the Control tab exists and works
+    const ctxP = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+    const P = await ctxP.newPage();
+    await P.goto(LIVE);
+    await visible(P, 'View only', 8000);
+    await P.locator('.tabs button', { hasText: 'Control' }).click();
+    check('phone: the Control tab shows the forms', await P.getByLabel('Title', { exact: true }).isVisible());
+    check('phone: control inputs are at least 44px tall', await P.locator('.form input, .form select, .form .btn').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent && (e as HTMLElement).offsetHeight < 44).length === 0));
+    await shot(P, '10-phone-control');
+    await ctxP.close();
   }
 
   // ---- present view, mock, offline ----

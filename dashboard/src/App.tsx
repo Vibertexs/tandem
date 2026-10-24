@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { config } from './config';
 import { useBrain } from './useBrain';
+import { Control } from './Control';
 import { claimable } from './sim';
 import { runScenario, SCENARIO_LABEL, type ScenarioName } from './scenarios';
 import type { Ev, Snapshot, Task, Worker } from './brain';
 
-type Tab = 'team' | 'tasks' | 'locks' | 'log';
+type Tab = 'control' | 'team' | 'tasks' | 'locks' | 'log';
 
 const STATUS_ICON: Record<string, string> = { idle: '○', busy: '▶', capped: '■' };
 const STATUS_TEXT: Record<string, string> = { idle: 'Idle', busy: 'Working', capped: 'Capped' };
@@ -233,7 +234,7 @@ const BREAKS: ScenarioName[] = ['limit', 'samefile', 'idle'];
 const STEPS = ['Run it', 'Break it', 'Poke around', 'Reset'];
 
 export function App() {
-  const { snap, api, status } = useBrain();
+  const { snap, api, status, me } = useBrain();
   const now = useNow();
   const [tab, setTab] = useState<Tab>('tasks');
   const [selected, setSelected] = useState<string | null>(null);
@@ -332,7 +333,7 @@ export function App() {
         </div>
       )}
 
-      {!config.present && (
+      {!config.present && !config.live && (
         <div className="scenario-bar">
           <ol className="stepper" aria-label="Steps">
             {STEPS.map((s, i) => <li key={s} className={i === step ? 'now' : i < step ? 'past' : ''} aria-current={i === step ? 'step' : undefined}><span>{i + 1}</span> {s}</li>)}
@@ -342,14 +343,14 @@ export function App() {
       )}
 
       <nav className="tabs" aria-label="Sections">
-        {(['team', 'tasks', 'locks', 'log'] as Tab[]).map(t => (
+        {((config.live ? ['control', 'team', 'tasks', 'locks', 'log'] : ['team', 'tasks', 'locks', 'log']) as Tab[]).map(t => (
           <button key={t} type="button" className={tab === t ? 'on' : ''} onClick={() => setTab(t)} aria-pressed={tab === t}>
-            {{ team: 'Team', tasks: 'Tasks', locks: 'Locks', log: 'Log' }[t]}
+            {{ control: 'Control', team: 'Team', tasks: 'Tasks', locks: 'Locks', log: 'Log' }[t]}
           </button>
         ))}
       </nav>
 
-      {empty && status === 'connected' ? (
+      {empty && status === 'connected' && !config.live ? (
         <main className="empty-state">
           <h2>Your team's AI coders, working as one.</h2>
           <p>Tandem stops Claude agents from colliding on the same files, and hands work to whoever has room.</p>
@@ -359,9 +360,15 @@ export function App() {
           </div>
         </main>
       ) : (
-        <main className="grid">
+        <main className={`grid ${config.live ? 'live' : ''}`}>
+          {config.live && !config.present && (
+            <div className={`control-wrap ${tab === 'control' ? 'show' : ''}`}>
+              <Control api={api} snap={snap} me={me} say={setToast} />
+            </div>
+          )}
           <div className={`panel team ${tab === 'team' ? 'show' : ''}`}>
             <h2>Team</h2>
+            {snap.workers.length === 0 && <p className="muted small">No teammates yet. Each one appears here when their Claude calls register_worker.</p>}
             {snap.workers.map(w => <WorkerCard key={w.id} w={w} snap={snap} now={now} flash={flashIds.has(w.id)} onSlide={readOnly ? undefined : slide} />)}
           </div>
           <div className={`panel tasks ${tab === 'tasks' ? 'show' : ''}`}>
@@ -379,7 +386,7 @@ export function App() {
         </main>
       )}
 
-      {!config.present && <div className="bottom-bar">{scenarioButtons}</div>}
+      {!config.present && !config.live && <div className="bottom-bar">{scenarioButtons}</div>}
 
       {toast && <div className="toast" role="status" aria-live="polite">{toast}</div>}
       {share !== null && (

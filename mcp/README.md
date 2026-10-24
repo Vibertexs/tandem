@@ -17,12 +17,17 @@ Every tool is callable from a real Claude Code session against the mock. The moc
 ## Done when
 A Claude Code session can call every tool, and the hook blocks an edit on a locked file. The hook is not built.
 
+## Manager tools in the live session
+`assign_task`, `create_job` and `set_context` only work in the `live` session for an operator. Run `npm run whoami` here, then paste the identity into the dashboard (live mode, "Authorize another identity"). Until then those tools return a plain error that says so. Worker tools need no authorization.
+
 ## Run it
 ```
 cd brain && npm install && cd ../mcp && npm install
 npm run test:mock   # no database needed
 npm test            # needs the local server and bilal-dev published, see brain/README.md
 npm start           # stdio server
+npm run whoami      # prints this machine's identity
+npm run test:operator  # publishes a fresh bilal-auth DB itself
 ```
 Env for `npm start`:
 
@@ -34,6 +39,7 @@ Env for `npm start`:
 | `TANDEM_SESSION` | `live` | session id (judges use their own) |
 | `TANDEM_WORKER_ID` | (none) | skip `register_worker` |
 | `HEARTBEAT_MS` | `30000` | |
+| `TANDEM_TOKEN_FILE` | `mcp/.tandem/token-<db>` | where the server saves its login, so its identity stays the same |
 
 Real-Claude test: `powershell -File mcp/test/e2e/run.ps1` (two headless `claude -p` haiku runs, uses a little quota, edits only a throwaway repo). Passed 3 times: two workers, three tasks, two sharing a file, no overlap.
 

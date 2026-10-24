@@ -24,6 +24,8 @@ export class MockBrain implements Brain {
     this.context = { ...seed.context };
   }
 
+  readonly identity = 'mock';
+
   disconnect() {}
 
   private worker(id: string) {

@@ -4,6 +4,7 @@
 //   TANDEM_SESSION    default "live"
 //   TANDEM_WORKER_ID  optional; otherwise call register_worker first
 //   HEARTBEAT_MS      default 30000
+//   TANDEM_TOKEN_FILE where this server saves its login (default mcp/.tandem/token-<db>)
 //   BRAIN_MODE=mock   in-memory brain loaded from contract/seed.json, no database
 // stdout is the protocol channel. Log to stderr only.
 import { McpServer } from '@modelcontextprotocol/server';
@@ -20,7 +21,7 @@ let workerId: string | undefined = process.env.TANDEM_WORKER_ID;
 const brainReady: Promise<Brain> = process.env.BRAIN_MODE === 'mock'
   ? Promise.resolve(new MockBrain())
   : BrainClient.connect(URI, DB, SESSION);
-brainReady.catch(e => console.error('cannot connect to brain:', e));
+brainReady.then(b => console.error(`tandem: connected to ${SESSION} as ${b.identity}`), e => console.error('cannot connect to brain:', e));
 
 // While this process is alive the worker is alive. If Claude crashes, the
 // heartbeat stops and the brain frees this worker's locks after a while.
@@ -39,7 +40,11 @@ function tool<A>(fn: (brain: Brain, args: A) => unknown | Promise<unknown>) {
     try {
       return ok(await fn(await brainReady, args));
     } catch (e) {
-      return fail(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('operator only')) {
+        return fail('Only an operator can do this in the live session. Run "npm run whoami" in mcp/ and authorize that identity on the dashboard.');
+      }
+      return fail(msg);
     }
   };
 }

@@ -14,6 +14,7 @@ Live web page and judge mode. Spec: root README sections 11 and 12. Vite, React,
 - [x] Per-judge sessions (`session_id`): each browser tab gets its own session and sandbox
 - [x] Mobile layout: tabs Team | Tasks | Locks | Log, sticky bottom scenario bar, tap targets of at least 44px
 - [x] `?view=present` for big type and no controls
+- [x] Operator panel (live mode): create a task or a big job, edit the shared notes, authorize or remove operators. Only operators can change the live session; everyone else is view only. The brain enforces it
 - [ ] Fallback: if the brain is unreachable, show a banner and play a prerecorded run. Done so far: the banner, and a still picture of the seed data. No prerecorded run plays
 - [x] QR code for the public URL (the Share button makes one for the current page URL)
 - [ ] After the base works (about hour 10): team-rules skill and lock-check hook in `/mcp`
@@ -41,7 +42,10 @@ URL options: `?mode=live`, `?view=present`, `?mock=1`, `?uri=ws://host:3000&db=n
 
 ## Tests
 - `npm test`: every scenario against the real brain, using the same simulator as the browser (24 checks).
-- `npm run test:ui`: the real page in Chrome via playwright-core, desktop and phone size (38 checks). Needs `npm run build && npm run preview -- --port 4173`, and Chrome. Set `SHOTS=<folder>` to save screenshots.
+- `npm run test:ui`: the real page in Chrome via playwright-core, desktop and phone size (54 checks). Needs `npm run build && npm run preview -- --port 4173`, and Chrome. Set `SHOTS=<folder>` to save screenshots.
+
+## Live mode and operators
+`?mode=live` shows the real `live` session. Open it on a fresh database, press "Become the operator", and the forms switch on. Your browser keeps its login, so it stays an operator between visits. To let another browser or the terminal manager Claude in, paste its identity under "Authorize another identity".
 
 ## Known limits
 - The simulator runs in the page. If a judge closes the tab mid-run, their sandbox stops moving until they come back.

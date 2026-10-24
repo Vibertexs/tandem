@@ -1,5 +1,6 @@
 // The only file in the dashboard that knows about SpacetimeDB. Everything else uses the
 // plain types below and the Api object, so tests can drive the same logic from node.
+import { Identity } from 'spacetimedb';
 import { DbConnection, tables } from '../../brain/bindings/index.js';
 
 export type Worker = {
@@ -13,9 +14,12 @@ export type Task = {
 };
 export type Lock = { path: string; taskId: string; workerId: string; createdAt: Date };
 export type Ev = { id: number; time: Date; workerId: string | null; type: string; message: string };
-export type Snapshot = { workers: Worker[]; tasks: Task[]; locks: Lock[]; events: Ev[] };
+export type Snapshot = {
+  workers: Worker[]; tasks: Task[]; locks: Lock[]; events: Ev[];
+  context: Record<string, string>; operators: string[]; // operators are identity hex strings
+};
 
-export const emptySnapshot: Snapshot = { workers: [], tasks: [], locks: [], events: [] };
+export const emptySnapshot: Snapshot = { workers: [], tasks: [], locks: [], events: [], context: {}, operators: [] };
 
 const date = (ts: { microsSinceUnixEpoch: bigint }) => new Date(Number(ts.microsSinceUnixEpoch / 1000n));
 
@@ -39,34 +43,63 @@ export function readSnapshot(conn: DbConnection, session: string): Snapshot {
     events: mine(conn.db.events.iter())
       .map(r => ({ id: Number(r.id), time: date(r.timestamp), workerId: r.workerId ?? null, type: r.type, message: r.message }))
       .sort((a, b) => b.id - a.id),
+    context: Object.fromEntries(mine(conn.db.context.iter()).map(r => [r.key, r.value])),
+    operators: [...conn.db.operators.iter()].map(r => r.identity.toHexString()),
   };
+}
+
+// The browser keeps its login (token) so it stays the same identity between visits.
+// That is what lets you authorize this browser as an operator once.
+const tokenKey = (uri: string, database: string) => `tandem-token:${uri}|${database}`;
+function loadToken(key: string): string | undefined {
+  try { return globalThis.localStorage?.getItem(key) ?? undefined; } catch { return undefined; }
+}
+function saveToken(key: string, token: string) {
+  try { globalThis.localStorage?.setItem(key, token); } catch { /* anonymous next time */ }
 }
 
 export function connect(
   uri: string, database: string, session: string,
-  on: { change: () => void; connected: () => void; error: (e: unknown) => void },
+  on: { change: () => void; connected: (identity: string) => void; error: (e: unknown) => void },
 ): DbConnection {
+  const key = tokenKey(uri, database);
   return DbConnection.builder()
     .withUri(uri)
     .withDatabaseName(database)
+    .withToken(loadToken(key))
     .withAutomaticReconnect()
-    .onConnect(c => {
-      for (const t of [c.db.workers, c.db.tasks, c.db.locks, c.db.events]) {
+    .onConnect((c, identity, token) => {
+      saveToken(key, token);
+      for (const t of [c.db.workers, c.db.tasks, c.db.locks, c.db.events, c.db.context, c.db.operators]) {
         t.onInsert(on.change);
         t.onUpdate(on.change);
         t.onDelete(on.change);
       }
       c.subscriptionBuilder()
-        .onApplied(() => { on.connected(); on.change(); })
+        .onApplied(() => { on.connected(identity.toHexString()); on.change(); })
         .subscribe([
           tables.workers.where(r => r.sessionId.eq(session)),
           tables.tasks.where(r => r.sessionId.eq(session)),
           tables.locks.where(r => r.sessionId.eq(session)),
           tables.events.where(r => r.sessionId.eq(session)),
+          tables.context.where(r => r.sessionId.eq(session)),
+          tables.operators,
         ]);
     })
     .onConnectError((_c, e) => on.error(e))
     .build();
+}
+
+export type PieceSpec = { title: string; description?: string; files: string[] };
+const newId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
+const toInput = (id: string, p: PieceSpec, difficulty = 'normal') => ({
+  id, title: p.title, description: p.description ?? '', files: p.files, difficulty, model: '', effort: 'default', dependsOn: [] as string[],
+});
+
+export function parseIdentity(hex: string) {
+  const clean = hex.trim().replace(/^0x/i, '');
+  if (!/^[0-9a-f]{64}$/i.test(clean)) throw new Error('An identity is 64 hex characters.');
+  return Identity.fromString(clean);
 }
 
 export type TaskSpec = {
@@ -99,6 +132,17 @@ export function makeApi(conn: DbConnection, session: string) {
       }),
     seed: (group: 'demo' | 'review') => conn.reducers.seedTasks({ sessionId: session, group }),
     reset: () => conn.reducers.resetSession({ sessionId: session }),
+    // --- operator controls (the real "live" session only accepts these from operators) ---
+    claimOperator: () => conn.reducers.claimOperator({}),
+    addOperator: (hex: string) => conn.reducers.addOperator({ identity: parseIdentity(hex) }),
+    removeOperator: (hex: string) => conn.reducers.removeOperator({ identity: parseIdentity(hex) }),
+    createJob: (goal: string, pieces: PieceSpec[], merge: PieceSpec) =>
+      conn.reducers.createJob({
+        sessionId: session, jobId: newId('job'), goal,
+        mapTasks: pieces.map(p => toInput(newId('t'), p)),
+        mergeTask: toInput(newId('t'), merge, 'hard'),
+      }),
+    setContext: (key: string, value: string) => conn.reducers.setContext({ sessionId: session, key, value }),
   };
 }
 export type Api = ReturnType<typeof makeApi>;

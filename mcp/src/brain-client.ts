@@ -1,5 +1,8 @@
 // The only file in mcp/ that talks to the database. To swap SpacetimeDB for
 // something else, replace BrainClient and keep the Brain interface.
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Timestamp } from 'spacetimedb';
 import { DbConnection, tables } from '../../brain/bindings/index.js';
 
@@ -36,6 +39,7 @@ export interface Brain {
   getCapacity(): Worker[];
   getStatus(): { tasks: Task[]; locks: Lock[] };
   setContext(key: string, value: string): Promise<void>;
+  readonly identity: string;
   disconnect(): void;
 }
 
@@ -65,22 +69,38 @@ const toWorker = (r: WorkerRow): Worker => ({
   usage_week_pct: r.usageWeekPct ?? null, reset_at: r.resetAt ? iso(r.resetAt) : null, last_seen: iso(r.lastSeen),
 });
 
+// The server keeps the same identity between runs by saving its token. You authorize that identity
+// once as an operator (dashboard, "Authorize another identity"). Never commit this file.
+function tokenFile(database: string): string {
+  return process.env.TANDEM_TOKEN_FILE
+    ?? join(dirname(fileURLToPath(import.meta.url)), '..', '.tandem', `token-${database}`);
+}
+function readToken(file: string): string | undefined {
+  try { return readFileSync(file, 'utf8').trim() || undefined; } catch { return undefined; }
+}
+function saveToken(file: string, token: string) {
+  try { mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, token, { mode: 0o600 }); } catch { /* run anonymous next time */ }
+}
+
 const toInput = (id: string, t: TaskDraft, dependsOn: string[] = t.depends_on ?? []) => ({
   id, title: t.title, description: t.description ?? '', files: t.files, difficulty: t.difficulty ?? 'normal',
   model: t.model ?? '', effort: t.effort ?? 'default', dependsOn,
 });
 
 export class BrainClient implements Brain {
-  private constructor(private conn: DbConnection, private session: string) {}
+  private constructor(private conn: DbConnection, private session: string, readonly identity: string) {}
 
   static connect(uri: string, database: string, session: string): Promise<BrainClient> {
+    const file = tokenFile(database);
     return new Promise((resolve, reject) => {
       DbConnection.builder()
         .withUri(uri)
         .withDatabaseName(database)
-        .onConnect(c => {
+        .withToken(readToken(file))
+        .onConnect((c, identity, token) => {
+          saveToken(file, token);
           c.subscriptionBuilder()
-            .onApplied(() => resolve(new BrainClient(c, session)))
+            .onApplied(() => resolve(new BrainClient(c, session, identity.toHexString())))
             .subscribe([
               tables.workers.where(r => r.sessionId.eq(session)),
               tables.tasks.where(r => r.sessionId.eq(session)),
