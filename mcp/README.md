@@ -9,13 +9,13 @@ MCP server that exposes the brain to every Claude as tools. TypeScript, stdio, M
 - [x] **Mock mode** (`BRAIN_MODE=mock`): in-memory brain loaded from `contract/seed.json`, no database needed (`src/mock-brain.ts`)
 - [ ] Register the server with Claude Code (`claude mcp add`, check the docs for the exact syntax). The real-Claude test uses `--mcp-config` instead; `claude mcp add` itself is not tested yet
 - [x] Team-rules skill: `skill/SKILL.md` (written by Bilal while solo). Copy it to `.claude/skills/tandem-worker/SKILL.md` in the repo a worker works on; headless runs get it in their prompt. Used by the real full-loop test
-- [ ] Lock-check hook: `hook/` (Omar, about hour 10)
+- [x] Lock-check hook: `hook/check-lock.mjs` (built by Bilal while solo). Blocks a real Claude editing a locked file (`test/e2e/hook-real.ps1`); unit test `npm run test:hook`
 
 ## Checkpoint (about hour 6)
 Every tool is callable from a real Claude Code session against the mock. The mock is tested through the MCP protocol (`npm run test:mock`). Real headless Claude runs are tested against the real brain, not the mock (`test/e2e`).
 
 ## Done when
-A Claude Code session can call every tool, and the hook blocks an edit on a locked file. The hook is not built.
+A Claude Code session can call every tool, and the hook blocks an edit on a locked file. Both done.
 
 ## Manager tools in the live session
 `assign_task`, `create_job`, `set_context` and `mark_goal` only work in the `live` session for an operator. Run `npm run whoami` here, then paste the identity into the dashboard (live mode, "Authorize another identity"). Until then those tools return a plain error that says so. Worker tools need no authorization.
