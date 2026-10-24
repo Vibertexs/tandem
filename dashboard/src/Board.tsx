@@ -1,7 +1,7 @@
 // The main page: tell the team what to build, then watch the tasks move across the board.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Api, Snapshot, Task } from './brain';
-import { Avatar, EV_ICON, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, money, online, stageOf, took, why, type Stage } from './ui';
+import { Avatar, EV_ICON, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, money, online, sh, stageOf, took, why, type Stage } from './ui';
 
 type Props = { snap: Snapshot; api: Api | null; isOp: boolean; now: number; say: (m: string) => void; present: boolean; go: (page: string) => void };
 
@@ -62,7 +62,7 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
       <div className="next card subtle">
         <span className="next-icon" aria-hidden="true">💤</span>
         <div><strong>The manager is offline, so new goals are waiting.</strong>
-          <p className="small muted">On the host, run <code className="mono">.\start.ps1</code> again. It picks up where it left off.</p></div>
+          <p className="small muted">On the host, run <code className="mono">{sh('.\\start.ps1', './start.sh')}</code> again. It picks up where it left off.</p></div>
       </div>
     );
   }
@@ -71,7 +71,7 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
       <div className="next card subtle">
         <span className="next-icon" aria-hidden="true">🧭</span>
         <div><strong>The manager is not connected yet.</strong>
-          <p className="small muted">It turns your goals into tasks. On the host, run <code className="mono">.\start.ps1</code>; then approve "Manager Claude" here. You can still add tasks by hand in Settings.</p></div>
+          <p className="small muted">It turns your goals into tasks. On the host, run <code className="mono">{sh('.\\start.ps1', './start.sh')}</code>; then approve "Manager Claude" here. You can still add tasks by hand in Settings.</p></div>
       </div>
     );
   }
@@ -80,7 +80,7 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
       <div className="next card subtle">
         <span className="next-icon" aria-hidden="true">💻</span>
         <div><strong>No workers are online.</strong>
-          <p className="small muted">Tasks wait until a worker picks them up. Start workers with <code className="mono">.\start.ps1</code>, or connect another computer.</p></div>
+          <p className="small muted">Tasks wait until a worker picks them up. Start workers with <code className="mono">{sh('.\\start.ps1', './start.sh')}</code>, or connect another computer.</p></div>
         <button type="button" className="btn" onClick={() => go('team')}>Connect a computer</button>
       </div>
     );

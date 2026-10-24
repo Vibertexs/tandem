@@ -1,7 +1,7 @@
 // What you see before you are connected to a team: host one, or join one.
 import { useState } from 'react';
 import { defaultUri, type Team } from './config';
-import { CodeLine } from './ui';
+import { CodeLine, WINDOWS, sh } from './ui';
 
 export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: string) => void }) {
   const [hostTeam, setHostTeam] = useState('tandem-local');
@@ -27,8 +27,8 @@ export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: s
           <p className="muted">Run the team on this computer. Do this once.</p>
           <ol className="steps">
             <li>In the Tandem folder, run:
-              <CodeLine code={'.\\start.ps1'} say={say} />
-              <span className="small muted">It starts the brain, the manager and two workers, then opens this page. Add <code className="mono">-Simulate</code> for workers that fake the coding (no Claude usage).</span>
+              <CodeLine code={WINDOWS ? '.\\start.ps1' : './start.sh'} say={say} />
+              <span className="small muted">It starts the brain, the manager and two workers, then opens this page. Add <code className="mono">{WINDOWS ? '-Simulate' : '--simulate'}</code> for workers that fake the coding (no Claude usage).{WINDOWS ? '' : ' On Windows: .\\start.ps1'}</span>
             </li>
             <li>Already running? Open it:
               <form className="inline-form" onSubmit={e => { e.preventDefault(); onOpen({ uri: defaultUri(), db: hostTeam.trim() || 'tandem-local' }); }}>
@@ -63,7 +63,7 @@ export function Unreachable({ team, problem, onRetry, onLeave }: { team: Team; p
         <section className="card choice narrow" role="alert">
           <h2>"{team.db}" needs an update</h2>
           <p className="muted">Its brain runs an older version of Tandem than this page.</p>
-          <p>On the host, run <code className="mono">.\start.ps1 -Db {team.db}</code>. It updates the team and keeps its data.</p>
+          <p>On the host, run <code className="mono">{sh(`.\\start.ps1 -Db ${team.db}`, `./start.sh --db ${team.db}`)}</code>. It updates the team and keeps its data.</p>
           <div className="row-actions">
             <button type="button" className="btn primary" onClick={onRetry}>Try again</button>
             <button type="button" className="btn" onClick={onLeave}>Choose another team</button>
@@ -78,7 +78,7 @@ export function Unreachable({ team, problem, onRetry, onLeave }: { team: Team; p
         <h2>Can't reach "{team.db}"</h2>
         <p className="muted">Nothing answered at <code className="mono">{team.uri}</code>.</p>
         {local
-          ? <p>If this computer hosts the team, start it with <code className="mono">.\start.ps1</code> in the Tandem folder.</p>
+          ? <p>If this computer hosts the team, start it with <code className="mono">{sh('.\\start.ps1', './start.sh')}</code> in the Tandem folder.</p>
           : <p>Check that the host is running Tandem and that the address is right.</p>}
         <div className="row-actions">
           <button type="button" className="btn primary" onClick={onRetry}>Try again</button>

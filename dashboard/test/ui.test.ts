@@ -52,6 +52,12 @@ try {
   check('start: with nothing connected, the page offers Host a team and Join a team',
     await seen(A, 'Host a team') && await seen(A, 'Join a team', 1000) && await A.getByText('.\\start.ps1').first().isVisible());
   await shot(A, '01-start');
+  {
+    const mac = await (await browser.newContext({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 Chrome/130 Safari/537.36' })).newPage();
+    await mac.goto(URL_);
+    check('start: on a Mac it shows ./start.sh', await seen(mac, './start.sh', 5000));
+    await mac.context().close();
+  }
   await A.getByLabel('Host address').fill('127.0.0.1:9');
   await A.getByLabel('Team name', { exact: true }).last().fill(DB);
   await A.getByRole('button', { name: 'Join' }).click();

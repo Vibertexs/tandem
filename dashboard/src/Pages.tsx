@@ -5,7 +5,7 @@ import type { Api, Snapshot } from './brain';
 import { shareable, type Team } from './config';
 import { GoalChip } from './Board';
 import { stageOf } from './ui';
-import { Avatar, Bar, CodeLine, EV_ICON, WorkerStatus, ago, copy, isManager, money, online, took, liveInfo } from './ui';
+import { Avatar, Bar, CodeLine, EV_ICON, WorkerStatus, ago, copy, isManager, money, online, sh, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
 
@@ -121,9 +121,9 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
           <>
             <p className="small warn">Right now only this computer can reach this team.</p>
             <p className="muted small">To let other computers join, restart it open to your network. This page then shows the command to run on them.</p>
-            <CodeLine code={'.\\stop.ps1 -All; .\\start.ps1 -Lan'} say={say} />
+            <CodeLine code={sh('.\\stop.ps1 -All; .\\start.ps1 -Lan', './stop.sh --all; ./start.sh --lan')} say={say} />
             <p className="muted small">Or add more workers on this computer:</p>
-            <CodeLine code={'.\\start.ps1 -Workers 4'} say={say} />
+            <CodeLine code={sh('.\\start.ps1 -Workers 4', './start.sh --workers 4')} say={say} />
           </>
         )}
         <details>
@@ -267,7 +267,7 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
           <dt>Address</dt><dd className="mono">{team.uri}</dd>
           {share && share.uri !== team.uri && <><dt>Others use</dt><dd className="mono">{share.uri}</dd></>}
         </dl>
-        {!share && <p className="small muted">Only this computer can open this team. Start it with <code className="mono">.\start.ps1 -Lan</code> to share the link.</p>}
+        {!share && <p className="small muted">Only this computer can open this team. Start it with <code className="mono">{sh('.\\start.ps1 -Lan', './start.sh --lan')}</code> to share the link.</p>}
         <div className="row-actions">
           <button type="button" className="btn" onClick={async () => { try { setQr(await QRCode.toDataURL(pageUrl, { margin: 1, width: 220 })); } catch { setQr(''); } }}>Show QR code</button>
           <button type="button" className="btn" onClick={() => copy(pageUrl, say, 'Link copied')}>Copy link</button>
