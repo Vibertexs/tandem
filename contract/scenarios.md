@@ -1,4 +1,6 @@
-# Judge-mode scenarios (PROPOSED)
+# Judge-mode scenarios (historical)
+
+> These were the demo buttons in the original plan. The page no longer has them: the product itself is the demo (`.\start.ps1 -Simulate`, see `docs/DEMO.md`). Each scenario still happens for real: a usage limit caps a worker and requeues its task, a locked file makes a task wait, and so on. The brain still has `reset_session` and `seed_tasks`, which the tests and the `?mock=1` sample board use.
 
 Each button is a few writes to the brain using existing tools. No special scenario reducers are needed except `reset_session`.
 Simulated workers (launcher `--simulate`) do the "work" with timed progress.

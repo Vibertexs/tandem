@@ -1,6 +1,6 @@
-# Tables (PROPOSED)
+# Tables
 
-Every table has `session_id` (string). Judge mode uses one session per judge. Live mode uses `live`.
+Every table has `session_id` (string). The team and the page use `live`; the tests use their own sessions to stay isolated. The module is `brain/spacetimedb/src/index.ts`.
 
 ## workers
 | Column | Type | Notes |
@@ -13,6 +13,7 @@ Every table has `session_id` (string). Judge mode uses one session per judge. Li
 | usage_week_pct | number 0-100 or null | |
 | reset_at | timestamp or null | when the cap lifts |
 | last_seen | timestamp | treat old values as unknown |
+| owner | identity (hex) | who registered it; only they (or an operator) may act for it. '' = anyone (sample rows) |
 
 ## tasks
 | Column | Type | Notes |

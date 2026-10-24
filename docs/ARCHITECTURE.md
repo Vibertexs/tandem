@@ -37,7 +37,7 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 ## One task, start to finish
 1. `register_worker`: the worker joins the team.
 2. `claim_task`: the brain picks an open task whose files are free, locks those files and writes the worker's name on it, all in one step.
-3. The worker edits only those files. `lock_files` adds more files, all or none. The hook blocks edits to anyone else's files.
+3. The worker edits only those files, in its own git worktree. A task that waited for others starts with their work merged in. `lock_files` adds more files, all or none. The hook blocks edits to anyone else's files.
 4. `report_progress` writes to the event log. A heartbeat every 30s says the worker is alive.
 5. `complete_task`: the task is done, locks are freed, and any task waiting on it opens. A job's merge task opens once, when its last piece finishes.
 
