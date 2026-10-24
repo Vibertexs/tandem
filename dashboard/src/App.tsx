@@ -117,7 +117,7 @@ function TaskCard({ t, snap, selected, flash, onSelect }: {
   return (
     <button type="button" className={`card task ${selected ? 'selected' : ''} ${flash ? 'flash' : ''}`} onClick={() => onSelect(t.id)} aria-pressed={selected}>
       <span className="task-title">{t.title}{t.kind === 'reduce' && <span className="badge" title={TIPS.merge}>merge</span>}</span>
-      <span className="files mono small">{t.files.join(', ') || 'no files'}</span>
+      <span className="files mono small" title={t.files.join(', ')}>{t.files.join(', ') || 'no files'}</span>
       <span className="chips">
         <span className="chip">{t.model || 'auto model'}</span>
         <span className="chip">{t.effort || 'default'} effort</span>
@@ -157,13 +157,18 @@ function Board({ snap, selected, flashIds, onSelect }: {
           </div>
         </div>
       ))}
-      <div className="columns">
+      <div className="columns" style={{ '--cols': COLUMNS.map(c => {
+        const n = snap.tasks.filter(c.match).length;
+        return n === 0 ? '0.55fr' : n > 6 ? '2.4fr' : '1fr';
+      }).join(' ') } as React.CSSProperties}>
         {COLUMNS.map(c => {
           const items = snap.tasks.filter(c.match);
           return (
             <div className="column" key={c.key}>
               <h3>{c.title} <span className="count">{items.length}</span></h3>
-              {items.map(t => <TaskCard key={t.id} t={t} snap={snap} selected={selected === t.id} flash={flashIds.has(t.id)} onSelect={onSelect} />)}
+              <div className={`list ${items.length > 6 ? 'wrap' : ''}`}>
+                {items.map(t => <TaskCard key={t.id} t={t} snap={snap} selected={selected === t.id} flash={flashIds.has(t.id)} onSelect={onSelect} />)}
+              </div>
               {items.length === 0 && <div className="empty small muted">Nothing here</div>}
             </div>
           );
