@@ -8,13 +8,17 @@ The planner: a Claude Code session with the tandem MCP that turns the operator's
 1. The first time, the watcher asks to manage the team. The page shows "Manager Claude wants to help manage this team"; click **Approve**. Its login is saved, so this happens once.
 2. You type a goal on the Board. Within a few seconds the watcher sees it and runs `plan.ts` once for all waiting goals.
 3. The manager splits each goal into tasks with file lists and dependencies, writes shared interfaces to Shared memory when needed, and marks the goal planned. Workers pick the tasks up.
-4. A goal that fails to plan twice is skipped, so one bad goal cannot use up your quota.
+4. A goal that fails to plan twice is marked failed with the reason (for example, Claude is not logged in), so one bad goal cannot use up your quota. The page shows why, with **Try again**. A run that stopped after creating tasks is marked planned, so that work goes ahead.
 
 `npx tsx plan.ts --db <team>` plans whatever is waiting once and stops (`run.ps1` is the same, for PowerShell scripts).
 
-5. When every task of a goal is done, `finish.ts` merges the task branches into `tandem/<goal id>` (`merge.ts`, in a separate worktree), runs the project's tests on it (`verify.ts`: an npm `test` script or Python unittest files), and finishes the goal. If the tests fail, it adds one "Fix the failing tests" task to the goal first; the launcher starts that task from the goal branch. With `--push`, the goal branch is pushed to origin and, if the GitHub CLI is set up, a PR is opened.
+5. When every task of a goal is done, `finish.ts` merges the task branches into `tandem/<goal id>` (`merge.ts`, in a separate worktree), runs the project's tests on it (`verify.ts`: an npm `test` script or Python unittest files), and finishes the goal.
+   - A branch that conflicts gets one "Resolve the merge conflict with task/X" task for the conflicted files. The launcher starts that merge in the worker's worktree, Claude edits out the markers, and the launcher commits it. Conflict fixes merge first next time, so the goal merges cleanly.
+   - If the tests fail, it adds one "Fix the failing tests" task to the goal. The launcher starts that task from the goal branch.
+   - With `--push`, the goal branch is pushed to origin and, if the GitHub CLI is set up, a PR is opened. The watcher also tells the page the repo's remote, so the Team page can show a teammate what to clone.
+   - With `--notify <url>` (or `TANDEM_WEBHOOK`), "goal done" is posted to a Slack or Discord incoming webhook.
 
-Tests: `npm test` here (merge, verify, finish, push; no Claude calls).
+Tests: `npm test` here (merge, conflicts, verify, finish, push, notify, and the watcher with a fake Claude; no Claude calls). `npm run test:two` is the real two-computers test (about 4 haiku runs).
 
 Planning is one headless `claude -p` run (haiku, `--max-budget-usd 0.50` by default; `start.ps1 -ManagerModel` changes the model). It uses `--mcp-config`, so nothing is added to your Claude Code settings. For an interactive manager instead, start Claude Code with the tandem MCP and paste `PROMPT.md`.
 

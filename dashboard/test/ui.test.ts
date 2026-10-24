@@ -194,6 +194,9 @@ try {
   await shot(A, '08-memory');
   await nav(A, 'Activity');
   check('activity: the log has plain-English lines', await until(async () => await A.locator('.log li').count() > 5) && await seen(A, /claimed:/, 2000), await A.locator('.log li').count());
+  await A.getByRole('button', { name: /^Finished/ }).click();
+  check('activity: "Finished" shows only what got done', await until(async () => (await A.locator('.log li').allInnerTexts()).every(t => /Done:|Goal done|Job progress|Merge task/.test(t))), await A.locator('.log li').allInnerTexts());
+  await A.getByRole('button', { name: /^All/ }).click();
 
   // ---- 7. a second person asks to make changes ----
   const ctxB = await browser.newContext({ viewport: desktop });

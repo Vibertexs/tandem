@@ -50,11 +50,12 @@ You type a goal on a web page, and a manager Claude splits it into tasks with ex
 - [x] Real Claude (haiku, capped):
   - `start.ps1` with real workers, three times: goal → plan → two Claudes → merged `tandem/<goal>` → tests pass → the goal card shows the result and its cost.
   - A real merge conflict resolved by a worker Claude, with the merged code running.
+  - A teammate on another computer: the worker on a second clone pushes its branches, and the host merges them from origin, tests them and pushes the goal branch.
   - `start.ps1 -Simulate`, several times.
   - The full loop, twice.
   - The hook blocking a real Claude.
   - The launcher in a worktree.
-- [ ] Not tried: `start.sh` on a Mac, `gh pr create`, `-Lan` from a second computer, a real Slack or Discord webhook, a real usage limit, and a real failing-tests fix round.
+- [ ] Not tried: `start.sh` on a Mac, `gh pr create`, `-Lan` from a second physical computer, a real Slack or Discord webhook, a real usage limit, and a real failing-tests fix round.
 
 ## Notes
 - Every person runs Claude Code under their own login on their own machine. Tandem only coordinates.

@@ -184,15 +184,33 @@ export function MemoryPage(c: Common) {
 }
 
 // ---------- Activity ----------
+const PROBLEMS = new Set(['task_failed', 'worker_capped', 'lock_blocked', 'lock_released']);
+const FINISHED = new Set(['task_done', 'merge_unblocked', 'job_progress']);
+const FILTERS = [
+  { key: 'all', label: 'All', keep: () => true },
+  { key: 'problems', label: 'Problems', keep: (type: string) => PROBLEMS.has(type) },
+  { key: 'finished', label: 'Finished', keep: (type: string) => FINISHED.has(type) },
+] as const;
+
 export function ActivityPage({ snap, now }: Common) {
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>('all');
+  const keep = FILTERS.find(f => f.key === filter)!.keep;
+  const shown = snap.events.filter(e => keep(e.type)).slice(0, 200);
   return (
     <div className="page">
       <p className="muted lead">What just happened, newest first.</p>
-      <ol className="plain log card">
-        {snap.events.slice(0, 200).map(e => (
-          <li key={e.id}><span aria-hidden="true" className="ev-icon">{EV_ICON[e.type] ?? '•'}</span><span>{e.message}</span><span className="muted small time">{ago(e.time, now)}</span></li>
+      <div className="row-actions filters" role="group" aria-label="Show">
+        {FILTERS.map(f => (
+          <button key={f.key} type="button" className={`chip ${filter === f.key ? 'on' : ''}`} aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}>
+            {f.label}{f.key === 'problems' ? ` (${snap.events.filter(e => PROBLEMS.has(e.type)).length})` : ''}
+          </button>
         ))}
-        {snap.events.length === 0 && <li className="muted">Nothing yet.</li>}
+      </div>
+      <ol className="plain log card">
+        {shown.map(e => (
+          <li key={e.id} className={PROBLEMS.has(e.type) ? 'problem' : ''}><span aria-hidden="true" className="ev-icon">{EV_ICON[e.type] ?? '•'}</span><span>{e.message}</span><span className="muted small time">{ago(e.time, now)}</span></li>
+        ))}
+        {shown.length === 0 && <li className="muted">{snap.events.length === 0 ? 'Nothing yet.' : 'Nothing like that yet.'}</li>}
       </ol>
     </div>
   );

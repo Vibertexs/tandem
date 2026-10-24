@@ -9,8 +9,10 @@ SpacetimeDB module: the shared database and its atomic operations. TypeScript. S
 - [x] `complete_task` unblocks dependents, and opens a job's merge task when its last map task finishes, exactly once
 - [x] Seed loader from `contract/seed.json` (imported at build time, no copy); `reset_session` restores the seed workers and context for one session only. Tasks come from `seed_tasks` (see below)
 - [x] Every table carries `session_id` and every reducer is scoped to one session. Clients filter their subscriptions by it
-- [x] Goals: `post_goal` (operator) saves what the operator asked for in plain words; `set_goal_status` (new, planning, planned) is for the manager. The page shows them. Nothing reads them yet
-- [x] Operators: in the `live` session only operators may create tasks, jobs and notes, seed or reset. The first caller of `claim_operator` becomes the operator; operators authorize others with `add_operator`
+- [x] Goals: `post_goal` (operator) saves what the operator asked for in plain words; `set_goal_status` (new, planning, planned) is for the manager, which reads them with `get_goals`. `finish_goal` (done, with its branch and note), `fail_goal` (could not be planned, with the reason), `cancel_goal` (removes its tasks that had not started). Tasks made while a goal is `planning` belong to it
+- [x] Operators: in the `live` session only operators may create tasks, jobs and notes, seed or reset. The first caller of `claim_operator` becomes the owner; others `request_operator` and an operator approves them
+- [x] Giving back: `give_back_task` frees the task's locks and reopens it for a different worker; after two workers it is `failed`. `retry_task` (operator) puts it back for anyone
+- [x] Costs: `record_cost` (the task's worker) and `add_goal_cost` (operator)
 
 ## Checkpoint (about hour 6)
 Hello world published, and two clients claiming one task gives exactly one winner. Done (local only).
@@ -18,7 +20,7 @@ Hello world published, and two clients claiming one task gives exactly one winne
 ## How it behaves
 - `claim_task` picks a task, takes its file locks and marks it claimed in one transaction. A task reserved for another worker (`assign_task` with an assignee) or with locked files is skipped and stays `open`.
 - `take_locks` is all or none. A conflict rolls everything back.
-- `update_capacity` caps a worker at usage 100 (or when `status: capped` is passed) and puts their running task back to `open`. Passing `status: idle` un-caps them.
+- `update_capacity` caps a worker at usage 100 (or when `status: capped` is passed) and puts their running task back to `open`. Reporting usage under 100 again (the limit reset), or passing `status: idle`, un-caps them.
 - Stale workers: the MCP server sends a heartbeat every 30s. A worker silent for 2 minutes loses its locks and its task goes back to `open`. Cleanup runs whenever a live worker claims, locks or sends a heartbeat.
 - `reset_session(session_id)` wipes that session and loads the seed workers (Alex, Sam, Jordan) and context. It does not load tasks: `seed_tasks(session_id, 'demo' | 'review')` adds the login tasks or the 12-piece review job. This matches `contract/scenarios.md`, where the buttons create the tasks.
 - Rows are keyed `pk = "<session_id>/<id>"`, so ids and file paths only need to be unique inside one session.
@@ -26,7 +28,7 @@ Hello world published, and two clients claiming one task gives exactly one winne
 
 ## Known limits
 - A worker belongs to the identity that registered it (`workers.owner`); only that identity or an operator may act for it. Anyone may register a new worker. Identities are saved tokens, not accounts.
-- Judge sandboxes (any session except `live`) are open to everyone on purpose.
+- Sessions other than `live` (the tests use them) are open to everyone on purpose.
 - `claim_operator` is first come, first served: claim it right after you publish a shared database.
 - Enum-like fields are strings, only some are validated.
 - Nothing is published to `tandem` or Maincloud.
@@ -34,7 +36,7 @@ Hello world published, and two clients claiming one task gives exactly one winne
 ## Tests
 `npm run test:auth`: operator rules, on a fresh `bilal-auth` database it publishes itself.
 
-`npm test`: 10-client race, locks, map-reduce, stale workers, session isolation, create_job, reservations, capacity, context, reset and seed.
+`npm test`: 10-client race, locks, map-reduce, stale workers, session isolation, create_job, reservations, capacity, context, reset and seed, goals (finish, fail, cancel), costs, presence, giving back and retry.
 
 ## Run it locally
 Port 3000 may be taken, so use 3001. Always pass `--server` and `--no-config`.

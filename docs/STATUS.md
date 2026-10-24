@@ -59,15 +59,16 @@ Also passing:
 - Real Claude runs (haiku, each capped at $0.50):
   - **`start.ps1` with real workers** (`FLOW_REAL=1`), three times, the last one on the final launcher and manager code. The goal is typed on the page, and the manager plans it. Two real Claudes build the calculator, which is merged into `tandem/<goal>`. The workers' tests pass on that branch, and the goal card shows "Tests pass" and its cost. The manager also wrote the shared interface to Shared memory by itself.
   - **A real merge conflict** (`launcher/test/conflict-real.ts`): two branches added different functions at the same spot. Haiku resolved the markers, kept both functions, and the merged `calc.py` runs.
+  - **A teammate on another computer** (`manager/test/two-computers.ts`): a bare repo stands in for GitHub, with two clones. The host's manager runs on one, and the only worker runs on the other with `--push`. Every task was done on the teammate's clone. The host fetched and merged those branches, the tests passed, and the goal branch was pushed.
   - `start.ps1 -Simulate`: goal → plan → done, several times.
   - Earlier in the night: the full loop twice, the hook blocking a real Claude, and the launcher in a worktree recording a real cost.
-- About 26 real runs were used in total, all haiku.
+- About 30 real runs were used in total, all haiku.
 
 ## Not done, or not proven
 - Not tried on a Mac: `start.sh` was only checked in Git Bash.
 - The PR-per-goal step (`gh pr create`) is built but not tried, because `gh` is not installed here. Pushing to an origin is tested against a local bare repo.
 - Two things were not run with real Claude: a real usage limit, and a real "tests fail, fix task" round. The limit is tested with simulated workers (capped, requeued, waits, resumes) and the limit-message parsing with sample messages. The fix round is tested with real git repos and a fake brain.
-- `-Lan` was not tried from a second computer. The address detection and the page's share links are tested; Windows may ask to allow node and spacetime on private networks.
+- `-Lan` was not tried from a second physical computer. The address detection, the page's share links and the whole push/fetch/merge path (two clones and an origin on one machine) are tested. Windows may ask to allow node and spacetime on private networks.
 - `-Notify` was tested against a local server, not a real Slack or Discord channel.
 - Identities are saved tokens on each computer, not accounts. Anyone who can reach the brain can watch and add a worker. Keep it on your machine or network until there is a real login.
 - Nothing is hosted on Maincloud (it needs `spacetime login` in a browser).

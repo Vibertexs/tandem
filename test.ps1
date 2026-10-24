@@ -48,6 +48,7 @@ if ($Real) {
   $suites += , @('REAL: hook blocks a real Claude (1 run)', 'mcp', 'powershell -NoProfile -ExecutionPolicy Bypass -File test/e2e/hook-real.ps1')
   $suites += , @('REAL: launcher in a worktree (1 run)', 'launcher', 'npx.cmd tsx test/real.ts')
   $suites += , @('REAL: a worker resolves a merge conflict (1 run)', 'launcher', 'npx.cmd tsx test/conflict-real.ts')
+  $suites += , @('REAL: a teammate on another computer, through a shared origin (about 4 runs)', 'manager', 'npx.cmd tsx test/two-computers.ts')
 }
 
 $rows = @(); $failed = 0

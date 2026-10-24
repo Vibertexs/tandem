@@ -6,7 +6,7 @@ MCP server that exposes the brain to every Claude as tools. TypeScript, stdio, M
 
 ## Checklist
 - [x] Pick a language and MCP SDK (check current docs): TypeScript, `@modelcontextprotocol/server` v2 (see NOTES.md)
-- [x] Server skeleton that registers every tool in `contract/tools.json` (all 16, `src/server.ts`)
+- [x] Server skeleton that registers every tool in `contract/tools.json` (all 17, `src/server.ts`)
 - [x] Thin brain client module (all database access goes through it): `src/brain-client.ts`
 - [x] **Mock mode** (`BRAIN_MODE=mock`): in-memory brain loaded from `contract/seed.json`, no database needed (`src/mock-brain.ts`)
 - [ ] Register the server with Claude Code (`claude mcp add`, check the docs for the exact syntax). The real-Claude test uses `--mcp-config` instead; `claude mcp add` itself is not tested yet
@@ -20,7 +20,9 @@ Every tool is callable from a real Claude Code session against the mock. The moc
 A Claude Code session can call every tool, and the hook blocks an edit on a locked file. Both done.
 
 ## Manager tools in the live session
-`assign_task`, `create_job`, `set_context` and `mark_goal` only work in the `live` session for an operator. Run `npm run whoami` here, then paste the identity into the dashboard (live mode, "Authorize another identity"). Until then those tools return a plain error that says so. Worker tools need no authorization.
+`assign_task`, `create_job`, `set_context` and `mark_goal` only work in the `live` session for an operator. A manager asks for that itself: the page shows "Manager Claude wants to help manage this team", and the owner clicks **Approve** (the first time, "Make me the owner" does it in the same click). Until then those tools return a plain error that says so.
+
+Worker tools need no approval, but a worker belongs to the identity that registered it: only that identity (or an operator) may claim, lock, complete, give back or report for it.
 
 ## Run it
 ```
@@ -38,7 +40,7 @@ Env for `npm start`:
 | `BRAIN_MODE` | (real) | `mock` = in-memory, no database |
 | `STDB_URI` | `ws://127.0.0.1:3001` | |
 | `STDB_DB` | `bilal-dev` | database name |
-| `TANDEM_SESSION` | `live` | session id (judges use their own) |
+| `TANDEM_SESSION` | `live` | session id (the page shows `live`; tests use their own) |
 | `TANDEM_WORKER_ID` | (none) | skip `register_worker` |
 | `HEARTBEAT_MS` | `30000` | |
 | `TANDEM_TOKEN_FILE` | `mcp/.tandem/token-<db>` | where the server saves its login, so its identity stays the same |

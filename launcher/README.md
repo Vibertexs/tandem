@@ -11,7 +11,7 @@ npx tsx launcher.ts --name Sam --repo C:\path\to\your\repo
 # no Claude calls, for demos:
 npx tsx launcher.ts --name Sam --simulate
 ```
-Options: `--plan pro|max`, `--exit-when-idle`, `--max-tasks N`, `--poll <seconds>`, `--sim-ms <ms>`.
+Options: `--plan pro|max`, `--exit-when-idle`, `--max-tasks N`, `--poll <seconds>`, `--push`, `--sim-ms <ms>`, `--sim-limit <seconds>` (simulate a usage limit on the first task).
 Env: `STDB_URI`, `STDB_DB`, `TANDEM_SESSION` (default `live`), `LAUNCHER_BUDGET_USD` (per-run cap, default 0.50), `LAUNCHER_MODEL` (force one model, for cheap tests).
 
 ## What one task looks like
@@ -23,20 +23,24 @@ Env: `STDB_URI`, `STDB_DB`, `TANDEM_SESSION` (default `live`), `LAUNCHER_BUDGET_
    - the model and effort from `routing.json`
    - the budget cap
 4. Commit the changes on the task branch, then `complete_task` with that branch. When every task of a goal is done, the manager merges these branches into one `tandem/<goal id>` branch.
-5. A rate-limit message caps the worker (usage 100), and the brain puts the task back in the queue. A failed run is retried once at `retry_effort`.
+5. A usage-limit message caps the worker (usage 100), and the brain puts the task back in the queue. The launcher reads when the limit resets (`limits.ts`: an epoch after `|`, or "resets 3pm"; else 30 minutes), stays online, then reports usage 0 and takes work again.
+6. A failed run is retried once at `retry_effort`. If it fails again, the task is given back with the reason (`give_back_task`) and a different worker gets it.
+7. A "Resolve the merge conflict with task/X" task is special: the launcher starts that merge in the worktree, Claude only edits out the conflict markers, and the launcher commits the merge (retrying if markers are left).
+
+`.worktrees/` is kept out of your repo's `git status` through `.git/info/exclude`, so nothing is committed to your repo.
 
 ## Checklist
 - [x] Launcher loop: register, claim a task, run it in a git worktree, report progress and completion, repeat (`launcher.ts`; the Python placeholder is not used)
 - [x] Run with `claude -p` using the model and effort on the task (`--model`, `--effort`; checked with `claude --help`)
-- [ ] Rate-limit handling: report it, requeue the task, mark the worker capped until `reset_at`. Built (caps the worker, which requeues the task), but not tested against a real rate limit, and `reset_at` is not read from the error
+- [x] Rate-limit handling: report it, requeue the task, mark the worker capped until `reset_at`, then come back. Tested with `--sim-limit` and sample limit messages (`test/limits.test.ts`); not yet against a real limit
 - [x] Routing: `routing.json` fills in model and effort when the manager leaves them blank, and downgrades one step when the worker is above 80% usage (`test/routing.test.ts`)
-- [ ] Retry a failed task once at higher effort. Built, not tested with a real failure. After two failures the task is left to the stale-worker cleanup (there is no fail tool yet)
+- [x] Retry a failed task once at higher effort, then give it back (`give_back_task`). The give-back rules are tested in the brain and on the page; the launcher's retry has not met a real failure
 - [ ] Capacity reporter (`statusline/report_usage.py`): not done; the placeholder is untouched
 - [x] `--simulate` mode: fake runs with timed progress and canned results (including canned structured results for map tasks), no Claude calls (`test/simulate.test.ts`)
 
 ## Done when
-- Assigning a task makes a teammate's machine run it and push a branch. **Mostly done:** `test/real.ts` (1 haiku run) claims a task, runs Claude in a worktree and commits `hello.py` on `task/t-hello`. It does not push; the test repo has no remote.
+- Assigning a task makes a teammate's machine run it and push a branch. **Done:** `test/real.ts` (1 haiku run) claims a task, runs Claude in a worktree and commits `hello.py` on `task/t-hello`. `manager/test/two-computers.ts` runs the worker on a second clone with `--push`, and the host merges its branches from origin.
 - Simulate mode does the same visibly with no Claude calls. **Done:** `test/simulate.test.ts` has two launchers finish a 6-task job, with a dependency and a merge task, then exit by themselves.
 
 ## Tests
-`npm test` (routing + simulate, no Claude calls). `npx tsx test/real.ts` (1 real haiku run).
+`npm test` (routing, limit parsing, simulate; no Claude calls). `npm run test:real` and `npm run test:conflict` (1 real haiku run each).
