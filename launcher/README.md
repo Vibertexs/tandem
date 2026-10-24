@@ -3,13 +3,13 @@
 One per teammate. Runs on their machine, logged in as themselves. Pulls tasks and runs each one as a fresh headless Claude Code run in its own git worktree. Code: `launcher.ts` (the Python placeholder `launcher.py` is left untouched and unused).
 
 ## Run it
-`tandem start` in your project starts two launchers for you (`--workers N` for more, `--simulate` for fake coding). `tandem join <invite>` starts them for someone else's team. By hand:
+`tandem start` in your project starts two launchers for you (`--workers N` for more). `tandem join <invite>` starts them for someone else's team. By hand:
 ```
 cd brain && npm install && cd ../mcp && npm install && cd ../launcher && npm install
 # real runs (uses your Claude quota):
 npx tsx launcher.ts --name Sam --repo C:\path\to\your\repo
 # no Claude calls, for demos:
-npx tsx launcher.ts --name Sam --simulate
+npx tsx launcher.ts --name Sam --repo C:\path\to\your\repo --exit-when-idle
 ```
 Options: `--plan pro|max`, `--exit-when-idle`, `--max-tasks N`, `--poll <seconds>`, `--push`, `--sim-ms <ms>`, `--sim-limit <seconds>` (simulate a usage limit on the first task).
 Env: `STDB_URI`, `STDB_DB`, `TANDEM_SESSION` (default `live`), `LAUNCHER_BUDGET_USD` (per-run cap, default 0.50), `LAUNCHER_MODEL` (force one model, for cheap tests).
@@ -37,7 +37,7 @@ Env: `STDB_URI`, `STDB_DB`, `TANDEM_SESSION` (default `live`), `LAUNCHER_BUDGET_
 - [x] Routing: `routing.json` fills in model and effort when the manager leaves them blank, and downgrades one step when the worker is above 80% usage (`test/routing.test.ts`)
 - [x] Retry a failed task once at higher effort, then give it back (`give_back_task`). The give-back rules are tested in the brain and on the page; the launcher's retry has not met a real failure
 - [ ] Capacity reporter (`statusline/report_usage.py`): not done; the placeholder is untouched
-- [x] `--simulate` mode: fake runs with timed progress and canned results (including canned structured results for map tasks), no Claude calls (`test/simulate.test.ts`)
+- [x] A tests-only simulate mode: fake runs with timed progress and canned results (including canned structured results for map tasks), no Claude calls (`test/simulate.test.ts`). It is not offered by the `tandem` command.
 
 ## Done when
 - Assigning a task makes a teammate's machine run it and push a branch. **Done:** `test/real.ts` (1 haiku run) claims a task, runs Claude in a worktree and commits `hello.py` on `task/t-hello`. `manager/test/two-computers.ts` runs the worker on a second clone with `--push`, and the host merges its branches from origin.

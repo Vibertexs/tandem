@@ -1,5 +1,5 @@
 // THE PRODUCT, END TO END, the way a person uses it:
-//   in the project: tandem start --simulate  ->  open the page  ->  Control this team
+//   in the project: tandem start  ->  open the page  ->  Control this team
 //   ->  type a goal  ->  the manager plans it (1 real haiku run)  ->  simulated workers do it
 //   ->  the board shows every task done  ->  tandem stop
 // Needs: Chrome, claude on PATH. Uses a fresh team (bilal-start) and a throwaway repo.
@@ -32,7 +32,8 @@ const seen = (page: Page, text: string | RegExp, ms: number) =>
 const tandem = (args: string[], cwd: string) => {
   const log = join(tmpdir(), `tandem-${args[0]}-${Date.now()}.log`);
   const fd = openSync(log, 'w');
-  try { execFileSync(process.execPath, [join(ROOT, 'cli', 'tandem.ts'), ...args], { cwd, stdio: ['ignore', fd, fd] }); }
+  // (the fake-coding switch is for tests only: it is an environment variable, not an option)
+  try { execFileSync(process.execPath, [join(ROOT, 'cli', 'tandem.ts'), ...args], { cwd, stdio: ['ignore', fd, fd], env: { ...process.env, ...(REAL ? {} : { TANDEM_SIMULATE: '1' }) } }); }
   catch { /* the output says what went wrong */ } finally { closeSync(fd); }
   return readFileSync(log, 'utf8');
 };
@@ -44,7 +45,7 @@ if (!existsSync(join(REPO, '.git'))) {
   g('add', '-A'); g('commit', '-q', '-m', 'start');
 }
 
-const started = tandem(['start', '--team', DB, ...(REAL ? [] : ['--simulate']), ...(REVIEW ? ['--review'] : []), '--fresh', '--local', '--no-browser'], REPO);
+const started = tandem(['start', '--team', DB, ...(REVIEW ? ['--review'] : []), '--fresh', '--local', '--no-browser'], REPO);
 console.log(started.split('\n').filter(l => /==|started|ready|Open|Alex|Sam/i.test(l)).join('\n'));
 check('tandem start, run in the project, finishes and says it is running for that project', started.includes(`Tandem is running for ${REPO}`), started.slice(-400));
 

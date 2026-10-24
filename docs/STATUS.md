@@ -18,7 +18,7 @@ git -c user.name=Tandem -c user.email=tandem@localhost commit --allow-empty -m "
 ```
 Then, while still in that project, run Tandem by its path (no PATH setup is needed):
 ```powershell
-& "C:\path\to\tandem\tandem.cmd" start --simulate
+& "C:\path\to\tandem\tandem.cmd" start
 ```
 It uses that project, and the workers fake the coding. On the board:
 1. Click **Control this team**.
@@ -39,7 +39,7 @@ For real work, go to your own project's folder and run `tandem start`. `tandem s
 Everything from the night before still holds: failure handling (giving back, conflicts as tasks, usage limits, goals that could not be planned), costs, worker ownership, `--review`, `--notify`, dependent tasks starting from their dependencies' work.
 
 ## Tested
-`.\test.ps1` on the final code: **11 suites, 361 checks, all pass** (no Claude calls).
+`.\test.ps1` on the final code: **11 suites, 362 checks, all pass** (no Claude calls).
 
 | Suite | Checks |
 |---|---|
@@ -56,7 +56,7 @@ Everything from the night before still holds: failure handling (giving back, con
 | the tandem command: host project sharing, join and branch push | 7 |
 
 Also passing:
-- The product end to end through the new command (`dashboard/test/start-flow.ts`): `tandem start --simulate` run in a test project, take control in the browser, a goal planned by the real manager (1 haiku run), simulated workers finish it on the board's lane, `tandem stop` leaves nothing running.
+- The product end to end through the new command (`dashboard/test/start-flow.ts`): `tandem start` run in a test project (fake-coding workers, tests only), take control in the browser, a goal planned by the real manager (1 haiku run), the workers finish it on the board's lane, `tandem stop` leaves nothing running.
 - Earlier real Claude runs (haiku, each capped at $0.50), on the same manager and launcher code:
   - Real workers, five times: the goal planned, built by two Claudes, merged into `tandem/<goal>`, its tests passing. One run with `--review`: "Tests pass. Review: Looks good. The only note is cosmetic: the README's title is generic rather than describing the calculator."
   - A real merge conflict resolved by a worker Claude, with the merged code running.

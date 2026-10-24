@@ -25,7 +25,7 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 - **tandem** (`cli/tandem.ts`): `tandem start` in your project starts the brain, the page, the manager and the workers, open to your network, and prints the invite link. `tandem join <invite>` copies the project host's project into Tandem's private work folder and adds a computer's workers to the team. `tandem stop`, `tandem status`.
 - **Worker rules** (`mcp/skill/SKILL.md`): what every worker Claude follows. Claim, touch only your files, respect locks, report, complete.
 - **Lock-check hook** (`mcp/hook/check-lock.mjs`): stops a Claude from editing a file another task holds. This is enforcement, not just a rule.
-- **Launcher** (`launcher/launcher.ts`): on each teammate's machine. Claims a task, runs `claude -p` in a git worktree on branch `task/<id>`, commits, completes. `--simulate` fakes the coding for tests and safe rehearsals.
+- **Launcher** (`launcher/launcher.ts`): on each teammate's machine. Claims a task, runs `claude -p` in a git worktree on branch `task/<id>`, commits, completes. A test-only switch fakes the coding so the automated tests need no Claude usage; the product has no such option.
 
 ## The whole loop (tested with real Claude runs: `mcp/test/e2e/loop.ps1`)
 1. You type a goal on the dashboard. It is saved as a goal: "Waiting for the manager".

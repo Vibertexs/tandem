@@ -25,11 +25,14 @@ const WIN = process.platform === 'win32';
 const BRAIN_PORT = 3001;
 const PAGE_PORT = 5173;
 const NAMES = ['Alex', 'Sam', 'Jordan', 'Taylor', 'Riley', 'Casey'];
+// Workers that fake the coding exist ONLY for Tandem's own automated tests. There is no option for
+// it: it takes this environment variable, which nothing in the product or the docs sets.
+const SIMULATE = process.env.TANDEM_SIMULATE === '1';
+const SIM_LIMIT = Number(process.env.TANDEM_SIM_LIMIT ?? 0);
 
 const HELP = `tandem: your team's Claude Codes, working as one.
 
   tandem start              Start a team for the git repo you are in. Prints the invite address.
-    --simulate              workers fake the coding (no Claude usage for the work)
     --workers N             workers on this computer (default 2; 0 = none)
     --local                 only this computer can join (default: your network can)
     --team NAME             the team's name (default: this folder's name)
@@ -44,7 +47,7 @@ const HELP = `tandem: your team's Claude Codes, working as one.
 
   tandem join <address>     Copy the host's project and add this computer's workers.
                             <address> is the invite the host's page shows, like http://192.168.1.20:5173/?db=shop
-    --simulate, --workers N, --accounts as above; --repo <path> uses your own clone instead
+    --workers N, --accounts as above; --repo <path> uses your own clone instead
 
   tandem account add <label> [--agent codex]   A login for workers (opens that CLI to sign in).
   tandem account list | remove <label>          Each account gets its own login folder in the
@@ -284,16 +287,15 @@ function startWorkers(team: string, uri: string, repo: string, count: number, op
 // ---------- tandem start ----------
 async function start(argv: string[]) {
   if (argv.some(arg => arg === '--demo' || arg.startsWith('--demo='))) {
-    fail('The --demo playground has been removed. Run tandem start in a Git project instead. For a safe rehearsal, use tandem start --simulate in a disposable Git project.');
+    fail('There is no demo project. Run tandem start in a Git project you want built.');
   }
   const { values: o } = parseArgs({ args: argv, options: {
-    simulate: { type: 'boolean', default: false }, workers: { type: 'string', default: '2' },
+    workers: { type: 'string', default: '2' },
     local: { type: 'boolean', default: false }, team: { type: 'string' }, fresh: { type: 'boolean', default: false },
     push: { type: 'boolean', default: false }, review: { type: 'boolean', default: false },
     model: { type: 'string', default: 'haiku' }, 'manager-model': { type: 'string', default: 'haiku' },
     budget: { type: 'string', default: '0.50' }, notify: { type: 'string' },
     'no-browser': { type: 'boolean', default: false }, 'no-manager': { type: 'boolean', default: false },
-    'sim-limit': { type: 'string', default: '0' }, // testing: the first simulated worker hits a usage limit
     accounts: { type: 'string' }, 'manager-account': { type: 'string' },
   } });
   const accts = pickAccounts(o.accounts);
@@ -303,17 +305,17 @@ async function start(argv: string[]) {
 
   // The project is the Git repo where the command runs.
   const repo = repoAt(process.cwd());
-  if (!repo) fail(`${process.cwd()} is not a git repository.\nRun tandem start in the project you want built. To try Tandem safely, use a disposable Git project with an initial commit, then run tandem start --simulate there.`);
+  if (!repo) fail(`${process.cwd()} is not a git repository.\nRun tandem start in the project you want built.`);
   if (resolve(repo) === ROOT) fail('This is the Tandem source folder, not the project it should work on. Run tandem start in your project instead.');
   if (!git(repo, 'rev-parse', '--verify', '--quiet', 'HEAD').ok) fail(`${repo} has no commits yet. Make a first commit, then run tandem start again.`);
   const team = slug(o.team ?? basename(repo));
 
   // which agent CLIs the real (not simulated) workers and the manager need
-  const realAgents = o.simulate ? [] : accts.length ? accts.map(a => a.agent) : workers > 0 ? ['claude'] : [];
+  const realAgents = SIMULATE ? [] : accts.length ? accts.map(a => a.agent) : workers > 0 ? ['claude'] : [];
   const needClaude = realAgents.includes('claude') || !o['no-manager'];
   for (const t of ['git', 'spacetime', ...(needClaude ? ['claude'] : []), ...(realAgents.includes('codex') ? ['codex'] : [])]) {
     if (!which(t)) fail(t === 'spacetime' ? 'The SpacetimeDB CLI is not installed. See https://spacetimedb.com/install'
-      : t === 'claude' ? 'Claude Code (claude) is not installed or not on PATH. Or try: tandem start --simulate --no-manager'
+      : t === 'claude' ? 'Claude Code (claude) is not installed or not on PATH. Install it from https://claude.com/claude-code and sign in.'
       : t === 'codex' ? 'The Codex CLI (codex) is not installed. See https://github.com/openai/codex' : `${t} is not installed.`);
   }
   say();
@@ -373,8 +375,8 @@ async function start(argv: string[]) {
     }
   }
   if (workers > 0) {
-    const names = startWorkers(team, uri, repo, workers, { simulate: o.simulate, push: o.push, model: o.model!, budget: o.budget!, suffix: '', offset: 0, simLimit: Number(o['sim-limit']), accounts: accts });
-    done('workers', `${names.join(', ')}${o.simulate ? ' (simulated: no Claude usage)' : accts.length ? '' : o.model === 'auto' ? ' (Claude, model by difficulty)' : ` (Claude, ${o.model})`}`);
+    const names = startWorkers(team, uri, repo, workers, { simulate: SIMULATE, push: o.push, model: o.model!, budget: o.budget!, suffix: '', offset: 0, simLimit: SIM_LIMIT, accounts: accts });
+    done('workers', `${names.join(', ')}${SIMULATE ? ' (test mode: fake coding)' : accts.length ? '' : o.model === 'auto' ? ' (Claude, model by difficulty)' : ` (Claude, ${o.model})`}`);
   }
 
   const page = `http://localhost:${PAGE_PORT}/?db=${team}${shared ? `&lan=${ip}` : ''}`;
@@ -442,7 +444,7 @@ function workClone(url: string, team: string): string {
 
 async function joinTeam(argv: string[]) {
   const { values: o, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
-    simulate: { type: 'boolean', default: false }, workers: { type: 'string', default: '2' },
+    workers: { type: 'string', default: '2' },
     team: { type: 'string' }, model: { type: 'string', default: 'haiku' }, budget: { type: 'string', default: '0.50' },
     'no-browser': { type: 'boolean', default: false }, accounts: { type: 'string' },
     repo: { type: 'string' }, // use your own clone of the project instead of the one Tandem makes
@@ -460,7 +462,7 @@ async function joinTeam(argv: string[]) {
 
   const workers = accts.length || Number(o.workers);
   let repo: string | null = null;
-  if (!o.simulate && workers > 0) {
+  if (!SIMULATE && workers > 0) {
     for (const agent of new Set(accts.length ? accts.map(a => a.agent) : ['claude'])) {
       if (!which(agent)) fail(agent === 'codex' ? 'The Codex CLI (codex) is not installed. See https://github.com/openai/codex' : 'Claude Code (claude) is not installed or not on PATH.');
     }
@@ -481,9 +483,9 @@ async function joinTeam(argv: string[]) {
 
   if (workers > 0) {
     const names = startWorkers(team, `ws://${host}:${BRAIN_PORT}`, repo, workers, {
-      simulate: o.simulate, push: !o.simulate, model: o.model!, budget: o.budget!, suffix: `-${slug(hostname())}`, offset: 3, accounts: accts,
+      simulate: SIMULATE, push: !SIMULATE, model: o.model!, budget: o.budget!, suffix: `-${slug(hostname())}`, offset: 3, accounts: accts,
     });
-    done('workers', `${names.join(', ')}${o.simulate ? ' (simulated: no Claude usage)' : accts.length ? ' (they push their branches)' : ` (Claude, ${o.model}; they push their branches)`}`);
+    done('workers', `${names.join(', ')}${SIMULATE ? ' (test mode: fake coding)' : accts.length ? ' (they push their branches)' : ` (Claude, ${o.model}; they push their branches)`}`);
   }
   const page = `http://${host}:${PAGE_PORT}/?db=${team}`;
   remember(team, { page, repo, host });
@@ -581,12 +583,19 @@ function logs(argv: string[]) {
 }
 
 const [cmd, ...rest] = process.argv.slice(2);
-if (cmd === 'start') await start(rest);
-else if (cmd === 'join') await joinTeam(rest);
-else if (cmd === 'stop') await stop(rest);
-else if (cmd === 'status') await status();
-else if (cmd === 'open') openPage(rest);
-else if (cmd === 'logs') logs(rest);
-else if (cmd === 'account' || cmd === 'accounts') await accountCmd(rest);
-else if (!cmd && loadProcs().some(p => p.team)) await status(); // just `tandem`: what is running
-else { say(HELP); if (cmd && cmd !== 'help' && cmd !== '--help' && cmd !== '-h') process.exit(2); }
+try {
+  if (cmd === 'start') await start(rest);
+  else if (cmd === 'join') await joinTeam(rest);
+  else if (cmd === 'stop') await stop(rest);
+  else if (cmd === 'status') await status();
+  else if (cmd === 'open') openPage(rest);
+  else if (cmd === 'logs') logs(rest);
+  else if (cmd === 'account' || cmd === 'accounts') await accountCmd(rest);
+  else if (!cmd && loadProcs().some(p => p.team)) await status(); // just `tandem`: what is running
+  else { say(HELP); if (cmd && cmd !== 'help' && cmd !== '--help' && cmd !== '-h') process.exit(2); }
+} catch (e) {
+  // a mistyped option: say so in one line, not a stack trace
+  const code = (e as { code?: string }).code ?? '';
+  if (code.startsWith('ERR_PARSE_ARGS')) fail(`${(e as Error).message.split('.')[0]}. Run "tandem help" for the options.`);
+  throw e;
+}

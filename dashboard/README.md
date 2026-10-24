@@ -1,6 +1,6 @@
 # dashboard
 
-The web page for Tandem. Vite, React, TypeScript. It reads the brain live through the generated bindings in `../brain/bindings`. There is one mode: the real team. For a rehearsal with simulated workers, run `tandem start --simulate` from a disposable Git project; they fake the coding.
+The web page for Tandem. Vite, React, TypeScript. It reads the brain live through the generated bindings in `../brain/bindings`. There is one mode: the real team.
 
 ## The flow
 1. **Not connected:** the start screen explains **Start a team for a project** (run `tandem start` in the Git project) or **Open a teammate's team** (paste the invite link). The browser is a dashboard; it does not host or copy the project.
@@ -39,5 +39,5 @@ npm run build && npm run preview  # production build
 
 ## Tests
 - `npx tsx test/ui.test.ts`: the whole first-use journey in Chrome (playwright-core), desktop and phone. It covers project host/invite, controller access, approving the manager, a goal, work by hand, simulated workers moving cards, the details panel, shared memory, a second controller request, remembered team, start over, sample data and present view. It needs `npm run build && npm run preview -- --port 4173`, the local brain, Chrome and `spacetime` on PATH. It publishes a fresh `bilal-ux` database.
-- `npx tsx test/start-flow.ts`: the product end to end. It runs `tandem start --simulate` in a test project, takes browser control, approves the manager, types a goal, and checks the real manager plans it (1 haiku run) and the workers finish it. Then it runs `tandem stop`.
+- `npx tsx test/start-flow.ts`: the product end to end. It runs `tandem start` in a test project (with the tests-only switch that fakes the coding), takes browser control, approves the manager, types a goal, and checks the real manager plans it (1 haiku run) and the workers finish it. Then it runs `tandem stop`.
 - `test/loop-ui.ts`: the last step of `mcp/test/e2e/loop.ps1`.
