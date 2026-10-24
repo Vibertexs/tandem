@@ -1,28 +1,40 @@
 # mcp (owner: Bilal; skill and hook: Omar)
 
-MCP server that exposes the brain to every Claude as tools.
+MCP server that exposes the brain to every Claude as tools. TypeScript, stdio, MCP SDK v2. Source: `src/`.
 
 ## Checklist
 - [x] Pick a language and MCP SDK (check current docs): TypeScript, `@modelcontextprotocol/server` v2 (see NOTES.md)
-- [ ] Server skeleton that registers every tool in `contract/tools.json` (6 of 14 done: register_worker, claim_task, lock_files, release_files, complete_task, get_status)
+- [x] Server skeleton that registers every tool in `contract/tools.json` (all 14, `src/server.ts`)
 - [x] Thin brain client module (all database access goes through it): `src/brain-client.ts`
-- [ ] **Mock mode** (`BRAIN_MODE=mock`): tools return canned data from `contract/seed.json`, so Sam and Omar can build without the real brain
-- [ ] Register the server with Claude Code (`claude mcp add`, check the docs for the exact syntax)
+- [x] **Mock mode** (`BRAIN_MODE=mock`): in-memory brain loaded from `contract/seed.json`, no database needed (`src/mock-brain.ts`)
+- [ ] Register the server with Claude Code (`claude mcp add`, check the docs for the exact syntax). The real-Claude test uses `--mcp-config` instead; `claude mcp add` itself is not tested yet
 - [ ] Team-rules skill: `skill/SKILL.md` (Omar, about hour 10)
 - [ ] Lock-check hook: `hook/` (Omar, about hour 10)
+
+## Checkpoint (about hour 6)
+Every tool is callable from a real Claude Code session against the mock. The mock is tested through the MCP protocol (`npm run test:mock`). Real headless Claude runs are tested against the real brain, not the mock (`test/e2e`).
+
+## Done when
+A Claude Code session can call every tool, and the hook blocks an edit on a locked file. The hook is not built.
 
 ## Run it
 ```
 cd brain && npm install && cd ../mcp && npm install
-npm test        # needs the local server and an empty bilal-dev DB, see test/mcp.test.ts
-npm start       # stdio server; env STDB_URI, STDB_DB, TANDEM_WORKER_ID
+npm run test:mock   # no database needed
+npm test            # needs the local server and bilal-dev published, see brain/README.md
+npm start           # stdio server
 ```
-Real-Claude test (two headless `claude -p` haiku runs, uses a little quota, edits only a throwaway repo): `powershell -File mcp/test/e2e/run.ps1` on an empty `bilal-dev`. It passed once: two workers, three tasks, two of them on the same file, no overlap. `claude mcp add` was not needed for it.
+Env for `npm start`:
 
-Register with Claude Code for interactive use (not done or tested yet): `claude mcp add tandem -- node --import tsx <repo>/mcp/src/server.ts` (check `claude mcp add --help` for scope and env flags).
+| Var | Default | |
+|---|---|---|
+| `BRAIN_MODE` | (real) | `mock` = in-memory, no database |
+| `STDB_URI` | `ws://127.0.0.1:3001` | |
+| `STDB_DB` | `bilal-dev` | database name |
+| `TANDEM_SESSION` | `live` | session id (judges use their own) |
+| `TANDEM_WORKER_ID` | (none) | skip `register_worker` |
+| `HEARTBEAT_MS` | `30000` | |
 
-## Checkpoint (about hour 6)
-Every tool is callable from a real Claude Code session against the mock.
+Real-Claude test: `powershell -File mcp/test/e2e/run.ps1` (two headless `claude -p` haiku runs, uses a little quota, edits only a throwaway repo). Passed 3 times: two workers, three tasks, two sharing a file, no overlap.
 
-## Done when
-A Claude Code session can call every tool, and the hook blocks an edit on a locked file.
+Register with Claude Code for interactive use (not tested): `claude mcp add tandem -- node --import tsx <repo>/mcp/src/server.ts` (check `claude mcp add --help` for scope and env flags).
