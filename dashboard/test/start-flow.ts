@@ -63,8 +63,9 @@ try {
   check('the workers are online (no "No workers" step)', await page.getByText('No workers are online.').waitFor({ state: 'hidden', timeout: 15_000 }).then(() => true, () => false));
   await page.getByLabel('Describe what you want built').fill('Create a tiny Python calculator: calc.py with add(a, b) and sub(a, b), test_calc.py with unittest tests, and a README.md.');
   await page.getByRole('button', { name: /^Send/ }).click();
-  check('the goal is sent and waits for the manager', await seen(page, /Waiting for the manager|Being planned/, 5000));
-  check('the manager plans it within 3 minutes', await page.locator('.latest').getByText(/Planned|Done/).waitFor({ timeout: 180_000 }).then(() => true, () => false));
+  const goalLane = page.locator('.goal-lane').first();
+  check('the goal is sent and gets its lane, waiting for the manager', await seen(page, /Waiting for the manager|Being planned/, 5000));
+  check('the manager plans it within 3 minutes', await goalLane.locator('.lane-head').getByText(/Planned|Done/).waitFor({ timeout: 180_000 }).then(() => true, () => false));
   const total = await page.locator('.summary-top strong').innerText().catch(() => '');
   check('the plan has at least 2 tasks', Number(total.match(/of (\d+)/)?.[1] ?? 0) >= 2, total);
   if (SHOTS) await page.screenshot({ path: join(SHOTS, 'flow-planned.png') });
@@ -74,9 +75,9 @@ try {
     return !!m && m[1] === m[2];
   }, undefined, { timeout: REAL ? 600_000 : 180_000 }).then(() => true, () => false);
   check(`the ${REAL ? 'real' : 'simulated'} workers finish every task`, allDone, await page.locator('.summary-top strong').innerText().catch(() => ''));
-  check('the manager marks the goal done', await page.locator('.latest').getByText('✓ Done').waitFor({ timeout: 30_000 }).then(() => true, () => false));
+  check('the manager marks the goal done', await goalLane.locator('.lane-head').getByText('✓ Done').waitFor({ timeout: 30_000 }).then(() => true, () => false));
   if (REAL) {
-    const branch = (await page.locator('.goal-row .link.mono').first().innerText().catch(() => '')).trim();
+    const branch = (await goalLane.locator('.branch code').innerText().catch(() => '')).trim();
     check('the goal shows the branch with all of its work', /^tandem\/g-/.test(branch), branch);
     let files: string[] = [];
     try { files = execSync(`git -C ${REPO} ls-tree -r --name-only ${branch}`, { encoding: 'utf8' }).trim().split('\n'); } catch { /* no branch */ }
@@ -88,13 +89,11 @@ try {
     } catch (e) { out = String((e as { stderr?: string }).stderr ?? e); ok = /OK\s*$/.test(out); }
     finally { try { execSync(`git -C ${REPO} worktree remove --force ${REPO}\\.worktrees\\verify`, { stdio: 'pipe' }); } catch { /* gone */ } }
     check("the workers' tests pass on the goal branch", ok, out.slice(-300));
-    await page.locator('.nav a', { hasText: 'Goals' }).click();
-    const card = await page.locator('.goal-card').first().innerText().catch(() => '');
-    check('the goal card says the tests passed and what it cost', /Tests pass/.test(card) && /\$\d+\.\d+ of Claude usage/.test(card), card);
-    if (REVIEW) check('with -Review, a worker reviewed the branch and its findings are on the goal card', /Review the goal's work/.test(card) && /Review: \S/.test(card), card);
-    await page.locator('.nav a', { hasText: 'Board' }).click();
+    const card = await goalLane.innerText().catch(() => '');
+    check("the goal's lane says the tests passed and what it cost", /Tests pass/.test(card) && /\$\d+\.\d+ of Claude usage/.test(card), card);
+    if (REVIEW) check("with --review, a worker reviewed the branch and its findings are on the goal's lane", /Review the goal's work/.test(card) && /Review: \S/.test(card), card);
   }
-  check('the board shows the goal at 100%', await page.locator('.goal-row').first().innerText().then(t => /(\d+)\/\1/.test(t)).catch(() => false));
+  check('the board shows the goal at 100%', await goalLane.innerText().then(t => /(\d+)\/\1/.test(t)).catch(() => false));
   if (SHOTS) await page.screenshot({ path: join(SHOTS, 'flow-done.png'), fullPage: true });
   await page.locator('.nav a', { hasText: 'Shared memory' }).click();
   const interfaces = await page.getByLabel('Interfaces').inputValue().catch(() => '');

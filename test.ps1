@@ -44,7 +44,7 @@ $suites = @(
 )
 if ($Restart) { $suites += , @('page + worker survive a brain restart', 'dashboard', 'npx.cmd tsx test/reconnect.test.ts') }
 if ($Real) {
-  $suites += , @('REAL: start.ps1, a goal, simulated workers (1 run)', 'dashboard', 'npx.cmd tsx test/start-flow.ts')
+  $suites += , @('REAL: tandem start in a project, a goal, simulated workers (1 run)', 'dashboard', 'npx.cmd tsx test/start-flow.ts')
   $suites += , @('REAL: hook blocks a real Claude (1 run)', 'mcp', 'powershell -NoProfile -ExecutionPolicy Bypass -File test/e2e/hook-real.ps1')
   $suites += , @('REAL: launcher in a worktree (1 run)', 'launcher', 'npx.cmd tsx test/real.ts')
   $suites += , @('REAL: a worker resolves a merge conflict (1 run)', 'launcher', 'npx.cmd tsx test/conflict-real.ts')
