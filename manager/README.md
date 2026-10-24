@@ -15,7 +15,7 @@ The planner: a Claude Code session with the tandem MCP that turns the operator's
 5. When every task of a goal is done, `finish.ts` merges the task branches into `tandem/<goal id>` (`merge.ts`, in a separate worktree), runs the project's tests on it (`verify.ts`: an npm `test` script or Python unittest files), and finishes the goal.
    - A branch that conflicts gets one "Resolve the merge conflict with task/X" task for the conflicted files. The launcher starts that merge in the worker's worktree, Claude edits out the markers, and the launcher commits it. Conflict fixes merge first next time, so the goal merges cleanly.
    - If the tests fail, it adds one "Fix the failing tests" task to the goal. The launcher starts that task from the goal branch.
-   - With `--push`, the goal branch is pushed to origin and, if the GitHub CLI is set up, a PR is opened. The watcher also tells the page the repo's remote, so the Team page can show a teammate what to clone.
+   - With `--push`, the goal branch is pushed to origin and, if the GitHub CLI is set up, a PR is opened. When Tandem hosts a project directly, the watcher also publishes its Git address so the Team page can show the one-command join flow.
    - With `--notify <url>` (or `TANDEM_WEBHOOK`), "goal done" is posted to a Slack or Discord incoming webhook.
    - With `--review`, one "Review the goal's work" task runs before the goal is done (read-only tools, on the goal branch). Its findings go into the note and the PR.
 

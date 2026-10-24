@@ -1,9 +1,8 @@
-// Setup: the steps to follow, in order, with this computer's real folders in the commands and a
-// tick on every step that is already done. Nothing here needs an install beyond Node and Git.
+// The practical first-use path: start the project host, control the browser, then add computers.
 import type { ReactNode } from 'react';
 import type { Snapshot } from './brain';
 import { shareable, type Team } from './config';
-import { CodeLine, JoinSteps, managerOnline, online } from './ui';
+import { CodeLine, JoinSteps, managerOnline, online, restartForSharingCommand, startCommand } from './ui';
 
 function Step({ done, title, children }: { done: boolean; title: string; children?: ReactNode }) {
   return (
@@ -17,79 +16,61 @@ function Step({ done, title, children }: { done: boolean; title: string; childre
   );
 }
 
-export function SetupPage({ snap, team, now, say, go }: { snap: Snapshot; team: Team; now: number; say: (m: string) => void; go: (page: string) => void }) {
+export function SetupPage({ snap, team, now, say, go, isOp }: { snap: Snapshot; team: Team; now: number; say: (m: string) => void; go: (page: string) => void; isOp: boolean }) {
   const ctx = snap.context;
   const tandemDir = ctx.tandem_dir || '<the Tandem folder>';
   const projectDir = ctx.project_dir || '<your project folder>';
-  const repoUrl = ctx.repo_url ?? '';
+  const gitUrl = ctx.git_url ?? '';
   const share = shareable(team);
   const live = snap.workers.filter(w => online(w, now));
-  const real = live.filter(w => w.agent !== 'simulated');
-  const joined = real.filter(w => w.name.includes('-')); // workers that joined from another computer are named <name>-<computer>
+  const joined = live.filter(w => w.name.includes('-'));
+  const manager = managerOnline(snap, now);
+  const hostReady = manager && live.length > 0;
   const tailscale = !!share && /^http:\/\/100\./.test(share.page);
+  const hostCommand = startCommand(tandemDir, projectDir);
+  const shareCommand = restartForSharingCommand(tandemDir, projectDir);
 
   return (
     <div className="page setup">
-      <p className="muted lead">Follow these in order. Each step ticks when Tandem sees it is done. The commands already have this computer's folders in them.</p>
+      <p className="muted lead">A <strong>project host</strong> is the computer running Tandem in the Git project. A <strong>team controller</strong> is a browser permission to send goals and approve people. They are usually the same person, but they do not have to be.</p>
+
+      <section className="card setup-roles" aria-labelledby="roles-h">
+        <h2 id="roles-h">This team</h2>
+        <dl className="facts">
+          <dt>Project host</dt><dd><code className="mono">{projectDir}</code><span className="small muted">Runs the manager, workers and shared project.</span></dd>
+          <dt>This browser</dt><dd>{isOp ? <><strong>You control this team.</strong><span className="small muted">You can send goals, approve controllers and change settings.</span></> : <><strong>You are watching.</strong><span className="small muted">Use Request control in the top bar if a current controller should approve this browser.</span></>}</dd>
+        </dl>
+      </section>
+
       <ol className="plain steps-list">
-        <Step done title="1. Tandem is running on this computer">
-          <p className="small muted">You are looking at it. The team is <code className="mono">{team.db}</code>. If you ever open a new terminal and <code className="mono">tandem</code> is not found:</p>
-          <p className="small muted">This terminal only (Windows PowerShell):</p>
-          <CodeLine code={`$env:Path += ";${tandemDir}"`} say={say} />
-          <p className="small muted">Mac or Linux:</p>
-          <CodeLine code={`export PATH="$PATH:${tandemDir}"`} say={say} />
-          <p className="small muted">Or, once and forever, in the Tandem folder: <code className="mono">npm install -g .</code></p>
+        <Step done={hostReady} title="1. Start the project host">
+          <p className="small muted">Paste this whole block in PowerShell or Terminal on the computer that holds the project. It calls Tandem by its known path, so there is no PATH setup to do.</p>
+          <CodeLine code={hostCommand} say={say} />
+          <p className="small muted">{manager ? '✓ Manager online.' : '○ Manager not online yet.'} {live.length ? `✓ ${live.length} coding worker${live.length === 1 ? '' : 's'} online.` : '○ No coding workers online yet.'}</p>
         </Step>
 
-        <Step done={managerOnline(snap, now)} title="2. The manager is online">
-          <p className="small muted">It turns each goal into tasks. If it is offline, start Tandem again from your project:</p>
-          <CodeLine code={`cd ${projectDir}\ntandem start`} say={say} />
+        <Step done={snap.goals.length > 0} title="2. Send a goal">
+          {isOp
+            ? <p className="small muted">Go to the <a href="#/board" onClick={() => go('board')}>Board</a>, describe what you want built, and send it. The manager turns it into tasks for the workers.</p>
+            : <p className="small muted">A controller must approve this browser before it can send goals. Use <strong>Request control</strong> in the top bar, then go to the Board.</p>}
         </Step>
 
-        <Step done={real.length > 0} title="3. Claude workers on this computer">
-          {real.length === 0 && (
-            <>
-              <p className="small muted">No Claude worker is online yet. Start Tandem from your project:</p>
-              <CodeLine code={`cd ${projectDir}\ntandem stop\ntandem start`} say={say} />
-            </>
-          )}
-          {real.length > 0 && <p className="small muted">{real.map(w => `${w.name} (${w.agent === 'codex' ? 'Codex' : 'Claude'}${w.account ? `, ${w.account}` : ''})`).join(', ')} online. Each runs under its owner's own login.</p>}
-          <p className="small muted">Claude Code has to be signed in on this computer. Check by running <code className="mono">claude</code> in a terminal.</p>
-        </Step>
-
-        <Step done={!!repoUrl} title="4. The project is on GitHub (so a teammate's work can reach yours)">
-          {repoUrl
-            ? <p className="small muted">Yes: <code className="mono">{repoUrl}</code></p>
-            : (
-              <>
-                <p className="small muted">Create an empty private repo on github.com (no README), add your teammate under Settings, Collaborators, then:</p>
-                <CodeLine code={`cd ${projectDir}\ngit remote add origin https://github.com/<you>/<repo>.git\ngit push -u origin main`} say={say} />
-                <p className="small muted">Then restart so Tandem notices: <code className="mono">tandem stop</code>, then <code className="mono">tandem start</code>.</p>
-              </>
-            )}
-        </Step>
-
-        <Step done={joined.length > 0} title="5. Invite a teammate">
+        <Step done={joined.length > 0} title="3. Add a teammate&apos;s computer">
           {!share ? (
             <>
-              <p className="small warn">Only this computer can join right now.</p>
-              <CodeLine code="tandem stop --all\ntandem start" say={say} />
+              <p className="small warn">This team is only available on this computer. Start the project host without <code className="mono">--local</code> to create an invite.</p>
+              <CodeLine code={shareCommand} say={say} />
             </>
           ) : (
             <>
-              {tailscale
-                ? <p className="small muted">This invite uses your Tailscale address, so it works on any wifi. Share this computer with them in Tailscale first (Tailscale admin, Machines, <strong>⋯</strong>, Share) and they accept.</p>
-                : <p className="small muted">This invite uses your wifi address. It only works if both computers are on the same wifi and the wifi lets devices talk to each other. On public wifi, use Tailscale and run <code className="mono">tandem start</code> again.</p>}
-              <p className="small muted">Send them this link. In a browser it shows this board:</p>
+              <p className="small muted">First, send this link to let them watch the board:</p>
               <CodeLine code={share.page} say={say} />
-              <JoinSteps link={share.page} repoUrl={repoUrl} say={say} />
+              <p className="small muted">Then, if you want their computer&apos;s workers to code, send them the one command block below:</p>
+              <JoinSteps link={share.page} gitUrl={gitUrl} say={say} restart={shareCommand} />
+              <p className="small muted">{tailscale ? 'This is a private Tailscale link. The teammate must be allowed to reach this computer in Tailscale.' : 'This works on the same network. For different networks or public Wi-Fi, use Tailscale and restart Tandem on the project host.'}</p>
             </>
           )}
-          {joined.length > 0 && <p className="small muted">Joined: {joined.map(w => w.name).join(', ')}.</p>}
-        </Step>
-
-        <Step done={snap.goals.length > 0} title="6. Send a goal">
-          <p className="small muted">On the <a href="#/board" onClick={() => go('board')}>Board</a>, click an example or describe what you want built, then Send. The manager plans it, and tasks go to every worker that is online.</p>
+          {joined.length > 0 && <p className="small muted">Joined worker computers: {joined.map(w => w.name).join(', ')}.</p>}
         </Step>
       </ol>
     </div>

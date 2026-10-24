@@ -7,6 +7,9 @@
 param([switch]$Real, [switch]$Restart)
 $root = $PSScriptRoot
 $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + [Environment]::GetEnvironmentVariable('Path', 'Machine')
+# The Windows installer keeps the SpacetimeDB CLI here, rather than always adding it to PATH.
+$spacetimeBin = Join-Path $env:LOCALAPPDATA 'SpacetimeDB'
+if (Test-Path $spacetimeBin) { $env:Path += ';' + $spacetimeBin }
 function Up($port) { [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) }
 
 if (-not (Up 3001)) {
@@ -41,7 +44,8 @@ $suites = @(
   @('launcher: routing, limits, simulate', 'launcher', 'npm.cmd run test'),
   @('manager: merge, conflicts, test, finish, notify', 'manager', 'npm.cmd run test'),
   @('page in Chrome', 'dashboard', 'npx.cmd tsx test/ui.test.ts'),
-  @('tandem command: accounts, start, stop', '.', 'node cli/cli.test.ts')
+  @('tandem command: accounts, start, stop', '.', 'node cli/cli.test.ts'),
+  @('tandem command: host project sharing and join', '.', 'npx.cmd --prefix brain tsx cli/share.test.ts')
 )
 if ($Restart) { $suites += , @('page + worker survive a brain restart', 'dashboard', 'npx.cmd tsx test/reconnect.test.ts') }
 if ($Real) {

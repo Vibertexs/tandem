@@ -49,47 +49,46 @@ try {
   const errs: string[] = [];
   A.on('pageerror', e => errs.push(String(e)));
 
-  // ---- 1. nothing connected: host or join ----
+  // ---- 1. nothing connected: start a project or open an invite ----
   await A.goto(URL_);
-  check('start: with nothing connected, the page offers Host a team (tandem start in your project) and Join a team',
-    await seen(A, 'Host a team') && await seen(A, 'Join a team', 1000) && await A.getByText('tandem start', { exact: true }).first().isVisible() && await seen(A, "In your project's folder", 1000));
+  check('start: with nothing connected, the page explains project host versus dashboard and offers an invite',
+    await seen(A, 'Start a team for a project') && await seen(A, "Open a teammate's team", 1000) && await A.getByText('tandem start', { exact: true }).first().isVisible() && await seen(A, 'does not host or copy the project', 1000));
   await shot(A, '01-start');
   await A.getByLabel('Invite link').fill('not an invite');
-  await A.getByRole('button', { name: 'Join' }).click();
+  await A.getByRole('button', { name: 'Open team' }).click();
   check('start: something that is not an invite says what one looks like', await seen(A, "That doesn't look like an invite", 3000));
   await A.getByLabel('Invite link').fill(`127.0.0.1:9/${DB}`);
-  await A.getByRole('button', { name: 'Join' }).click();
+  await A.getByRole('button', { name: 'Open team' }).click();
   check('start: an invite nobody answers says it cannot reach the team, with Try again', await seen(A, `Can't reach "${DB}"`, 12_000) && await A.getByRole('button', { name: 'Try again' }).isVisible());
   await A.getByRole('button', { name: 'Choose another team' }).click();
-  check('start: "Choose another team" goes back to the start', await seen(A, 'Host a team', 4000));
-  await A.getByLabel('Team name', { exact: true }).fill(DB);
-  await A.getByRole('button', { name: 'Open' }).click();
+  check('start: "Choose another team" goes back to the start', await seen(A, 'Start a team for a project', 4000));
+  await A.goto(`${URL_}/?db=${DB}`);
 
-  // ---- 2. first visitor becomes the owner ----
-  check('owner: a team with no owner asks "Make me the owner" (or just watch)', await seen(A, 'has no owner yet') && await A.getByRole('button', { name: 'Just watch' }).isVisible());
+  // ---- 2. first visitor becomes the controller ----
+  check('control: a team with no controller explains the browser permission and offers control or watch', await seen(A, `Control “${DB}”?`) && await A.getByRole('button', { name: 'Watch only' }).isVisible() && await seen(A, 'does not start the project server', 1000));
   await shot(A, '02-owner');
-  await A.getByRole('button', { name: 'Make me the owner' }).click();
-  check('owner: then the board opens, with the prompt on', await until(() => prompt(A).isEnabled()));
-  check('owner: the sidebar has Setup, Board, Team, Shared memory, Activity, Settings (goals live on the Board)',
-    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Setup|Board|Team|Shared memory|Activity|Settings');
-  check('owner: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
-  check('owner: it shows one next step: the manager is not connected yet', await seen(A, 'The manager is not connected yet', 3000));
-  check('owner: the sidebar says you manage the team', await seen(A, 'You manage this team', 2000));
+  await A.getByRole('button', { name: 'Control this team' }).click();
+  check('control: then the board opens, with the prompt on', await until(() => prompt(A).isEnabled()));
+  check('control: the sidebar has Get started, Board, Team, Shared memory, Activity, Settings (goals live on the Board)',
+    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Get started|Board|Team|Shared memory|Activity|Settings');
+  check('control: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
+  check('control: it shows one next step: the manager is not connected yet', await seen(A, 'The manager is not connected yet', 3000));
+  check('control: the sidebar says this browser controls the team', await seen(A, 'You control this team', 2000));
 
-  // ---- 3. the manager asks, the owner approves with one click ----
+  // ---- 3. the manager requests control, and the controller approves with one click ----
   const manager = await new Promise<DbConnection>((res, rej) => {
     DbConnection.builder().withUri('ws://127.0.0.1:3001').withDatabaseName(DB)
       .onConnect(c => { c.subscriptionBuilder().onApplied(() => res(c)).subscribe([tables.goals]); }).onConnectError((_c, e) => rej(e)).build();
   });
   await manager.reducers.requestOperator({ name: 'Manager Claude' });
-  check('approve: the board shows "Manager Claude wants to help" with Approve', await seen(A, 'Manager Claude wants to help manage this team.', 5000));
+  check('approve: the board shows "Manager Claude wants to control" with Approve', await seen(A, 'Manager Claude wants to control this team.', 5000));
   check('approve: Settings shows a badge for the request', await A.locator('.nav a', { hasText: 'Settings' }).locator('.badge-count').innerText().then(t => t === '1'));
   await shot(A, '03-approve-manager');
   await A.getByRole('button', { name: 'Approve' }).click();
   check('approve: after approving, the next step is "No workers are online"', await seen(A, 'No workers are online.', 5000));
 
   // ---- 4. send a goal ----
-  check('goal: a new owner gets example goals; clicking one fills the prompt', await A.locator('.chip.example').count() === 3 &&
+  check('goal: a new controller gets example goals; clicking one fills the prompt', await A.locator('.chip.example').count() === 3 &&
     await A.locator('.chip.example').first().click().then(() => prompt(A).inputValue()).then(v => v.startsWith('A tiny Python calculator')));
   await A.locator('body').click({ position: { x: 5, y: 5 } });
   await A.keyboard.press('/');
@@ -162,23 +161,22 @@ try {
   check('goal done: a finished goal moves below the work still going', (await A.locator('.goal-lane .goal-text').allInnerTexts()).join('|') === 'Other tasks|Build a tiny calculator with tests');
   await shot(A, '06-board-done', true);
 
-  // ---- 5b. the Setup page: steps to follow, with this computer's folders, ticking as they happen ----
+  // ---- 5b. Get started: host/controller distinction and one complete host command ----
+  await manager.reducers.ping({ sessionId: 'live', name: 'Manager Claude', kind: 'manager' });
   await manager.reducers.setContext({ sessionId: 'live', key: 'tandem_dir', value: 'C:\\Code\\tandem' });
   await manager.reducers.setContext({ sessionId: 'live', key: 'project_dir', value: 'C:\\Code\\calc-demo' });
-  await nav(A, 'Setup');
+  await nav(A, 'Get started');
   const steps = A.locator('.step');
-  check('setup: six numbered steps, from running to sending a goal', await until(async () => await steps.count() === 6) &&
-    (await steps.first().innerText()).includes('Tandem is running') && (await steps.last().innerText()).includes('Send a goal'));
-  check('setup: the commands carry this computer\'s real folders', await until(async () => {
+  check('get started: three steps distinguish the project host from the team controller', await until(async () => await steps.count() === 3) &&
+    await seen(A, 'project host', 1000) && await seen(A, 'team controller', 1000) && (await steps.first().innerText()).includes('Start the project host') && (await steps.last().innerText()).includes('Add a teammate'));
+  check('get started: one whole PowerShell block carries this computer\'s real folders without a PATH edit', await until(async () => {
     const s = await A.locator('.setup').innerText();
-    return s.includes('$env:Path += ";C:\\Code\\tandem"') && s.includes('cd C:\\Code\\calc-demo');
+    return s.includes("Set-Location -LiteralPath 'C:\\Code\\calc-demo'") && s.includes("& 'C:\\Code\\tandem\\tandem.cmd' start") && !s.includes('$env:Path');
   }, 4000));
-  check('setup: the manager step ticks once the manager is online, the goal step once a goal exists',
-    await steps.nth(1).evaluate(e => e.classList.contains('done')) && await steps.nth(5).evaluate(e => e.classList.contains('done')));
-  check('setup: step 3 is not ticked while no Claude worker is online, and gives the command to start them',
-    await steps.nth(2).innerText().then(t => t.includes('No Claude worker is online yet') && t.includes('tandem start')) && !(await steps.nth(2).evaluate(e => e.classList.contains('done'))));
-  check('setup: with no GitHub remote, step 4 says how to add one', await steps.nth(3).innerText().then(t => t.includes('git remote add origin')) && !(await steps.nth(3).evaluate(e => e.classList.contains('done'))));
-  check('setup: a team only this computer can reach says how to open it up', await steps.nth(4).innerText().then(t => t.includes('tandem stop --all')));
+  check('get started: the host and goal steps tick, while adding a teammate stays optional',
+    await steps.nth(0).evaluate(e => e.classList.contains('done')) && await steps.nth(1).evaluate(e => e.classList.contains('done')) && !(await steps.nth(2).evaluate(e => e.classList.contains('done'))));
+  check('get started: a local-only team explains that an invite needs a non-local host',
+    await steps.nth(2).innerText().then(t => t.includes('only available on this computer') && t.includes('without --local')));
   await shot(A, '06a-setup');
 
   // ---- 6. team, shared memory, activity ----
@@ -186,8 +184,8 @@ try {
   check('team: each worker card says how many tasks it finished', await until(async () => /\d+ tasks? done/.test(await A.locator('.worker').first().innerText())));
   check('team: both workers are listed as online cards', await until(async () => await A.locator('.worker').count() === 2) && await seen(A, 'Alex', 2000) && await seen(A, 'Sam', 1000));
   const connect = await A.locator('.connect').innerText();
-  check('team: a team only this computer can reach says so, with the one command to open it up (no join command that cannot work)',
-    connect.includes('Right now only this computer can join') && connect.includes('tandem stop --all; tandem start') && !connect.includes('tandem join'), connect.slice(0, 300));
+  check('team: a team only this computer can reach says so, with the restart command but no join command that cannot work',
+    connect.includes('Right now only this computer can join') && connect.includes('stop --all') && /tandem(\.cmd')? start/.test(connect) && !/tandem(\.cmd')? join/.test(connect), connect.slice(0, 300));
   {
     // tandem start opens the page with &lan=<ip> when the brain is open to the network
     const L = await (await browser.newContext({ viewport: desktop })).newPage();
@@ -195,17 +193,17 @@ try {
     const invite = `http://10.1.2.3:${new URL(URL_).port}/?db=${DB}`;
     await L.getByRole('button', { name: 'Invite' }).click();
     const pop = await L.getByRole('dialog', { name: 'Invite' }).innerText().catch(() => '');
-    check('invite: on the network, every page has an Invite button with the link, and without a GitHub remote it says to add one first', pop.includes(invite) && pop.includes('no GitHub remote'), pop);
+    check('invite: on the network, every page has an Invite button with the link, and without a shared project it says what is missing', pop.includes(invite) && pop.includes('project is not ready to share yet'), pop);
     await L.keyboard.press('Escape');
     await nav(L, 'Team');
     const lan = await L.locator('.connect').innerText().catch(() => '');
-    check('team: with no GitHub remote it says to put the project on GitHub first, and shows no join command that could not work', lan.includes('no GitHub remote') && !lan.includes('tandem.cmd join'), lan.slice(0, 400));
-    // the manager publishes the repo's origin: then the steps are clone + join
-    await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: 'https://github.com/acme/shop.git' });
-    const withRepo = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/acme/shop.git'), 4000);
+    check('team: without a shared project it says what is missing, and shows no join command that could not work', lan.includes('project is not ready to share yet') && !lan.includes('tandem.cmd join'), lan.slice(0, 400));
+    // the manager publishes the host's Git address: then the steps are one bulk get-Tandem + join block
+    await manager.reducers.setContext({ sessionId: 'live', key: 'git_url', value: 'http://10.1.2.3:9418/bilal-ux' });
+    const withShare = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/Vibertexs/tandem'), 4000);
     const lan2 = await L.locator('.connect').innerText();
-    check('team: with a shared repo, a joiner clones it, then tandem join in that folder', withRepo && lan2.includes(`..\\tandem\\tandem.cmd join "${invite}"`) && lan2.includes('git clone https://github.com/acme/shop.git'), lan2.slice(0, 400));
-    await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: '' });
+    check('team: with a host-shared project, a joiner gets one complete Windows command block', withShare && lan2.includes('Set-Location tandem') && lan2.includes(`.\\tandem.cmd join "${invite}"`) && lan2.includes('private copy of the host project'), lan2.slice(0, 400));
+    await manager.reducers.setContext({ sessionId: 'live', key: 'git_url', value: '' });
     await L.context().close();
   }
   await shot(A, '07-team');
@@ -220,17 +218,17 @@ try {
   check('activity: "Finished" shows only what got done', await until(async () => (await A.locator('.log li').allInnerTexts()).every(t => /Done:|Goal done|Job progress|Merge task/.test(t))), await A.locator('.log li').allInnerTexts());
   await A.getByRole('button', { name: /^All/ }).click();
 
-  // ---- 7. a second person asks to make changes ----
+  // ---- 7. a second person requests controller access ----
   const ctxB = await browser.newContext({ viewport: desktop });
   const B = await ctxB.newPage();
   await B.goto(`${URL_}/?db=${DB}`);
-  check('viewer: someone else sees the board but cannot send', await until(() => prompt(B).isDisabled(), 10_000) && await seen(B, 'Viewing', 2000));
-  await B.getByRole('button', { name: 'Ask to make changes' }).click();
+  check('viewer: someone else sees the board but cannot send', await until(() => prompt(B).isDisabled(), 10_000) && await seen(B, 'Watching', 2000));
+  await B.getByRole('button', { name: 'Request control' }).click();
   await B.getByLabel('Your name').fill('Omar');
-  await B.getByRole('button', { name: /^Ask$/ }).click();
-  check('viewer: after asking, it says it is waiting for the owner', await seen(B, 'Waiting for the owner to approve you', 4000));
+  await B.getByRole('button', { name: /^Request$/ }).click();
+  check('viewer: after asking, it says it is waiting for a controller', await seen(B, 'Waiting for a controller to approve you', 4000));
   await nav(A, 'Board');
-  check('viewer: the owner sees "Omar wants to help manage this team"', await seen(A, 'Omar wants to help manage this team.', 5000));
+  check('viewer: a controller sees "Omar wants to control this team"', await seen(A, 'Omar wants to control this team.', 5000));
   await A.getByRole('button', { name: 'Approve' }).click();
   check('viewer: once approved, Omar can send goals without reloading', await until(() => prompt(B).isEnabled(), 6000));
   await ctxB.close();

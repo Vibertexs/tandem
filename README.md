@@ -11,7 +11,7 @@ Describe what you want built. A manager plans it, every teammate's coding agent 
 ![SpacetimeDB](https://img.shields.io/badge/shared%20brain-SpacetimeDB-7c3aed)
 ![MCP](https://img.shields.io/badge/tools-MCP-1f2937)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex-d97757)
-![Tests](https://img.shields.io/badge/tests-343%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-361%20passing-2ea44f)
 
 ![The board while two workers are on it](docs/img/board.png)
 
@@ -40,62 +40,96 @@ When a few people each run an AI coding agent on the same repo:
 
 ## How to start
 
-### What you need (once per computer)
-- [Node.js](https://nodejs.org) **22.18 or newer** (`node --version`), and Git
-- [Claude Code](https://claude.com/claude-code), signed in (run `claude` once to check)
-- The host also needs the [SpacetimeDB CLI](https://spacetimedb.com/install) (Windows: `iwr https://windows.spacetimedb.com -useb | iex`; macOS and Linux: `curl -sSf https://install.spacetimedb.com | sh`). Teammates do not.
-- Get Tandem: `git clone https://github.com/Vibertexs/tandem`
+Two roles. The **host** runs Tandem on a project. A **teammate** adds their computer's Claude workers to the host's team. You can be only the host, only a teammate, or both.
 
-### 1. Start Tandem on your project
-Open a terminal **in your project's folder** (any git repo with a first commit) and run Tandem's launcher by its path:
+### Before anything (each computer, once)
+| You need | Check |
+|---|---|
+| Node.js **22.18 or newer** | `node --version` (get it at https://nodejs.org) |
+| Git | `git --version` |
+| Claude Code, signed in | run `claude` once |
+| **Host only:** the SpacetimeDB CLI | Windows: `iwr https://windows.spacetimedb.com -useb \| iex`  ·  macOS/Linux: `curl -sSf https://install.spacetimedb.com \| sh` |
+| On public wifi: [Tailscale](https://tailscale.com/download), on both computers | see [Public wifi](#public-wifi-use-tailscale) |
+
+### A. Host: start Tandem on your project
+**1. Get Tandem (first time only).** In PowerShell or a terminal:
+```powershell
+git clone https://github.com/Vibertexs/tandem
 ```
-C:\path\to\tandem\tandem.cmd start          # Windows
-/path/to/tandem/tandem start                # macOS and Linux
+**2. Start it from your project's folder.** Your project is any git repo with at least one commit. Paste this, with your own two paths:
+```powershell
+# Windows PowerShell
+cd C:\path\to\your-project
+& "C:\path\to\tandem\tandem.cmd" start
 ```
-To type just `tandem start` from anywhere, run `npm install -g .` once in the Tandem folder.
+```bash
+# macOS / Linux
+cd /path/to/your-project
+/path/to/tandem/tandem start
+```
+That is the whole setup. There is nothing to install globally and no PATH to edit. It prints something like this and opens the board in your browser:
 ```
   ✓ brain    started
-  ✓ team     "shop"
+  ✓ team     "your-project"
   ✓ page     started
+  ✓ project  shared from this computer: no GitHub needed
   ✓ manager  started: it plans every goal you type
   ✓ workers  Alex, Sam (Claude, haiku)
 
-  Open     http://localhost:5173/?db=shop
-  Invite   http://192.168.1.20:5173/?db=shop
-  Stop     tandem stop
+  Open     http://localhost:5173/?db=your-project
+  Invite   http://100.x.y.z:5173/?db=your-project
 ```
-The board opens on its own. Click **Make me the owner** (it also approves the manager). The **Setup** page lists every step in order, with this computer's real folders in the commands, and ticks each one as it happens.
+**3. On the board, click Control this team** (it also approves the manager). Then describe what you want built on the **Board** and send it. The manager splits it into tasks, each task runs as a Claude Code run in its own git branch, and when the goal is done the work is merged on one branch, `tandem/<goal>`, with your tests run on it.
 
-### 2. Send a goal
-On the **Board**, describe what you want built and send it. The manager splits it into tasks, and each task runs as a Claude Code run in its own git worktree and branch. When the goal is done, its work is merged on one branch, `tandem/<goal>`, with your tests run on it.
+The board's **Get started** page repeats these steps with your real folders already filled in, and ticks each one as it happens.
+
+> **Page not loading at `localhost:5173`?** Nothing is running. The board only exists after step 2. Run that command again.
+
+### B. Teammate: add your computer
+You need the invite link from the host (the `Invite` line in their terminal, or **Invite** at the top right of their board). Paste this, with that link:
+```powershell
+# Windows PowerShell
+git clone https://github.com/Vibertexs/tandem
+cd tandem
+.\tandem.cmd join "PASTE-THE-INVITE-LINK-HERE"
+```
+```bash
+# macOS / Linux
+git clone https://github.com/Vibertexs/tandem
+cd tandem
+./tandem join "PASTE-THE-INVITE-LINK-HERE"
+```
+Keep the quotes around the link. Tandem copies the project from the host (no GitHub needed) into its own work folder and starts your Claude workers. They run under **your** Claude login and quota. Their branches are sent straight back to the host, whose manager merges them. Opening the invite link in a browser also shows the board.
+
+### Who controls the team
+- The computer where `tandem start` ran is the **host**.
+- A browser that clicked **Control this team** is a **controller**: it can send goals and approve others. It is not an account and not anyone's Claude login.
+- Anyone else opening the link is **watching**. They click **Request control**, and a controller approves them.
+
+### Public wifi: use Tailscale
+Venue wifi often stops devices reaching each other, and anyone on it could reach an open host. [Tailscale](https://tailscale.com/download) makes a private network between your devices:
+1. Everyone installs Tailscale and signs in. The host shares their computer: Tailscale admin, **Machines**, **⋯** next to it, **Share**, and sends the link. Teammates **Accept**.
+2. The host starts Tandem as usual. If Tailscale is running, the `Invite` link uses the host's Tailscale address (`100.x.y.z`).
+3. Teammates use that invite. If you type an address by hand, use the Tailscale one (`tailscale ip -4`).
+
+The host's project sharing has no login. Share only with people you trust, ideally through Tailscale. `tandem start --local` keeps everything on one computer.
 
 ### Several projects at once
-Run the same command in each project's folder. Every project is its own **team** with its own board and workers (`?db=<project folder name>`), all sharing one brain and one page. `tandem status` lists them, and `tandem stop` stops all of them.
+Run the start command in each project's folder. Each project is its own team with its own board (`?db=<project folder name>`), all sharing one page. `tandem status` lists them, and `tandem stop` stops all of them.
 
-### 3. Add a teammate's computer
-Their work reaches yours through **GitHub**, so the project needs a GitHub remote first:
-```
-git remote add origin https://github.com/<you>/<repo>.git
-git push -u origin main
-```
-Add your teammate as a collaborator on the repo, then restart (`tandem stop`, `tandem start`). Then:
-1. Send them the **invite link** (top right of the board, **Invite**, or the `Invite` line in your terminal).
-2. They need Node 22.18+, Git, Claude Code signed in, and the invite. The **Invite** box shows the exact commands to copy: `git clone` Tandem and the project side by side, then in the *project's* folder `..\tandem\tandem.cmd join "<invite>"` (macOS and Linux: `../tandem/tandem join "<invite>"`).
-3. Their Claude runs under their own login and quota. Their workers push each task branch to GitHub, and your manager fetches and merges them into the goal branch and runs the tests.
-
-If Node is older than 22.18, `tandem` stops with a clear message and where to get a new one (https://nodejs.org, or `winget install OpenJS.NodeJS.LTS` on Windows).
-
-**On public wifi (a hackathon, a cafe), use Tailscale.** Venue wifi often stops devices talking to each other, and anyone on it could reach an open brain. [Tailscale](https://tailscale.com/download) makes a private network between your devices:
-1. Everyone installs Tailscale and signs in. The host shares their computer: Tailscale admin, **Machines**, **⋯** next to it, **Share**, and sends the link. Teammates **Accept**.
-2. The host runs `tandem start` as usual. If Tailscale is running, the **Invite** is the host's Tailscale address (`100.x.y.z`) instead of the wifi address, and the venue-wifi address is printed as the other way.
-3. Teammates use that invite.
-
-If you ever type an address by hand, use the host's Tailscale address (`tailscale ip -4` prints it), not the wifi one.
-
+### If something goes wrong
+| You see | Do this |
+|---|---|
+| `localhost:5173` does not load | Run the host start command again. |
+| "Tandem needs Node.js 22.18 or newer" | Install the current LTS from https://nodejs.org, then open a **new** terminal. |
+| `tandem` is not recognized | Use the full path as shown above. You never need `tandem` on your PATH. |
+| Teammate cannot open the invite | Check Tailscale is connected on both, and the host's share was accepted. |
+| "The host is not sharing the project yet" | On the host, `tandem stop`, then start again (not with `--local`). |
+| Anything else | `tandem logs` shows the latest lines. |
 ## Commands
 | Command | What it does |
 |---|---|
-| `tandem start` | Host a team for the project you are in, open to your network. The board opens |
+| `tandem start` | Start a team for the Git project you are in, open to your network. The board opens |
 | `tandem start --local` | Only this computer can join |
 | `tandem start --workers 4` | More workers here (run it again any time; what runs is kept) |
 | `tandem start --accounts all` | One worker per saved account (see below) |
@@ -103,13 +137,13 @@ If you ever type an address by hand, use the host's Tailscale address (`tailscal
 | `tandem start --review` | A worker reviews each goal's merged branch (read only) before it is done |
 | `tandem start --push` | Push each goal's branch to origin, and open a PR if the GitHub CLI is set up |
 | `tandem start --notify <url>` | Post "goal done" (branch, tests, cost) to Slack or Discord |
-| `tandem join <invite>` | In your clone of the project: add this computer's workers to that team |
+| `tandem join <invite>` | Copy the project host's project into Tandem's private work folder and add this computer's workers |
 | `tandem account add <label> [--agent codex]` | A separate Claude Code or Codex login for a worker |
 | `tandem` / `tandem status` | What is running, with each team's links |
 | `tandem open` / `tandem logs` | Open the board / show the latest log lines |
 | `tandem stop` | Stop what this computer started (`--all` stops the brain too) |
 
-For development, `tandem start --simulate` (and `--demo`) use workers that fake the coding, so the tests need no Claude usage.
+For development, `tandem start --simulate` uses workers that fake the coding, so the coding workers need no Claude usage. Run it from a disposable Git project rather than the Tandem source folder.
 ### Several accounts, Claude and Codex
 ```
 tandem account add work1                  # opens Claude Code: /login, sign in, /exit
@@ -127,7 +161,7 @@ Each account gets its own login folder inside the Tandem folder (`CLAUDE_CONFIG_
 | **Atomic rules (reducers)** | Claim a task, take its file locks and mark it claimed happens as **one transaction**. Two workers racing for a task or a file can never both win. That is what makes collisions impossible, not a convention. We test it with 10 clients at once. |
 | **Live updates** | The board never polls. Clients subscribe to tables, and a task moving on one computer moves on every screen immediately. |
 | **No server to write** | The rules are a TypeScript module (`brain/spacetimedb`) published to the database. There is no separate backend, queue or cache. |
-| **Identities** | Every connection has a saved identity. That is how a worker belongs to the computer that registered it, and how the owner approves who can manage the team. |
+| **Identities** | Every connection has a saved identity. That is how a worker belongs to the computer that registered it, and how a team controller approves another browser's controller access. |
 | **One brain per team** | Each team is one database. `tandem start` publishes it, `tandem join` points other computers at it. |
 
 ## How it works
@@ -156,11 +190,12 @@ Nothing talks to anything else directly. Every part reads and writes the brain, 
 | `docs/` | Architecture, status, roadmap, demo script |
 
 ## Tested
-`.\test.ps1` runs **10 suites, 343 checks**, none of which call an AI. [docs/STATUS.md](docs/STATUS.md) has the numbers and [docs/ROADMAP.md](docs/ROADMAP.md) what is next.
+`.\test.ps1` runs **11 suites, 361 checks**, none of which call an AI. [docs/STATUS.md](docs/STATUS.md) has the numbers and [docs/ROADMAP.md](docs/ROADMAP.md) what is next.
 - **Atomic rules:** 10 clients race for one task and exactly one wins. Lock conflicts leave no partial locks.
 - **Tools:** all 17, through the real MCP protocol, plus a mock mode.
 - **The board:** the whole first-use journey in Chrome, on desktop and phone, including failures.
 - **Failure handling:** a usage limit, a task given back twice, a merge conflict, failing tests.
+- **Host sharing:** a second Tandem state copies a host-served project, then pushes a task branch back to it without GitHub.
 - **Real Claude runs** (`.\test.ps1 -Real`): a goal planned, built by two Claudes, merged, tests passing; a Claude blocked from a locked file; a real merge conflict resolved; a teammate on another clone merged through a shared origin.
 
 ## Limits

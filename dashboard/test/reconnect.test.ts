@@ -34,7 +34,7 @@ const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google
 try {
   const page = await (await browser.newContext()).newPage();
   await page.goto(URL_);
-  await page.getByRole('button', { name: 'Make me the owner' }).click();
+  await page.getByRole('button', { name: 'Control this team' }).click();
   await page.getByLabel('Describe what you want built').waitFor({ timeout: 10_000 });
   check('setup: the page is connected and the worker is online', await page.getByText('1 worker online').waitFor({ timeout: 15_000 }).then(() => true, () => false));
 
@@ -48,7 +48,7 @@ try {
   // work created after the restart is still picked up by the same worker process
   const conn = await connect();
   await conn.reducers.createTask({ sessionId: 'live', kind: 'normal', task: { id: 't-after', title: 'Work after the restart', description: '', files: ['after.txt'], difficulty: 'easy', model: '', effort: 'default', dependsOn: [] } }).catch(() => {});
-  // createTask in live needs an operator; if refused, the page (the owner) adds it instead
+  // createTask in live needs a controller; if refused, the page adds it instead
   await sleep(500);
   if (![...conn.db.tasks.iter()].some(t => t.id === 't-after')) {
     await page.goto(URL_ + '#/settings');

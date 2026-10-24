@@ -62,7 +62,7 @@ export function readSnapshot(conn: DbConnection): Snapshot {
 }
 
 // The browser keeps its login (token) so it stays the same identity between visits.
-// That is what lets you stay the owner of the team you host.
+// That is what lets this browser stay a controller of the team it opened.
 const tokenKey = (uri: string, database: string) => `tandem-token:${uri}|${database}`;
 function loadToken(key: string): string | undefined {
   try { return globalThis.localStorage?.getItem(key) ?? undefined; } catch { return undefined; }

@@ -19,8 +19,8 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
       <div className="next card" role="status">
         <span className="next-icon" aria-hidden="true">✋</span>
         <div>
-          <strong>{req.name} wants to help manage this team.</strong>
-          <p className="small muted">{isManager(req.name) ? 'This is the manager: approve it so it can plan your goals.' : 'Approve to let them send goals and change the team.'}{snap.requests.length > 1 ? ` (${snap.requests.length - 1} more in Settings)` : ''}</p>
+          <strong>{req.name} wants to control this team.</strong>
+          <p className="small muted">{isManager(req.name) ? 'This is the manager: approve it so it can plan your goals.' : 'Approve to let this browser send goals and change the team.'}{snap.requests.length > 1 ? ` (${snap.requests.length - 1} more in Settings)` : ''}</p>
         </div>
         <div className="row-actions">
           <button type="button" className="btn primary" disabled={busy || !api} onClick={() => act(() => api!.approve(req.identity), `${req.name} can now manage the team.`)}>Approve</button>
@@ -88,7 +88,7 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
   return null;
 }
 
-// For a first-time owner: goals small enough to finish in a few minutes.
+// For a first-time controller: goals small enough to finish in a few minutes.
 const EXAMPLES = [
   'A tiny Python calculator: calc.py with add and sub, unittest tests, and a README',
   'A command-line to-do list in Python that saves to todo.json, with unittest tests',
@@ -122,7 +122,7 @@ function Prompt({ snap, api, isOp, say }: Props) {
       <form onSubmit={send} className={isOp ? '' : 'readonly'}>
         <input ref={input} value={text} onChange={e => setText(e.target.value)} disabled={!isOp || busy}
           aria-label="Describe what you want built"
-          placeholder={isOp ? 'Describe what you want built…' : 'View only: ask to make changes'} />
+          placeholder={isOp ? 'Describe what you want built…' : 'Watching: request control to send work'} />
         <button type="submit" className="btn primary" disabled={!isOp || busy || !text.trim()}>Send</button>
       </form>
       {isOp && !latest && !text && (
@@ -386,8 +386,8 @@ export function BoardPage(p: Props) {
       {lanes.length === 0 ? (
         <div className="empty-board card">
           <p><strong>Nothing yet.</strong></p>
-          <p className="muted">{p.isOp ? 'Describe what you want built above. The manager splits it into tasks, and workers pick them up.' : 'When the owner sends a goal, it shows up here with its tasks.'}</p>
-          <p className="small muted">New here? <a href="#/setup">Follow the Setup steps</a>.</p>
+          <p className="muted">{p.isOp ? 'Describe what you want built above. The manager splits it into tasks, and workers pick them up.' : 'When a controller sends a goal, it shows up here with its tasks.'}</p>
+          <p className="small muted">New here? <a href="#/setup">See how to get started</a>.</p>
         </div>
       ) : (
         <div className="lanes">

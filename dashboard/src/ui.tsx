@@ -125,29 +125,57 @@ export function why(task: Task, snap: Snapshot): string {
 // Our own repo, where a teammate gets the tandem command.
 export const TANDEM_REPO = 'https://github.com/Vibertexs/tandem';
 
-// What a teammate copies to add their computer's workers. It needs nothing installed globally:
-// the command is run from the project's clone, beside the Tandem folder.
-export function JoinSteps({ link, repoUrl, say }: { link: string; repoUrl: string; say: (m: string) => void }) {
-  if (!repoUrl) {
+const isWindowsPath = (path: string) => /^[a-z]:[\\/]/i.test(path) || path.includes('\\');
+const powershellQuote = (path: string) => `'${path.replace(/'/g, "''")}'`;
+const shellQuote = (path: string) => `'${path.replace(/'/g, "'\\''")}'`;
+
+// A complete command for the project host. Calling Tandem by its known path means the ordinary
+// first-use path never asks someone to edit PATH or install anything globally.
+export function startCommand(tandemDir: string, projectDir: string) {
+  if (!tandemDir || !projectDir || tandemDir.startsWith('<') || projectDir.startsWith('<')) return 'tandem start';
+  if (isWindowsPath(tandemDir) || isWindowsPath(projectDir)) {
+    const command = `${tandemDir.replace(/[\\/]+$/, '')}\\tandem.cmd`;
+    return `Set-Location -LiteralPath ${powershellQuote(projectDir)}\n& ${powershellQuote(command)} start`;
+  }
+  const command = `${tandemDir.replace(/\/+$/, '')}/tandem`;
+  return `cd -- ${shellQuote(projectDir)}\n${shellQuote(command)} start`;
+}
+
+// Use this when a host was started with --local, or its project share did not come up. Stopping
+// the brain is deliberate: it must be rebound to the network before a teammate can reach it.
+export function restartForSharingCommand(tandemDir: string, projectDir: string) {
+  if (!tandemDir || tandemDir.startsWith('<')) return 'tandem stop --all\ntandem start';
+  if (isWindowsPath(tandemDir) || isWindowsPath(projectDir)) {
+    const command = `${tandemDir.replace(/[\\/]+$/, '')}\\tandem.cmd`;
+    return `& ${powershellQuote(command)} stop --all\n${startCommand(tandemDir, projectDir)}`;
+  }
+  const command = `${tandemDir.replace(/\/+$/, '')}/tandem`;
+  return `${shellQuote(command)} stop --all\n${startCommand(tandemDir, projectDir)}`;
+}
+
+// What a teammate copies to add their computer's workers. The command copies the project from
+// the host by itself, so there is no existing project folder to find or configure.
+export function JoinSteps({ link, gitUrl, say, restart }: { link: string; gitUrl: string; say: (m: string) => void; restart?: string }) {
+  if (!gitUrl) {
     return (
       <div className="join-steps">
-        <p className="small warn">Their work reaches yours through GitHub, and this project has no GitHub remote yet. Put the project on GitHub first (Setup, step 4), restart Tandem, and the commands for them appear here.</p>
+        <p className="small warn">The project is not ready to share yet. Others can watch the board, but cannot add workers until the project host restarts Tandem from its project folder.</p>
+        {restart && <CodeLine code={restart} say={say} />}
       </div>
     );
   }
-  const folder = repoUrl.replace(/\/+$/, '').split(/[/:]/).pop()?.replace(/\.git$/, '') || 'project';
   return (
     <div className="join-steps">
-      <p className="small muted">1. Get Tandem and the project, side by side (once). Needs Node.js 22.18 or newer (<code className="mono">node --version</code>) and Git:</p>
-      <CodeLine code={`git clone ${TANDEM_REPO}\ngit clone ${repoUrl}`} say={say} />
-      <p className="small muted">2. In the project's folder, run:</p>
-      <CodeLine code={`cd ${folder}\n..\\tandem\\tandem.cmd join "${link}"`} say={say} />
-      <p className="small muted">On Mac or Linux: <code className="mono">{`../tandem/tandem join "${link}"`}</code></p>
-      <p className="small muted">Their Claude Code runs under their own login and quota.</p>
+      <p className="small muted">Paste this one block in Windows PowerShell. It gets Tandem once, makes its private copy of the host project, and starts this computer&apos;s workers.</p>
+      <CodeLine code={`git clone ${TANDEM_REPO}\nSet-Location tandem\n.\\tandem.cmd join "${link}"`} say={say} />
+      <details className="join-platforms">
+        <summary className="small">macOS or Linux</summary>
+        <CodeLine code={`git clone ${TANDEM_REPO}\ncd tandem\n./tandem join "${link}"`} say={say} />
+      </details>
+      <p className="small muted">It needs Node.js 22.18+, Git, and Claude Code signed in. The workers use that computer&apos;s own Claude login and quota; they do not change an existing project folder.</p>
     </div>
   );
 }
-
 export const copy = (text: string, say: (m: string) => void, what = 'Copied') => {
   void navigator.clipboard?.writeText(text).then(() => say(`${what}.`), () => say('Could not copy. Select the text instead.'));
 };

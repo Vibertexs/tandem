@@ -1,9 +1,9 @@
 # PR: Tandem: a shared brain so a team's Claude Code agents work as one
 
-Open from `bilal/one-view` into `main`. The branch carries every earlier branch, so this one PR is everything.
+Open from `bilal/git-share` into `main`. The branch carries every earlier branch, so this one PR is everything.
 
 ## Summary
-You run `tandem start` in your project and type a goal on the board it opens. A manager Claude splits it into tasks with exact file lists. Each worker claims tasks from a shared SpacetimeDB brain, which locks their files atomically. A worker is a Claude Code run on the host, on a teammate's computer (`tandem join <invite>`), or a teammate's own Claude Code session. When a goal's tasks are done, their branches are merged into one `tandem/<goal>` branch and the project's tests run on it. The page shows all of it live, including what each task and goal cost.
+You run `tandem start` in your project and type a goal on the board it opens. A manager Claude splits it into tasks with exact file lists. Each worker claims tasks from a shared SpacetimeDB brain, which locks their files atomically. A teammate clones Tandem once, then `tandem join <invite>` copies the host project and starts their worker; its task branches push directly back to the host, with no GitHub required. When a goal's tasks are done, their branches are merged into one `tandem/<goal>` branch and the project's tests run on it. The page shows all of it live, including what each task and goal cost.
 
 - **Brain** (`brain/`, SpacetimeDB module in TypeScript)
   - Atomic claim and lock, all-or-none locks, and dependency unblocking.
@@ -33,19 +33,20 @@ You run `tandem start` in your project and type a goal on the board it opens. A 
   - An Invite button on every page, one next step at a time, and a task details drawer.
   - One-click owner and approvals, a phone layout and dark mode.
   - "Needs you" alerts with the reason and Try again, and share links that work from other computers.
-- **The `tandem` command** (`cli/tandem.ts`, one cross-platform TypeScript file, Node 22.18+): `tandem start` in your project, `tandem join <invite>`, `tandem stop`, `tandem status`, `tandem open`, `tandem logs`. `test.ps1` runs every suite.
+- **The `tandem` command** (`cli/tandem.ts`, one cross-platform TypeScript file, Node 22.18+): `tandem start` shares the project through Git's HTTP backend; `tandem join <invite>` copies it into Tandem's private work folder and starts workers that push task branches to the host. `tandem stop`, `tandem status`, `tandem open`, `tandem logs`. GitHub remains optional for `--push` and PRs.
 - **Contract and docs**
   - `tools.json` gained `get_goals`, `mark_goal` and `give_back_task` (17 tools).
   - `tables.md` documents goals, the task's `goal_id`, `cost_usd` and `tried_by`, and the access tables.
   - `docs/SPEC.md` is the original plan, and `docs/DEMO.md` is the presenter script.
 
 ## Test plan
-- [x] `.\test.ps1`: 10 suites, 343 checks, all pass. It covers:
+- [x] `.\test.ps1`: 11 suites, 361 checks, all pass. It covers:
   - the brain, access and worker ownership
   - MCP in mock mode, MCP against the real brain, and the manager identity
   - the hook, and the launcher with a usage limit and a restart while capped
   - the manager's merge, conflicts, test, finish, push, notify, and planning failures
   - the page in Chrome, on desktop and phone, including the failure screens
+  - host project sharing: join from a second state, clone, and push a task branch back without GitHub
 - [x] `.\test.ps1 -Restart`: the page and a worker survive a brain restart.
 - [x] Real Claude (haiku, capped):
   - Real workers, four times: goal → plan → two Claudes → merged `tandem/<goal>` → tests pass → the goal's lane shows the result and its cost.
@@ -56,10 +57,12 @@ You run `tandem start` in your project and type a goal on the board it opens. A 
   - The full loop, twice.
   - The hook blocking a real Claude.
   - The launcher in a worktree.
+  - The direct host-share flow: a real manager and a real joined worker completed two tasks, pushed branches to the host, merged `tandem/g-live`, and passed `npm test` (two isolated states on one Windows computer).
 - [ ] Not tried: `tandem` on a Mac or Linux, `gh pr create`, a second physical computer, a real Slack or Discord webhook, a real usage limit, and a real failing-tests fix round.
 
 ## Notes
 - Every person runs Claude Code under their own login on their own machine. Tandem only coordinates.
 - Identities are saved tokens, not accounts. A real login is the next step before hosting publicly.
+- The host project server has no separate login. Use it only on a trusted private network such as Tailscale; `--local` disables sharing.
 - The Python placeholders from the scaffold are left untouched and unused.
 
