@@ -1,6 +1,6 @@
-// What you see before you are connected to a team: host one, or join one.
+// What you see before you are connected to a team: start a project, or open an invite.
 import { useState } from 'react';
-import { defaultUri, type Team } from './config';
+import { type Team } from './config';
 import { CodeLine } from './ui';
 
 // The invite the host's page and `tandem start` show: http://192.168.1.20:5173/?db=shop.
@@ -20,7 +20,6 @@ export function parseInvite(text: string): { page: string | null; team: Team } |
 }
 
 export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: string) => void }) {
-  const [hostTeam, setHostTeam] = useState('');
   const [invite, setInvite] = useState('');
   const [bad, setBad] = useState(false);
   const join = (e: React.FormEvent) => {
@@ -40,34 +39,33 @@ export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: s
       </header>
       <div className="landing-cards">
         <section className="card choice" aria-labelledby="host-h">
-          <h2 id="host-h">Host a team</h2>
-          <p className="muted">For the project on your computer.</p>
+          <h2 id="host-h">Start a team for a project</h2>
+          <p className="muted">Run Tandem in the Git project on this computer. This browser is the dashboard; it does not host or copy the project.</p>
           <ol className="steps">
-            <li>In your project's folder, run:
+            <li>Open PowerShell or Terminal in your project&apos;s folder, then run:
               <CodeLine code="tandem start" say={say} />
-              <span className="small muted">It starts everything, opens this page and prints the link to invite others. If <code className="mono">tandem</code> is not recognised, run <code className="mono">npm install -g .</code> once in the Tandem folder, or use <code className="mono">.\tandem.cmd start</code> from there (Mac and Linux: <code className="mono">./tandem start</code>).</span>
+              <span className="small muted">It starts the project host, manager, workers and this page. The page opens automatically.</span>
             </li>
-            <li>Already running? Open it:
-              <form className="inline-form" onSubmit={e => { e.preventDefault(); if (hostTeam.trim()) onOpen({ uri: defaultUri(), db: hostTeam.trim() }); }}>
-                <label className="sr-only" htmlFor="host-team">Team name</label>
-                <input id="host-team" value={hostTeam} onChange={e => setHostTeam(e.target.value)} aria-label="Team name" placeholder="project folder name" />
-                <button type="submit" className="btn primary" disabled={!hostTeam.trim()}>Open</button>
-              </form>
-            </li>
+            <li>On the page, choose <strong>Control this team</strong>. That lets this browser send goals and approve other controllers.</li>
           </ol>
+          <details className="start-help">
+            <summary className="small">If <code className="mono">tandem</code> is not recognised</summary>
+            <p className="small muted">Keep the terminal in your project and run Tandem by its path instead:</p>
+            <CodeLine code={'& "C:\\path\\to\\tandem\\tandem.cmd" start'} say={say} />
+            <p className="small muted">On macOS or Linux: <code className="mono">/path/to/tandem/tandem start</code>.</p>
+          </details>
         </section>
         <section className="card choice" aria-labelledby="join-h">
-          <h2 id="join-h">Join a team</h2>
-          <p className="muted">Someone else hosts it. Paste the invite link they sent you.</p>
+          <h2 id="join-h">Open a teammate&apos;s team</h2>
+          <p className="muted">Paste the invite they sent you to open the board. Watching needs no setup.</p>
           <form className="form" onSubmit={join}>
             <label>Invite link<input value={invite} onChange={e => { setInvite(e.target.value); setBad(false); }} placeholder="http://192.168.1.20:5173/?db=shop" aria-invalid={bad} /></label>
             {bad && <p className="small warn">That doesn't look like an invite. It looks like http://192.168.1.20:5173/?db=shop</p>}
-            <button type="submit" className="btn primary" disabled={!invite.trim()}>Join</button>
+            <button type="submit" className="btn primary" disabled={!invite.trim()}>Open team</button>
           </form>
-          <p className="small muted">You can watch right away. To add your computer's workers, get Tandem, then run <code className="mono">tandem join &lt;invite link&gt;</code>. It copies the project from the host.</p>
+          <p className="small muted">Want this computer&apos;s Claude workers to code too? Open the team, then use <strong>Invite</strong> → <strong>Add a teammate&apos;s computer</strong> for one copyable command block.</p>
         </section>
       </div>
-      <p className="small muted center"><a href="?mock=1">See a sample board</a> without connecting.</p>
     </main>
   );
 }

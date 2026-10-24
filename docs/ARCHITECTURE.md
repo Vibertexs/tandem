@@ -20,12 +20,12 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 ## The parts
 - **Brain** (`brain/`): the shared notebook. Holds goals, tasks, file locks, workers, an event log and shared notes. Its rules are the point: claiming a task, locking its files and unblocking waiting tasks each happen as one indivisible step.
 - **MCP server** (`mcp/`): the buttons Claude can press. 17 tools from `contract/tools.json`. One file (`src/brain-client.ts`) talks to the database. `BRAIN_MODE=mock` swaps in an in-memory copy.
-- **Dashboard** (`dashboard/`): the web page. Start screen (host or join), then a Jira-style app: Board (prompt, next step, Waiting → To do → In progress → Done, task details), Goals, Team, Shared memory, Activity, Settings.
+- **Dashboard** (`dashboard/`): the web page. Its start screen explains how to start a project host or open an invite, then a Jira-style app: Get started, Board (prompt, next step, Waiting → To do → In progress → Done, task details), Team, Shared memory, Activity and Settings.
 - **Manager** (`manager/`): `watch.ts` waits for goals and runs `plan.ts` (one headless Claude with `PROMPT.md`) that reads goals (`get_goals`), splits each into tasks with file lists and dependencies (`assign_task`, `create_job`), and marks it planned (`mark_goal`). When every task of a goal is done, `finish.ts` merges their branches into `tandem/<goal>`, runs the project's tests, and either finishes the goal or adds one fix task.
-- **tandem** (`cli/tandem.ts`): `tandem start` in your project starts the brain, the page, the manager and the workers, open to your network, and prints the invite link. `tandem join <invite>` adds a computer's workers to a team. `tandem stop`, `tandem status`.
+- **tandem** (`cli/tandem.ts`): `tandem start` in your project starts the brain, the page, the manager and the workers, open to your network, and prints the invite link. `tandem join <invite>` copies the project host's project into Tandem's private work folder and adds a computer's workers to the team. `tandem stop`, `tandem status`.
 - **Worker rules** (`mcp/skill/SKILL.md`): what every worker Claude follows. Claim, touch only your files, respect locks, report, complete.
 - **Lock-check hook** (`mcp/hook/check-lock.mjs`): stops a Claude from editing a file another task holds. This is enforcement, not just a rule.
-- **Launcher** (`launcher/launcher.ts`): on each teammate's machine. Claims a task, runs `claude -p` in a git worktree on branch `task/<id>`, commits, completes. `--simulate` fakes the coding for demos.
+- **Launcher** (`launcher/launcher.ts`): on each teammate's machine. Claims a task, runs `claude -p` in a git worktree on branch `task/<id>`, commits, completes. `--simulate` fakes the coding for tests and safe rehearsals.
 
 ## The whole loop (tested with real Claude runs: `mcp/test/e2e/loop.ps1`)
 1. You type a goal on the dashboard. It is saved as a goal: "Waiting for the manager".
@@ -52,11 +52,17 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 - **With `--review`:** before the goal is done, the manager adds one "Review the goal's work" task. The launcher runs it with read-only tools on the goal branch, and its findings go into the goal's note and the PR.
 
 ## How teammates join
-A teammate does not need approval to work. They clone Tandem once, then in its folder run `tandem join <invite>`; the command copies the project from the host into Tandem's private work folder and starts workers that push task branches back to the host. The Team page shows the exact commands. The host's Git server has no separate login, so the invite must stay on a trusted private network such as Tailscale. A teammate can instead connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Ask to make changes**, and the owner clicks **Approve**. The manager asks the same way.
+A teammate does not need controller approval to work. The Invite box first gives them a board link to watch. To add their computer's workers, they paste one whole Windows PowerShell block:
+```powershell
+git clone https://github.com/Vibertexs/tandem
+Set-Location tandem
+.\tandem.cmd join "<invite>"
+```
+It gets Tandem once, copies the project from the project host into Tandem's private work folder and starts workers that push task branches back to the host. It does not change an existing project folder. The Team page shows the exact commands; macOS/Linux uses the same clone, `cd tandem`, and `./tandem join "<invite>"`. The host's Git server has no separate login, so the invite must stay on a trusted private network such as Tailscale. A teammate can instead connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Request control**; a current controller clicks **Approve**. The manager requests the same browser permission.
 
 ## Who may do what
 - **Worker actions** (claim, lock, complete, heartbeat, report, cost): only by the identity that registered that worker (or an operator). Anyone may register a new worker; a name in use can only be taken over after its owner has been quiet for 2 minutes.
-- **Manager actions** (goals, tasks and jobs, shared memory, clearing the board, approvals): only an **operator** may do them in the team's `live` session. The first visitor becomes the owner ("Make me the owner"); others ask, and an operator approves.
+- **Manager actions** (goals, tasks and jobs, shared memory, clearing the board, approvals): only an **operator** may do them in the team's `live` session. The first visitor chooses **Control this team**; another browser uses **Request control**, and a current controller approves it. This is a saved browser identity, not a Tandem account or a Claude login.
 
 ## Teams and sessions
 A team is one database on a brain (`-Db`, default `tandem-local`). The page and every Claude use its `live` session. The brain still supports other sessions (the tests use them to stay isolated).

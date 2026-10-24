@@ -11,7 +11,7 @@ Describe what you want built. A manager plans it, every teammate's coding agent 
 ![SpacetimeDB](https://img.shields.io/badge/shared%20brain-SpacetimeDB-7c3aed)
 ![MCP](https://img.shields.io/badge/tools-MCP-1f2937)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex-d97757)
-![Tests](https://img.shields.io/badge/tests-361%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-362%20passing-2ea44f)
 
 ![The board while two workers are on it](docs/img/board.png)
 
@@ -49,10 +49,10 @@ When a few people each run an AI coding agent on the same repo:
 ### 1. Start Tandem on your project
 Open a terminal **in your project's folder** (any git repo with a first commit) and run Tandem's launcher by its path:
 ```
-C:\path\to\tandem\tandem.cmd start          # Windows
-/path/to/tandem/tandem start                # macOS and Linux
+& "C:\path\to\tandem\tandem.cmd" start   # Windows PowerShell
+/path/to/tandem/tandem start             # macOS and Linux
 ```
-To type just `tandem start` from anywhere, run `npm install -g .` once in the Tandem folder.
+That is the normal first-use command; it does not require changing `PATH` or installing Tandem globally. The browser's **Get started** page repeats it with the real project and Tandem folders on that computer.
 ```
   ✓ brain    started
   ✓ team     "shop"
@@ -64,7 +64,7 @@ To type just `tandem start` from anywhere, run `npm install -g .` once in the Ta
   Invite   http://192.168.1.20:5173/?db=shop
   Stop     tandem stop
 ```
-The board opens on its own. Click **Make me the owner** (it also approves the manager). The **Setup** page lists every step in order, with this computer's real folders in the commands, and ticks each one as it happens.
+The board opens on its own. Click **Control this team** (it also approves the manager). The **project host** is the computer where you ran `tandem start`; a **team controller** is an approved browser that can send goals and approve other controllers. Controller access is not a Tandem account or anyone's Claude login.
 
 ### 2. Send a goal
 On the **Board**, describe what you want built and send it. The manager splits it into tasks, and each task runs as a Claude Code run in its own git worktree and branch. When the goal is done, its work is merged on one branch, `tandem/<goal>`, with your tests run on it.
@@ -73,9 +73,15 @@ On the **Board**, describe what you want built and send it. The manager splits i
 Run the same command in each project's folder. Every project is its own **team** with its own board and workers (`?db=<project folder name>`), all sharing one brain and one page. `tandem status` lists them, and `tandem stop` stops all of them.
 
 ### 3. Add a teammate's computer
-GitHub is not needed. Tandem shares the host's project directly with the teammate, and their workers push their task branches back to the host. Then:
+GitHub is not needed to share the project. Tandem shares the project host directly with the teammate, and their workers push task branches back to the host. Then:
 1. Send them the **invite link** (top right of the board, **Invite**, or the `Invite` line in your terminal).
-2. They need Node 22.18+, Git, Claude Code signed in, and the invite. The **Invite** box shows the exact commands: clone Tandem once, then from its new `tandem` folder run `.\tandem.cmd join "<invite>"` on Windows (macOS and Linux: `./tandem join "<invite>"`). That one command copies the project into Tandem's private work folder and starts their workers.
+2. They need Node 22.18+, Git, Claude Code signed in, and the invite. On Windows, they paste this one block (the **Invite** box shows it with the real link):
+   ```powershell
+   git clone https://github.com/Vibertexs/tandem
+   Set-Location tandem
+   .\tandem.cmd join "<invite>"
+   ```
+   On macOS or Linux, use `git clone https://github.com/Vibertexs/tandem`, `cd tandem`, then `./tandem join "<invite>"`. This makes a private project copy in Tandem's work folder and starts their workers; it does not change an existing project folder.
 3. Their Claude runs under their own login and quota. Their workers push each task branch straight back to the host, and the host manager merges them into the goal branch and runs the tests.
 
 The host's project server has no separate login. Share only with people you trust, ideally through Tailscale; do not expose it on a public or shared network. `tandem start --local` keeps everything on one computer and does not share the project.
@@ -92,7 +98,7 @@ If you ever type an address by hand, use the host's Tailscale address (`tailscal
 ## Commands
 | Command | What it does |
 |---|---|
-| `tandem start` | Host a team for the project you are in, open to your network. The board opens |
+| `tandem start` | Start a team for the Git project you are in, open to your network. The board opens |
 | `tandem start --local` | Only this computer can join |
 | `tandem start --workers 4` | More workers here (run it again any time; what runs is kept) |
 | `tandem start --accounts all` | One worker per saved account (see below) |
@@ -100,13 +106,13 @@ If you ever type an address by hand, use the host's Tailscale address (`tailscal
 | `tandem start --review` | A worker reviews each goal's merged branch (read only) before it is done |
 | `tandem start --push` | Push each goal's branch to origin, and open a PR if the GitHub CLI is set up |
 | `tandem start --notify <url>` | Post "goal done" (branch, tests, cost) to Slack or Discord |
-| `tandem join <invite>` | Copy the host's project and add this computer's workers to that team |
+| `tandem join <invite>` | Copy the project host's project into Tandem's private work folder and add this computer's workers |
 | `tandem account add <label> [--agent codex]` | A separate Claude Code or Codex login for a worker |
 | `tandem` / `tandem status` | What is running, with each team's links |
 | `tandem open` / `tandem logs` | Open the board / show the latest log lines |
 | `tandem stop` | Stop what this computer started (`--all` stops the brain too) |
 
-For development, `tandem start --simulate` (and `--demo`) use workers that fake the coding, so the tests need no Claude usage.
+For development, `tandem start --simulate` uses workers that fake the coding, so the coding workers need no Claude usage. Run it from a disposable Git project rather than the Tandem source folder.
 ### Several accounts, Claude and Codex
 ```
 tandem account add work1                  # opens Claude Code: /login, sign in, /exit
@@ -124,7 +130,7 @@ Each account gets its own login folder inside the Tandem folder (`CLAUDE_CONFIG_
 | **Atomic rules (reducers)** | Claim a task, take its file locks and mark it claimed happens as **one transaction**. Two workers racing for a task or a file can never both win. That is what makes collisions impossible, not a convention. We test it with 10 clients at once. |
 | **Live updates** | The board never polls. Clients subscribe to tables, and a task moving on one computer moves on every screen immediately. |
 | **No server to write** | The rules are a TypeScript module (`brain/spacetimedb`) published to the database. There is no separate backend, queue or cache. |
-| **Identities** | Every connection has a saved identity. That is how a worker belongs to the computer that registered it, and how the owner approves who can manage the team. |
+| **Identities** | Every connection has a saved identity. That is how a worker belongs to the computer that registered it, and how a team controller approves another browser's controller access. |
 | **One brain per team** | Each team is one database. `tandem start` publishes it, `tandem join` points other computers at it. |
 
 ## How it works
@@ -153,7 +159,7 @@ Nothing talks to anything else directly. Every part reads and writes the brain, 
 | `docs/` | Architecture, status, roadmap, demo script |
 
 ## Tested
-`.\test.ps1` runs **11 suites, 361 checks**, none of which call an AI. [docs/STATUS.md](docs/STATUS.md) has the numbers and [docs/ROADMAP.md](docs/ROADMAP.md) what is next.
+`.\test.ps1` runs **11 suites, 362 checks**, none of which call an AI. [docs/STATUS.md](docs/STATUS.md) has the numbers and [docs/ROADMAP.md](docs/ROADMAP.md) what is next.
 - **Atomic rules:** 10 clients race for one task and exactly one wins. Lock conflicts leave no partial locks.
 - **Tools:** all 17, through the real MCP protocol, plus a mock mode.
 - **The board:** the whole first-use journey in Chrome, on desktop and phone, including failures.

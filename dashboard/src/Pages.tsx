@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import type { Api, Snapshot } from './brain';
 import { shareable, type Team } from './config';
-import { Avatar, Bar, CodeLine, EV_ICON, JoinSteps, WorkerStatus, agentLabel, ago, copy, isManager, money, online, took, liveInfo } from './ui';
+import { Avatar, Bar, CodeLine, EV_ICON, JoinSteps, WorkerStatus, agentLabel, ago, copy, isManager, money, online, restartForSharingCommand, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
 
@@ -26,12 +26,13 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
   const uri = share?.uri ?? team.uri;
   // The manager says which repo the team works on (its origin). Real workers elsewhere need a clone.
   const gitUrl = snap.context.git_url ?? ''; // set once the host serves the project (tandem start)
+  const restart = restartForSharingCommand(snap.context.tandem_dir ?? '', snap.context.project_dir ?? '');
   const mcp = `claude mcp add tandem -e STDB_URI=${uri} -e STDB_DB=${team.db} -e TANDEM_SESSION=live -- node --import tsx <tandem-folder>/mcp/src/server.ts`;
   const sorted = [...snap.workers].sort((a, b) => Number(online(b, now)) - Number(online(a, now)) || a.name.localeCompare(b.name));
   return (
     <div className="page">
       <p className="muted lead">Each worker is a coding agent (Claude Code or Codex) on someone's computer. They pick up tasks by themselves.</p>
-      {sorted.length === 0 && <div className="card empty-board"><p className="muted">No workers yet. Connect one below.</p></div>}
+      {sorted.length === 0 && <div className="card empty-board"><p className="muted">No workers yet. Add a computer below.</p></div>}
       <div className="worker-grid">
         {sorted.map(w => {
           const current = snap.tasks.find(t => t.status === 'claimed' && t.assignee === w.id);
@@ -52,17 +53,17 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
         })}
       </div>
       <section className="card connect" aria-labelledby="connect-h">
-        <h2 id="connect-h">Connect a computer</h2>
+        <h2 id="connect-h">Add a teammate&apos;s computer</h2>
         {share ? (
           <>
-            <p className="muted small">Send them the invite: <a href={share.page}>{share.page}</a>. In a browser it shows this board. To add their computer's workers:</p>
-            <JoinSteps link={share.page} gitUrl={gitUrl} say={say} />
+            <p className="muted small">Send them the invite to watch the board: <a href={share.page}>{share.page}</a>. To let their computer&apos;s workers code, send them this one command block:</p>
+            <JoinSteps link={share.page} gitUrl={gitUrl} say={say} restart={restart} />
           </>
         ) : (
           <>
             <p className="small warn">Right now only this computer can join.</p>
-            <p className="muted small">To invite others, start it open to your network, in the project's folder:</p>
-            <CodeLine code="tandem stop --all; tandem start" say={say} />
+            <p className="muted small">On the project host, restart without <code className="mono">--local</code> to invite others:</p>
+            <CodeLine code={restart} say={say} />
             <p className="muted small">Or add more workers on this computer:</p>
             <CodeLine code="tandem start --workers 4" say={say} />
           </>
@@ -158,11 +159,12 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
   const [goal, setGoal] = useState(''); const [pieces, setPieces] = useState('');
   const share = shareable(team);
   const pageUrl = share?.page ?? `${location.origin}${location.pathname}?db=${encodeURIComponent(team.db)}`;
+  const restart = restartForSharingCommand(snap.context.tandem_dir ?? '', snap.context.project_dir ?? '');
   return (
     <div className="page settings">
       {isOp && snap.requests.length > 0 && (
         <section className="card" aria-labelledby="req-h">
-          <h2 id="req-h">Asking to manage</h2>
+          <h2 id="req-h">Control requests</h2>
           <ul className="plain rows">
             {snap.requests.map(r => (
               <li key={r.identity} className="row">
@@ -176,8 +178,8 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
       )}
 
       <section className="card" aria-labelledby="ops-h">
-        <h2 id="ops-h">Who can manage</h2>
-        <p className="small muted">They can send goals, edit shared memory and change the team. Anyone else can watch.</p>
+        <h2 id="ops-h">People who control this team</h2>
+        <p className="small muted">Controllers can send goals, edit shared memory and change the team. This is a browser permission, not a Tandem account or anyone&apos;s Claude login. Everyone else can watch.</p>
         <ul className="plain rows">
           {snap.operators.map(o => (
             <li key={o.identity} className="row">
@@ -226,7 +228,7 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
           <dt>Address</dt><dd className="mono">{team.uri}</dd>
           {share && share.uri !== team.uri && <><dt>Others use</dt><dd className="mono">{share.uri}</dd></>}
         </dl>
-        {!share && <p className="small muted">Only this computer can open this team. To share the link: <code className="mono">tandem stop --all; tandem start</code> in the project's folder.</p>}
+        {!share && <><p className="small muted">Only this computer can open this team. On the project host, restart Tandem without <code className="mono">--local</code> to share the link:</p><CodeLine code={restart} say={say} /></>}
         <div className="row-actions">
           <button type="button" className="btn" onClick={async () => { try { const QRCode = (await import('qrcode')).default; setQr(await QRCode.toDataURL(pageUrl, { margin: 1, width: 220 })); } catch { setQr(''); } }}>Show QR code</button>
           <button type="button" className="btn" onClick={() => copy(pageUrl, say, 'Link copied')}>Copy link</button>

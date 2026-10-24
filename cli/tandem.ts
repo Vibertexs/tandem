@@ -28,7 +28,7 @@ const NAMES = ['Alex', 'Sam', 'Jordan', 'Taylor', 'Riley', 'Casey'];
 
 const HELP = `tandem: your team's Claude Codes, working as one.
 
-  tandem start              Host a team for the git repo you are in. Prints the invite address.
+  tandem start              Start a team for the git repo you are in. Prints the invite address.
     --simulate              workers fake the coding (no Claude usage for the work)
     --workers N             workers on this computer (default 2; 0 = none)
     --local                 only this computer can join (default: your network can)
@@ -38,7 +38,6 @@ const HELP = `tandem: your team's Claude Codes, working as one.
     --review                a worker reviews each goal before it is done
     --model auto            pick the model by task difficulty (default: haiku for everything)
     --notify URL            post "goal done" to a Slack or Discord webhook
-    --demo                  use a sample project instead of this folder (good for a first try)
     --accounts all|a,b      one worker per saved account (see tandem account), instead of --workers
     --manager-account A     the Claude account the manager plans with
     --no-browser            do not open the page
@@ -192,20 +191,6 @@ function repoAt(dir: string): string | null {
   return r.ok ? resolve(r.out) : null;
 }
 
-// A sample project next to the Tandem folder, for a first try.
-function demoRepo(): string {
-  const repo = join(dirname(ROOT), 'tandem-playground');
-  if (!existsSync(join(repo, '.git'))) {
-    mkdirSync(repo, { recursive: true });
-    git(repo, 'init', '-q');
-    writeFileSync(join(repo, 'README.md'), '# Tandem playground\n\nA sample project for trying Tandem.\n');
-    writeFileSync(join(repo, '.gitignore'), '.worktrees/\n');
-    git(repo, 'add', '-A');
-    git(repo, '-c', 'user.name=tandem', '-c', 'user.email=tandem@localhost', 'commit', '-q', '-m', 'Start');
-  }
-  return repo;
-}
-
 // ---------- accounts: one login folder per agent account, kept in the Tandem folder ----------
 // Claude Code keeps its login in CLAUDE_CONFIG_DIR, Codex in CODEX_HOME. Pointing a worker at its
 // own folder makes it use that account; nothing in your home folder changes.
@@ -298,14 +283,17 @@ function startWorkers(team: string, uri: string, repo: string, count: number, op
 
 // ---------- tandem start ----------
 async function start(argv: string[]) {
+  if (argv.some(arg => arg === '--demo' || arg.startsWith('--demo='))) {
+    fail('The --demo playground has been removed. Run tandem start in a Git project instead. For a safe rehearsal, use tandem start --simulate in a disposable Git project.');
+  }
   const { values: o } = parseArgs({ args: argv, options: {
     simulate: { type: 'boolean', default: false }, workers: { type: 'string', default: '2' },
     local: { type: 'boolean', default: false }, team: { type: 'string' }, fresh: { type: 'boolean', default: false },
     push: { type: 'boolean', default: false }, review: { type: 'boolean', default: false },
     model: { type: 'string', default: 'haiku' }, 'manager-model': { type: 'string', default: 'haiku' },
-    budget: { type: 'string', default: '0.50' }, notify: { type: 'string' }, demo: { type: 'boolean', default: false },
+    budget: { type: 'string', default: '0.50' }, notify: { type: 'string' },
     'no-browser': { type: 'boolean', default: false }, 'no-manager': { type: 'boolean', default: false },
-    'sim-limit': { type: 'string', default: '0' }, // demos: the first simulated worker hits a usage limit
+    'sim-limit': { type: 'string', default: '0' }, // testing: the first simulated worker hits a usage limit
     accounts: { type: 'string' }, 'manager-account': { type: 'string' },
   } });
   const accts = pickAccounts(o.accounts);
@@ -313,11 +301,10 @@ async function start(argv: string[]) {
   const mgrAcct = o['manager-account'] ? pickAccounts(o['manager-account'])[0] : undefined;
   if (mgrAcct && mgrAcct.agent !== 'claude') fail('The manager plans with Claude Code: --manager-account must be a Claude account.');
 
-  // the project: this folder's git repo
-  let repo = o.demo ? demoRepo() : repoAt(process.cwd());
-  if (!repo) fail(`${process.cwd()} is not a git repository.\nRun tandem start inside the project you want built (new project: git init, then make a first commit).\nJust trying it out? tandem start --demo --simulate`);
-  repo = repo!;
-  if (resolve(repo) === ROOT) fail('This is the Tandem folder itself. Run tandem start inside the project you want built.\nJust trying it out? tandem start --demo --simulate');
+  // The project is the Git repo where the command runs.
+  const repo = repoAt(process.cwd());
+  if (!repo) fail(`${process.cwd()} is not a git repository.\nRun tandem start in the project you want built. To try Tandem safely, use a disposable Git project with an initial commit, then run tandem start --simulate there.`);
+  if (resolve(repo) === ROOT) fail('This is the Tandem source folder, not the project it should work on. Run tandem start in your project instead.');
   if (!git(repo, 'rev-parse', '--verify', '--quiet', 'HEAD').ok) fail(`${repo} has no commits yet. Make a first commit, then run tandem start again.`);
   const team = slug(o.team ?? basename(repo));
 
@@ -399,8 +386,7 @@ async function start(argv: string[]) {
   say(`  ${bold('Open')}     ${cyan(page)}`);
   if (invite) {
     say(`  ${bold('Invite')}   ${cyan(invite)}${vpn ? dim('  (your Tailscale address)') : ''}`);
-    say(dim('           Others open it in a browser to watch. To add their workers, in their Tandem folder:'));
-    say(dim(`           tandem join "${invite}"`));
+    say(dim('           Others open it in a browser to watch. The Invite menu gives them one copyable block to add workers.'));
     if (vpn && wifi && wifi !== vpn) say(dim(`           Same wifi and no isolation? http://${wifi}:${PAGE_PORT}/?db=${team} works too.`));
     if (vpn) say(dim('           Tailscale: share this computer with them first (Tailscale admin, Machines, ... , Share).'));
     else if (wifi) say(dim('           On public wifi, devices often cannot reach each other. If they cannot, use Tailscale and run tandem start again.'));
@@ -410,7 +396,7 @@ async function start(argv: string[]) {
   } else say(`  ${bold('Invite')}   ${dim('only this computer can join (--local)')}`);
   say(`  ${bold('Stop')}     tandem stop`);
   say();
-  say(dim('  First time: click "Make me the owner" on the page. It also approves the manager.'));
+  say(dim('  First time: click "Control this team" on the page. It also approves the manager.'));
   if (invite && WIN) say(dim('  If Windows asks whether node and spacetime may use the network, allow private networks.'));
   if (!o['no-browser']) openBrowser(page);
 }
@@ -507,7 +493,7 @@ async function joinTeam(argv: string[]) {
   say(`  ${bold('Board')}    ${cyan(page)}`);
   say(`  ${bold('Stop')}     tandem stop`);
   say();
-  say(dim('  You can watch right away. To send goals, click "Ask to make changes" on the page.'));
+  say(dim('  You can watch right away. To send goals, click "Request control" on the page.'));
   if (!o['no-browser']) openBrowser(page);
 }
 

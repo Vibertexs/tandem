@@ -34,6 +34,7 @@ check('Node versions: 18, 20, 22.6 and 22.17 are too old; 22.18, 22.20, 24 and 2
 check('an old Node gets a message that says which version it has and where to get a new one',
   /needs Node\.js 22\.18/.test(oldNodeMessage('20.11.0')) && oldNodeMessage('20.11.0').includes('20.11.0') && oldNodeMessage().includes('nodejs.org'));
 check('outside a git repo, tandem start says what to do', /is not a git repository/.test(tandem(['start'], tmpdir())));
+check('the retired --demo playground flag gives a migration message', /--demo playground has been removed/.test(tandem(['start', '--demo'], repo)));
 check('no accounts yet: account list says how to add one', /No accounts yet/.test(tandem(['account', 'list'], repo)));
 tandem(['account', 'add', 'work1', '--no-login'], repo);
 tandem(['account', 'add', 'school', '--agent', 'codex', '--no-login'], repo);

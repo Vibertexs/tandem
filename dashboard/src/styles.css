@@ -103,6 +103,9 @@ textarea { resize: vertical; }
 .choice h2 { font-size: 1.3rem; }
 .choice.narrow { max-width: 520px; text-align: left; }
 .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 14px; }
+.start-help, .join-platforms { display: flex; flex-direction: column; gap: 6px; }
+.start-help summary, .join-platforms summary { cursor: pointer; color: var(--accent-strong); }
+.start-help p { margin: 0; }
 
 /* ---- app shell (sidebar + main), like a project tracker ---- */
 .shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
@@ -194,6 +197,8 @@ textarea { resize: vertical; }
 .step-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
 .step-body p { margin: 0; }
 .join-steps { display: flex; flex-direction: column; gap: 6px; }
+.setup-roles { max-width: 760px; display: flex; flex-direction: column; gap: 10px; }
+.setup-roles h2 { font-size: 1rem; }
 
 /* ---- the invite, top right of every page ---- */
 .invite { position: relative; }

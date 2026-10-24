@@ -5,11 +5,11 @@ import { Landing, Unreachable } from './Landing';
 import { BoardPage } from './Board';
 import { ActivityPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
 import { SetupPage } from './Setup';
-import { CodeLine, JoinSteps, isManager, managerOnline, online, useNow } from './ui';
+import { CodeLine, JoinSteps, isManager, managerOnline, online, restartForSharingCommand, useNow } from './ui';
 import type { Snapshot } from './brain';
 
 const PAGES = [
-  { key: 'setup', label: 'Setup', icon: '✓' },
+  { key: 'setup', label: 'Get started', icon: '✓' },
   { key: 'board', label: 'Board', icon: '▦' },
   { key: 'team', label: 'Team', icon: '◉' },
   { key: 'memory', label: 'Shared memory', icon: '✎' },
@@ -92,19 +92,20 @@ export function App() {
       try {
         await api!.claimTeam();
         if (mgr) await api!.approve(mgr.identity);
-        say(mgr ? "You're the owner, and the manager is ready. Describe what you want built." : "You're the owner. Describe what you want built.");
+        say(mgr ? 'This browser controls the team, and the manager is ready. Describe what you want built.' : 'This browser controls the team. Describe what you want built.');
       } catch (e) { say('Could not do that: ' + (e as Error).message); }
     };
     return (
       <main className="landing">
         <section className="card choice narrow">
           <span className="brand-mark" aria-hidden="true" />
-          <h2>"{team!.db}" has no owner yet</h2>
-          <p className="muted">The owner sends work to the team and approves who else can. If you started this team, that's you.</p>
+          <h2>Control &ldquo;{team!.db}&rdquo;?</h2>
+          <p className="muted">This gives this browser permission to send goals, approve people and change settings. It does not start the project server, move the project, or control anyone&apos;s Claude login.</p>
+          <p className="small muted">If you started Tandem for this project, choose control. Otherwise, you can watch until a controller grants access.</p>
           {mgr && <p className="small">✓ The manager on this team is running and will be approved too.</p>}
           <div className="row-actions">
-            <button type="button" className="btn primary" disabled={!api} onClick={() => void claim()}>Make me the owner</button>
-            <button type="button" className="btn" onClick={() => setJustWatch(true)}>Just watch</button>
+            <button type="button" className="btn primary" disabled={!api} onClick={() => void claim()}>Control this team</button>
+            <button type="button" className="btn" onClick={() => setJustWatch(true)}>Watch only</button>
           </div>
         </section>
         {toast}
@@ -141,7 +142,7 @@ export function App() {
             ))}
           </ul>
           <div className="you small">
-            {config.mock ? <span className="chip">Read only</span> : isOp ? <span className="chip st-busy">✓ You manage this team</span> : <span className="chip">Viewing</span>}
+            {config.mock ? <span className="chip">Read only</span> : isOp ? <span className="chip st-busy">✓ You control this team</span> : <span className="chip">Watching</span>}
           </div>
         </nav>
       )}
@@ -152,15 +153,15 @@ export function App() {
           {!config.mock && !config.present && team && <Invite team={team} snap={snap} say={say} />}
           {!config.mock && !isOp && !config.present && status === 'connected' && (
             asked
-              ? <span className="chip goal-new">⏳ Waiting for the owner to approve you</span>
-              : <AskToManage onAsk={name => api!.askToManage(name).then(() => say('Asked. The owner sees your request on their board.'), e => say('Could not ask: ' + (e as Error).message))} />
+              ? <span className="chip goal-new">⏳ Waiting for a controller to approve you</span>
+              : <AskToManage onAsk={name => api!.askToManage(name).then(() => say('Control request sent. A controller sees it on the Board.'), e => say('Could not ask: ' + (e as Error).message))} />
           )}
         </header>
         {config.mock && <div className="banner">Sample data, not connected to a team. <a href="?">Host or join a team</a></div>}
         {status === 'connecting' && api && <div className="banner">Connection lost. Reconnecting…</div>}
         <main>
           {page === 'board' && <BoardPage {...common} isOp={isOp} present={config.present} go={go} />}
-          {page === 'setup' && <SetupPage snap={snap} team={team ?? { uri: '', db: 'sample' }} now={now} say={say} go={go} />}
+          {page === 'setup' && <SetupPage snap={snap} team={team ?? { uri: '', db: 'sample' }} now={now} say={say} go={go} isOp={isOp} />}
           {page === 'team' && <TeamPage {...common} team={team ?? { uri: '', db: 'sample' }} />}
           {page === 'memory' && <MemoryPage {...common} />}
           {page === 'activity' && <ActivityPage {...common} />}
@@ -178,6 +179,7 @@ function Invite({ team, snap, say }: { team: Team; snap: Snapshot; say: (m: stri
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const share = shareable(team);
+  const restart = restartForSharingCommand(snap.context.tandem_dir ?? '', snap.context.project_dir ?? '');
   // closes on Escape or a click anywhere else, like other menus
   useEffect(() => {
     if (!open) return;
@@ -195,10 +197,10 @@ function Invite({ team, snap, say }: { team: Team; snap: Snapshot; say: (m: stri
       <button type="button" className="btn" aria-expanded={open} onClick={() => setOpen(!open)}>Invite</button>
       {open && (
         <div className="invite-pop card" role="dialog" aria-label="Invite">
-          <p className="small"><strong>Send this link.</strong> <span className="muted">In a browser it shows this board.</span></p>
+          <p className="small"><strong>Send this link to watch the board.</strong></p>
           <CodeLine code={share.page} say={say} />
-          <p className="small muted">To add their computer's workers:</p>
-          <JoinSteps link={share.page} gitUrl={snap.context.git_url ?? ''} say={say} />
+          <p className="small muted">To let their computer&apos;s workers code, send this one command block too:</p>
+          <JoinSteps link={share.page} gitUrl={snap.context.git_url ?? ''} say={say} restart={restart} />
         </div>
       )}
     </div>
@@ -208,12 +210,13 @@ function Invite({ team, snap, say }: { team: Team; snap: Snapshot; say: (m: stri
 function AskToManage({ onAsk }: { onAsk: (name: string) => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
-  if (!open) return <button type="button" className="btn primary" onClick={() => setOpen(true)}>Ask to make changes</button>;
+  if (!open) return <button type="button" className="btn primary" onClick={() => setOpen(true)}>Request control</button>;
   return (
     <form className="inline-form" onSubmit={e => { e.preventDefault(); if (name.trim()) void onAsk(name.trim()).then(() => setOpen(false)); }}>
       <label className="sr-only" htmlFor="ask-name">Your name</label>
       <input id="ask-name" autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="Your name" aria-label="Your name" />
-      <button type="submit" className="btn primary" disabled={!name.trim()}>Ask</button>
+      <span className="small muted">A current controller must approve this browser.</span>
+      <button type="submit" className="btn primary" disabled={!name.trim()}>Request</button>
       <button type="button" className="btn" onClick={() => setOpen(false)}>Cancel</button>
     </form>
   );

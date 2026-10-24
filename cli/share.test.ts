@@ -12,6 +12,8 @@ const CLI = fileURLToPath(new URL('./tandem.ts', import.meta.url));
 const TEAM = `bilal-share-${process.pid}`;
 const hostState = mkdtempSync(join(tmpdir(), 'tandem-share-host-'));
 const joinerState = mkdtempSync(join(tmpdir(), 'tandem-share-joiner-'));
+// A teammate only has Tandem and an invite; they do not need to start in a project clone.
+const joinerCwd = mkdtempSync(join(tmpdir(), 'tandem-share-join-cwd-'));
 const repo = mkdtempSync(join(tmpdir(), 'tandem-share-repo-'));
 let failures = 0;
 let owner: DbConnection | null = null;
@@ -90,9 +92,9 @@ try {
   const listed = gitUrl ? git(repo, 'ls-remote', gitUrl, 'HEAD') : { ok: false, out: '' };
   check('the host Git address answers ls-remote', listed.ok && /HEAD/.test(listed.out), listed.out);
 
-  const joined = gitUrl ? tandem(['join', `http://127.0.0.1:5173/?db=${TEAM}`, '--workers', '1', '--no-browser'], repo, joinerState) : { ok: false, out: '' };
+  const joined = gitUrl ? tandem(['join', `http://127.0.0.1:5173/?db=${TEAM}`, '--workers', '1', '--no-browser'], joinerCwd, joinerState) : { ok: false, out: '' };
   const clone = join(joinerState, 'work', TEAM);
-  check('a second state joins and copies the host project', joined.ok && existsSync(join(clone, '.git')), joined.out.slice(-800));
+  check('a teammate joins from a non-Git folder and copies the host project', !existsSync(join(joinerCwd, '.git')) && joined.ok && existsSync(join(clone, '.git')), joined.out.slice(-800));
   const origin = existsSync(join(clone, '.git')) ? git(clone, 'remote', 'get-url', 'origin') : { ok: false, out: '' };
   check('the work copy points at the host Git address', origin.ok && origin.out.trim() === gitUrl, origin.out);
 

@@ -1,5 +1,5 @@
 // THE PRODUCT, END TO END, the way a person uses it:
-//   in the project: tandem start --simulate  ->  open the page  ->  Make me the owner
+//   in the project: tandem start --simulate  ->  open the page  ->  Control this team
 //   ->  type a goal  ->  the manager plans it (1 real haiku run)  ->  simulated workers do it
 //   ->  the board shows every task done  ->  tandem stop
 // Needs: Chrome, claude on PATH. Uses a fresh team (bilal-start) and a throwaway repo.
@@ -52,14 +52,14 @@ const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google
 try {
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 960 } })).newPage();
   await page.goto(URL_);
-  check('the page asks to make me the owner of the new team', await seen(page, 'has no owner yet', 15_000));
-  // If the manager is already asking, "Make me the owner" approves it in the same click.
+  check('the page asks this browser to control the new team', await seen(page, `Control “${DB}”?`, 15_000));
+  // If the manager is already asking, controlling the team approves it in the same click.
   const sameClick = await seen(page, 'The manager on this team is running and will be approved too.', 20_000);
-  await page.getByRole('button', { name: 'Make me the owner' }).click();
-  if (!sameClick && await seen(page, 'Manager Claude wants to help manage this team.', 30_000)) {
+  await page.getByRole('button', { name: 'Control this team' }).click();
+  if (!sameClick && await seen(page, 'Manager Claude wants to control this team.', 30_000)) {
     await page.getByRole('button', { name: 'Approve' }).click();
   }
-  check(`the manager is approved (${sameClick ? 'in the same click as becoming the owner' : 'with one more click'}) and online`, await seen(page, 'Manager online', 30_000));
+  check(`the manager is approved (${sameClick ? 'in the same click as taking control' : 'with one more click'}) and online`, await seen(page, 'Manager online', 30_000));
   check('the workers are online (no "No workers" step)', await page.getByText('No workers are online.').waitFor({ state: 'hidden', timeout: 15_000 }).then(() => true, () => false));
   await page.getByLabel('Describe what you want built').fill('Create a tiny Python calculator: calc.py with add(a, b) and sub(a, b), test_calc.py with unittest tests, and a README.md.');
   await page.getByRole('button', { name: /^Send/ }).click();
