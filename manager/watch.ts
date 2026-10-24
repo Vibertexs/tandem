@@ -6,6 +6,7 @@
 //
 //   npx tsx watch.ts [--repo <path>] [--budget 0.50] [--model haiku] [--push]
 // --push: push each finished goal branch to origin (and open a PR if the GitHub CLI is set up).
+// --notify <url>: post "goal done" to a Slack or Discord incoming webhook (or set TANDEM_WEBHOOK).
 //
 // The first time, it asks to become an operator. Click Approve on "Manager Claude" on the page.
 // Its login is saved, so this happens once.
@@ -15,7 +16,8 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { BrainClient } from '../mcp/src/brain-client.js';
-import { finishGoal } from './finish.js';
+import { finishGoal, type FinishBrain } from './finish.js';
+import { goalDoneMessage, notify } from './notify.js';
 
 const { values: opt } = parseArgs({
   options: {
@@ -24,6 +26,7 @@ const { values: opt } = parseArgs({
     model: { type: 'string', default: 'haiku' },
     poll: { type: 'string', default: '3' },
     push: { type: 'boolean', default: false },
+    notify: { type: 'string', default: process.env.TANDEM_WEBHOOK },
   },
 });
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -73,8 +76,18 @@ for (;;) {
     const mine = tasks.filter(t => t.goal_id === g.id);
     if (mine.length > 0 && mine.every(t => t.status === 'done')) {
       try {
-        const outcome = await finishGoal(brain, REPO, g, mine, undefined, opt.push);
-        log(outcome === 'done' ? `goal ${g.id} done` : `goal ${g.id}: tests fail after merging; added a task to fix them`);
+        let finished = { branch: '', note: '' };
+        const finisher: FinishBrain = {
+          finishGoal: async (id, branch, note) => { finished = { branch, note }; await brain.finishGoal(id, branch, note); },
+          markGoal: (id, status) => brain.markGoal(id, status),
+          assignTask: t => brain.assignTask(t),
+        };
+        const outcome = await finishGoal(finisher, REPO, g, mine, undefined, opt.push);
+        log(outcome === 'done' ? `goal ${g.id} done` : `goal ${g.id}: added a task to resolve a merge conflict or fix the tests`);
+        if (outcome === 'done' && opt.notify) {
+          const sent = await notify(opt.notify, goalDoneMessage(g, mine, finished.branch, finished.note));
+          log(sent ? 'posted to the webhook' : 'could not post to the webhook');
+        }
       } catch (e) { log(`could not finish goal ${g.id}: ${(e as Error).message}`); }
     }
   }

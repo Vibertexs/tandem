@@ -13,6 +13,8 @@ Every person runs Claude Code under their own account on their own machine. Tand
 - Cost per task and per goal, from `claude -p`.
 - Handing a task back with a reason. After two workers, it waits for a person ("needs you", then Try again).
 - Merge conflicts as tasks: a worker Claude resolves the conflict markers and the launcher commits the merge.
+- Usage limits: a capped worker waits for the reset and comes back by itself.
+- A "goal done" post to Slack or Discord (`-Notify`).
 - Workers that reconnect on their own, worker ownership, and `start.sh` for macOS and Linux.
 
 ## Next steps, in the order that adds the most
@@ -22,6 +24,5 @@ Every person runs Claude Code under their own account on their own machine. Tand
 4. **Bigger plans.** Map-reduce goals ("review every module") are built into the brain and tools; they need a real trial with real Claude.
 
 ## Ideas worth trying
-- **Notifications:** post "goal done, branch X, $0.12" to Slack or Discord.
 - **Templates:** saved goal prompts per repo ("add tests for every file in src/").
 - **Budgets:** a spending cap per goal. The manager stops creating tasks when the goal's cost reaches it.

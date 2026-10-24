@@ -13,8 +13,10 @@ When a few people each run an AI coding agent on the same repo:
 ## What Tandem does
 - **One prompt for the whole team.** Type a goal. The manager Claude turns it into small tasks, with the exact files each one touches and what has to happen first.
 - **No collisions, guaranteed.** Claiming a task locks its files in one atomic step, so two agents can never get the same task or the same file. A hook stops a Claude that tries to edit a file someone else holds.
-- **Work goes to whoever has room.** Workers pull tasks themselves. A worker that hits its usage limit hands its task back, and a crashed one gives its files back after two minutes.
-- **One checked branch per goal.** When a goal's tasks are done, the manager merges them into one branch, `tandem/<goal>`, and runs your tests on it. If they fail, it adds a task to fix them before calling the goal done.
+- **Work goes to whoever has room.** Workers pull tasks themselves. A worker that hits its usage limit hands its task back, waits for the limit to reset, and comes back. A crashed one gives its files back after two minutes.
+- **Stuck work comes back to you, not lost.** A worker that can't finish a task gives it back with a reason, and a different worker tries. If two can't, the board says "needs you" and why, with a **Try again** button.
+- **One checked branch per goal.** When a goal's tasks are done, the manager merges them into one branch, `tandem/<goal>`, and runs your tests on it. If two tasks' changes conflict, a worker Claude resolves the conflict. If the tests fail, a worker fixes them before the goal is called done.
+- **What it cost.** Every Claude run's cost is recorded, per task and per goal.
 - **A live board.** Waiting → To do → In progress → Done, per goal or all together. You see who is on what, for how long, their latest note, and why each task is where it is.
 
 | Start | Goals, each ending as one branch | A task's details |
@@ -52,6 +54,7 @@ For real work, drop `-Simulate`. Each task becomes a real headless Claude Code r
 | `.\start.ps1 -Join ws://<host>:3001 -Db <team>` | Add this computer's workers to someone else's team |
 | `.\start.ps1 -Workers 4 -Repo C:\path\to\repo` | More workers, working on your own repo |
 | `.\start.ps1 -Model auto` | Real workers pick the model by task difficulty (`launcher/routing.json`) instead of always using haiku |
+| `.\start.ps1 -Notify <webhook url>` | Post "goal done" (branch, test result, cost) to a Slack or Discord channel |
 | `.\stop.ps1` | Stop what `start.ps1` started (`-All` stops the brain too) |
 
 The page also works on a phone.
@@ -83,12 +86,14 @@ Nothing talks to anything else directly. Every part reads and writes the brain, 
 ## Tested
 Every suite passes on the final commit. See [docs/STATUS.md](docs/STATUS.md) for the latest numbers and commands, and [docs/ROADMAP.md](docs/ROADMAP.md) for where this goes next.
 - **Atomic rules:** 10 clients race for one task and exactly one wins. Lock conflicts leave no partial locks. A merge task opens exactly once.
-- **MCP tools:** all 16, through the real MCP protocol, plus a mock mode.
-- **The page:** the whole first-use journey in Chrome, on desktop and phone.
+- **MCP tools:** all 17, through the real MCP protocol, plus a mock mode.
+- **The page:** the whole first-use journey in Chrome, on desktop and phone, including a task two workers give back and a worker out of quota.
+- **Failure handling without Claude:** a usage limit (capped, requeued, waits, resumes), a task given back twice, a merge conflict turned into a task, failing tests turned into a task.
 - **Real Claude runs:**
   - Goal → manager → two workers → done, and the workers' own tests pass.
   - A Claude blocked from editing a locked file.
   - The launcher committing work on its task branch.
+  - A Claude resolving a real merge conflict, with the merged code running.
   - `start.ps1` with real workers: a goal typed on the page, planned, built by two Claudes, merged into one branch, and its tests passing.
 
 ## Limits

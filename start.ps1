@@ -9,6 +9,7 @@
 #                               are on other computers; opens a PR per goal if the GitHub CLI is set up)
 #   .\start.ps1 -Model auto     real workers pick the model by task difficulty (launcher/routing.json)
 #                               instead of always using haiku (the cheap default)
+#   .\start.ps1 -Notify <url>   post "goal done" to a Slack or Discord incoming webhook
 # Join someone else's team from this computer (starts workers here that work for that team):
 #   .\start.ps1 -Join ws://192.168.1.20:3001 -Db tandem-local
 # Stop:
@@ -26,6 +27,7 @@ param(
   [string]$Model = 'haiku',
   [string]$ManagerModel = 'haiku',
   [string]$Budget = '0.50',
+  [string]$Notify = '',
   [switch]$NoBrowser
 )
 $ErrorActionPreference = 'Stop'
@@ -147,6 +149,7 @@ if ($hosting -and -not $NoManager -and (Running 'manager')) {
   $env:TANDEM_TOKEN_FILE = Join-Path $root "mcp\.tandem\manager-token-$Db"
   $managerArgs = @('--import', (Tsx 'manager'), (Join-Path $root 'manager\watch.ts'), '--repo', $Repo, '--model', $ManagerModel, '--budget', $Budget)
   if ($Push) { $managerArgs += '--push' }
+  if ($Notify) { $managerArgs += @('--notify', $Notify) }
   Spawn 'manager' 'node' $managerArgs 'manager'
   Write-Host '  started. The first time, "Make me the owner" on the page approves it too.'
 }
