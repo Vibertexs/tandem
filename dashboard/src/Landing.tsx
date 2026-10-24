@@ -45,12 +45,15 @@ export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: s
           <ol className="steps">
             <li>In your project's folder, run:
               <CodeLine code="tandem start" say={say} />
-              <span className="small muted">It starts everything, opens this page and prints the link to invite others. Just trying it out? <code className="mono">tandem start --demo --simulate</code> uses a sample project and no Claude usage.</span>
+              <span className="small muted">It starts everything, opens this page and prints the link to invite others.</span>
+            </li>
+            <li>Just trying it out? This uses a sample project and no Claude usage:
+              <CodeLine code="tandem start --demo --simulate" say={say} />
             </li>
             <li>Already running? Open it:
               <form className="inline-form" onSubmit={e => { e.preventDefault(); if (hostTeam.trim()) onOpen({ uri: defaultUri(), db: hostTeam.trim() }); }}>
                 <label className="sr-only" htmlFor="host-team">Team name</label>
-                <input id="host-team" value={hostTeam} onChange={e => setHostTeam(e.target.value)} aria-label="Team name" placeholder="team name (your project folder's name)" />
+                <input id="host-team" value={hostTeam} onChange={e => setHostTeam(e.target.value)} aria-label="Team name" placeholder="project folder name" />
                 <button type="submit" className="btn primary" disabled={!hostTeam.trim()}>Open</button>
               </form>
             </li>

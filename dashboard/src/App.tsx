@@ -172,18 +172,22 @@ export function App() {
 // `tandem join` on their computer.
 function Invite({ team, say }: { team: Team; say: (m: string) => void }) {
   const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
   const share = shareable(team);
+  // closes on Escape or a click anywhere else, like other menus
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onDown = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('mousedown', onDown);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('mousedown', onDown); };
   }, [open]);
   if (!share) {
     return <span className="chip invite-local" title="To invite others: tandem stop --all, then tandem start, in the project's folder">This computer only</span>;
   }
   return (
-    <div className="invite">
+    <div className="invite" ref={box}>
       <button type="button" className="btn" aria-expanded={open} onClick={() => setOpen(!open)}>Invite</button>
       {open && (
         <div className="invite-pop card" role="dialog" aria-label="Invite">
