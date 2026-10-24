@@ -446,6 +446,11 @@ async function joinTeam(argv: string[]) {
   let repo = repoAt(process.cwd());
   const repoUrl = await teamRepo(host, team);
   if (!o.simulate && workers > 0) {
+    if (repo && resolve(repo) === ROOT) {
+      fail('This is the Tandem folder itself. For real work, run join from the project\'s clone (next to the tandem folder):\n' +
+        `  cd <project folder>\n  ${WIN ? '..\\tandem\\tandem.cmd' : '../tandem/tandem'} join "${positionals[0]}"\n` +
+        'Or add --simulate to try it here with fake workers.');
+    }
     if (!repo) {
       fail(repoUrl
         ? `Run tandem join inside your clone of the team's repo:\n  git clone ${repoUrl}\n  cd ${basename(repoUrl).replace(/\.git$/, '')}\n  tandem join ${positionals[0]}`

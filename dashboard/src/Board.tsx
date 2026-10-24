@@ -387,6 +387,7 @@ export function BoardPage(p: Props) {
         <div className="empty-board card">
           <p><strong>Nothing yet.</strong></p>
           <p className="muted">{p.isOp ? 'Describe what you want built above. The manager splits it into tasks, and workers pick them up.' : 'When the owner sends a goal, it shows up here with its tasks.'}</p>
+          <p className="small muted">New here? <a href="#/setup">Follow the Setup steps</a>.</p>
         </div>
       ) : (
         <div className="lanes">

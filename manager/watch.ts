@@ -59,6 +59,9 @@ if (!brain.isOperator()) {
   let url = '';
   try { url = execFileSync('git', ['-C', REPO, 'remote', 'get-url', 'origin'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch { /* no origin */ }
   await brain.setContext('repo_url', url).catch(() => {});
+  // where Tandem and the project are on this computer, so the Setup page can show real commands
+  await brain.setContext('tandem_dir', resolve(here, '..')).catch(() => {});
+  await brain.setContext('project_dir', REPO).catch(() => {});
 }
 
 // ---------- planning ----------

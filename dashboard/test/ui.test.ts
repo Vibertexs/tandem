@@ -70,8 +70,8 @@ try {
   await shot(A, '02-owner');
   await A.getByRole('button', { name: 'Make me the owner' }).click();
   check('owner: then the board opens, with the prompt on', await until(() => prompt(A).isEnabled()));
-  check('owner: the sidebar has Board, Team, Shared memory, Activity, Settings (goals live on the Board)',
-    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Board|Team|Shared memory|Activity|Settings');
+  check('owner: the sidebar has Setup, Board, Team, Shared memory, Activity, Settings (goals live on the Board)',
+    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Setup|Board|Team|Shared memory|Activity|Settings');
   check('owner: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
   check('owner: it shows one next step: the manager is not connected yet', await seen(A, 'The manager is not connected yet', 3000));
   check('owner: the sidebar says you manage the team', await seen(A, 'You manage this team', 2000));
@@ -162,6 +162,25 @@ try {
   check('goal done: a finished goal moves below the work still going', (await A.locator('.goal-lane .goal-text').allInnerTexts()).join('|') === 'Other tasks|Build a tiny calculator with tests');
   await shot(A, '06-board-done', true);
 
+  // ---- 5b. the Setup page: steps to follow, with this computer's folders, ticking as they happen ----
+  await manager.reducers.setContext({ sessionId: 'live', key: 'tandem_dir', value: 'C:\\Code\\tandem' });
+  await manager.reducers.setContext({ sessionId: 'live', key: 'project_dir', value: 'C:\\Code\\calc-demo' });
+  await nav(A, 'Setup');
+  const steps = A.locator('.step');
+  check('setup: six numbered steps, from running to sending a goal', await until(async () => await steps.count() === 6) &&
+    (await steps.first().innerText()).includes('Tandem is running') && (await steps.last().innerText()).includes('Send a goal'));
+  check('setup: the commands carry this computer\'s real folders', await until(async () => {
+    const s = await A.locator('.setup').innerText();
+    return s.includes('$env:Path += ";C:\\Code\\tandem"') && s.includes('cd C:\\Code\\calc-demo');
+  }, 4000));
+  check('setup: the manager step ticks once the manager is online, the goal step once a goal exists',
+    await steps.nth(1).evaluate(e => e.classList.contains('done')) && await steps.nth(5).evaluate(e => e.classList.contains('done')));
+  check('setup: step 3 is not ticked while no Claude worker is online, and gives the command to start them',
+    await steps.nth(2).innerText().then(t => t.includes('No Claude worker is online yet') && t.includes('tandem start')) && !(await steps.nth(2).evaluate(e => e.classList.contains('done'))));
+  check('setup: with no GitHub remote, step 4 says how to add one', await steps.nth(3).innerText().then(t => t.includes('git remote add origin')) && !(await steps.nth(3).evaluate(e => e.classList.contains('done'))));
+  check('setup: a team only this computer can reach says how to open it up', await steps.nth(4).innerText().then(t => t.includes('tandem stop --all')));
+  await shot(A, '06a-setup');
+
   // ---- 6. team, shared memory, activity ----
   await nav(A, 'Team');
   check('team: each worker card says how many tasks it finished', await until(async () => /\d+ tasks? done/.test(await A.locator('.worker').first().innerText())));
@@ -176,16 +195,16 @@ try {
     const invite = `http://10.1.2.3:${new URL(URL_).port}/?db=${DB}`;
     await L.getByRole('button', { name: 'Invite' }).click();
     const pop = await L.getByRole('dialog', { name: 'Invite' }).innerText().catch(() => '');
-    check('invite: on the network, every page has an Invite button with the link and the tandem join command', pop.includes(invite) && pop.includes(`tandem join ${invite}`), pop);
+    check('invite: on the network, every page has an Invite button with the link, and without a GitHub remote it says to add one first', pop.includes(invite) && pop.includes('no GitHub remote'), pop);
     await L.keyboard.press('Escape');
     await nav(L, 'Team');
     const lan = await L.locator('.connect').innerText().catch(() => '');
-    check('team: with no shared repo, a joiner\'s workers are simulated, and it says how to get real work', lan.includes(`tandem join ${invite} --simulate`) && lan.includes('no GitHub remote'), lan.slice(0, 400));
+    check('team: with no GitHub remote it says to put the project on GitHub first, and shows no join command that could not work', lan.includes('no GitHub remote') && !lan.includes('tandem.cmd join'), lan.slice(0, 400));
     // the manager publishes the repo's origin: then the steps are clone + join
     await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: 'https://github.com/acme/shop.git' });
     const withRepo = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/acme/shop.git'), 4000);
     const lan2 = await L.locator('.connect').innerText();
-    check('team: with a shared repo, a joiner clones it, then tandem join in that folder', withRepo && lan2.includes(`tandem join ${invite}`) && !lan2.includes('--simulate'), lan2.slice(0, 400));
+    check('team: with a shared repo, a joiner clones it, then tandem join in that folder', withRepo && lan2.includes(`..\\tandem\\tandem.cmd join "${invite}"`) && lan2.includes('git clone https://github.com/acme/shop.git'), lan2.slice(0, 400));
     await manager.reducers.setContext({ sessionId: 'live', key: 'repo_url', value: '' });
     await L.context().close();
   }
@@ -291,7 +310,7 @@ try {
   await P.goto(`${URL_}/?db=${DB}`);
   await until(() => prompt(P).isVisible(), 10_000);
   const bar = await P.locator('.sidebar').boundingBox();
-  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 840 && await P.locator('.nav a').count() === 5, bar);
+  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 840 && await P.locator('.nav a').count() === 6, bar);
   const small = await P.locator('.nav a, .btn').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent && (e as HTMLElement).offsetHeight < 44).length);
   check('phone: tap targets are at least 44px tall', small === 0, small);
   check('phone: no sideways scrolling', await P.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));

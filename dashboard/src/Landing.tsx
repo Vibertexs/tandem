@@ -45,10 +45,7 @@ export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: s
           <ol className="steps">
             <li>In your project's folder, run:
               <CodeLine code="tandem start" say={say} />
-              <span className="small muted">It starts everything, opens this page and prints the link to invite others.</span>
-            </li>
-            <li>Just trying it out? This uses a sample project and no Claude usage:
-              <CodeLine code="tandem start --demo --simulate" say={say} />
+              <span className="small muted">It starts everything, opens this page and prints the link to invite others. If <code className="mono">tandem</code> is not recognised, run <code className="mono">npm install -g .</code> once in the Tandem folder, or use <code className="mono">.\tandem.cmd start</code> from there (Mac and Linux: <code className="mono">./tandem start</code>).</span>
             </li>
             <li>Already running? Open it:
               <form className="inline-form" onSubmit={e => { e.preventDefault(); if (hostTeam.trim()) onOpen({ uri: defaultUri(), db: hostTeam.trim() }); }}>

@@ -185,6 +185,16 @@ textarea { resize: vertical; }
 .done-line { color: var(--accent-strong); font-weight: 600; }
 .empty-board { text-align: center; padding: 36px 20px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
 
+/* ---- Setup: numbered steps that tick when done ---- */
+.steps-list { display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
+.step { display: flex; gap: 14px; padding: 14px 16px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.step.done { border-color: var(--accent-strong); }
+.step-mark { flex: none; width: 26px; height: 26px; border-radius: 999px; display: grid; place-items: center; background: var(--panel); color: var(--muted); font-weight: 700; }
+.step.done .step-mark { background: var(--accent-strong); color: var(--bg); }
+.step-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.step-body p { margin: 0; }
+.join-steps { display: flex; flex-direction: column; gap: 6px; }
+
 /* ---- the invite, top right of every page ---- */
 .invite { position: relative; }
 .invite-pop { position: absolute; right: 0; top: calc(100% + 8px); width: min(460px, calc(100vw - 32px)); z-index: 30; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12); }
