@@ -1,57 +1,44 @@
-# dashboard (owner: Omar; first version built by Bilal while solo)
+# dashboard
 
-One web page for Tandem. Spec: root README sections 11 and 12. Vite, React, TypeScript. It reads the brain directly through the generated bindings in `../brain/bindings`.
+The web page for Tandem. Vite, React, TypeScript. It reads the brain live through the generated bindings in `../brain/bindings`. There is one mode: the real team. For a demo with no Claude usage, start the team with `.\start.ps1 -Simulate` (workers that fake the coding).
 
-## How it works
-One page, one flow: **say what you want, then watch it happen.**
+## The flow
+1. **Not connected:** the start screen offers **Host a team** (run `.\start.ps1`) or **Join a team** (host address + team name).
+   - A wrong address shows "Can't reach" with Try again.
+   - A team running an older version shows "needs an update" with the command to run.
+2. **A team with no owner:** **Make me the owner** (or Just watch).
+3. **The app.** A Jira-style sidebar with six pages:
+   - **Board:**
+     - One next step at a time: approve the manager, start workers, and so on.
+     - The prompt ("Describe what you want built"), with the latest goal's status.
+     - A progress summary.
+     - Waiting → To do → In progress → Done. Cards show the worker's avatar, elapsed time, a moving strip and their last note.
+     - Click a card for its details: assignee, files, what to do, why it is here, result and a timeline.
+   - **Goals:** everything you asked for, with status.
+   - **Team:** worker cards (online, usage, current task, held files), and **Connect a computer** with the exact command.
+   - **Shared memory:** project summary, interfaces and decisions. Every Claude reads these.
+   - **Activity:** the full log.
+   - **Settings:**
+     - Requests to manage (Approve or Dismiss), and who can manage.
+     - Add work by hand.
+     - This team's address, link and QR code.
+     - **Start over** (clears the board, keeps the team).
+4. **Anyone else** can watch. **Ask to make changes** sends a request the owner approves with one click. No identities to copy.
 
-1. **Prompt box** at the top: "What should your team build?"
-2. **Progress summary**: "3 of 13 tasks done", a bar, and counts for waiting / ready / working / done.
-3. **Task board** in four stages, left to right: **Waiting** (needs other tasks first) → **Ready** (free) → **Working** (a teammate is on it: who, how long, a moving strip, their last progress note) → **Done** (finished by whom).
-4. Team (usage bars, current task), locked files, "Why this assignment?", and a plain-English log.
-
-A switch in the header chooses the session:
-- **Demo** (default): your own private sandbox with simulated workers, so anyone can try it with no setup. The coordination is real, only the coding is faked. Typing a goal makes one task; the example chips start a login build or a 12-piece review. "Make Sam hit a limit", "same file", "goes idle" and Reset are here.
-- **My team** (`?mode=team`): the real session. No simulation. The first visitor presses **Claim this team** and becomes the operator. Operators type goals into the prompt box; a goal is saved and waits for the manager Claude to plan it. **Add a teammate** shows the exact command for a teammate's Claude to join. **Manage** (collapsed) has the by-hand forms, shared notes and who can operate. Everyone else can watch but not change anything; the brain enforces that.
-
-## Checklist
-- [x] Pick a stack: Vite + React + TypeScript, plain CSS, light and dark
-- [x] Mock mode (`?mock=1`) that loads `contract/seed.json` so you can build before the brain exists
-- [x] Team panel: name, plan badge, 5-hour and weekly bars, status chip (icon + text), current task with elapsed time, "updated Xs ago"
-- [x] Task board in stages, with model chips, assignee, live progress strip and note, and a job progress bar
-- [x] Locks panel and "Why this assignment?" panel
-- [x] Event log in plain English, newest first
-- [x] Prompt box, progress summary, scenario buttons and stepper (Demo), Reset
-- [x] Demo (simulated workers, visible badge) and My team (real session) in one page
-- [x] Per-sandbox sessions (`session_id`): each browser tab gets its own demo sandbox
-- [x] Operator flow: claim, send goals, manage by hand, approve and remove other identities
-- [x] "Add a teammate": the exact `claude mcp add` command and the prompt to give their Claude
-- [x] Mobile layout: tabs, 44px tap targets, no sideways scroll
-- [x] `?view=present` for big type and no controls
-- [x] QR code for the page URL (the Share button)
-- [ ] Fallback: if the brain is unreachable, show a banner and play a prerecorded run. Done so far: the banner, and a still picture of the seed data
-- [ ] After the base works: team-rules skill and lock-check hook in `/mcp`
-
-## Not done yet
-- **Nothing reads goals yet.** The manager Claude that plans a goal into tasks is not built. Until it is, a goal stays "Waiting for the manager". Use Manage to add tasks by hand.
-- No real Claude workers have fed this page yet.
-- No stranger has tried it on a phone with no help.
-- Nothing is deployed. "Add a teammate" shows `127.0.0.1` for now, so only this machine can join.
+The page remembers the last team you opened. URL options:
+- `?db=<team>&uri=ws://host:3001` opens a team.
+- `?view=present` shows the board only, in big type.
+- `?mock=1` shows sample data with no brain.
 
 ## Run it
+`.\start.ps1` in the repo root starts the page for you. By hand:
 ```
 cd brain && npm install && cd ../dashboard && npm install
-# brain running locally with bilal-dev published (see brain/README.md)
 npm run dev                       # http://localhost:5173
 npm run build && npm run preview  # production build
 ```
-URL options: `?mode=team` (alias `?mode=live`), `?view=present`, `?mock=1`, `?uri=ws://host:3000&db=name`. Defaults can also be set with `VITE_STDB_URI` and `VITE_STDB_DB`.
 
 ## Tests
-- `npm test`: every Demo scenario against the real brain, using the same simulator as the browser.
-- `npm run test:ui`: the real page in Chrome via playwright-core, desktop and phone size, Demo and My team. Needs `npm run build && npm run preview -- --port 4173`, Chrome, and `spacetime` on PATH (it publishes a fresh `bilal-auth` database for the My team checks). Set `SHOTS=<folder>` to save screenshots.
-
-## Known limits
-- The simulator runs in the page. If someone closes the tab mid-run, their sandbox stops moving until they come back.
-- Anyone can point `?uri=` at any server. Harmless, but not locked down.
-- Worker actions have no login (see `brain/README.md`).
+- `npx tsx test/ui.test.ts`: the whole first-use journey in Chrome (playwright-core), desktop and phone. It covers host/join, owner, approving the manager, a goal, work by hand, simulated workers moving cards, the details panel, shared memory, a second person asking to manage, remembered team, start over, sample data and present view. It needs `npm run build && npm run preview -- --port 4173`, the local brain, Chrome and `spacetime` on PATH. It publishes a fresh `bilal-ux` database.
+- `npx tsx test/start-flow.ts`: the product end to end. It runs `.\start.ps1 -Simulate`, makes you the owner, approves the manager, types a goal, and checks the real manager plans it (1 haiku run) and the workers finish it. Then it runs `.\stop.ps1`.
+- `test/loop-ui.ts`: the last step of `mcp/test/e2e/loop.ps1`.

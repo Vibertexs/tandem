@@ -30,12 +30,38 @@ $logs = Join-Path $state 'logs'
 New-Item -ItemType Directory -Force $logs | Out-Null
 $pids = @()
 $hosting = -not $Join
+# What an earlier start.ps1 left running, so running it again does not start duplicates.
+$pidFile = Join-Path $state 'pids.json'
+$old = @()
+if (Test-Path $pidFile) {
+  # PowerShell 5.1 hands a JSON array to the pipeline as one object; ForEach-Object unrolls it.
+  $old = @((Get-Content $pidFile -Raw | ConvertFrom-Json) | ForEach-Object { $_ } | Where-Object { Get-Process -Id $_.pid -ErrorAction SilentlyContinue })
+}
+function Running($name) { [bool]($old | Where-Object { $_.name -eq $name }) }
+# Runs a native command. PowerShell 5.1 turns anything a tool prints on stderr (even a warning)
+# into an error under 'Stop', so judge native tools by their exit code only.
+function Native($exe, [string[]]$argList) {
+  $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  try { $out = & $exe @argList 2>&1 | ForEach-Object { "$_" } | Out-String; $code = $LASTEXITCODE }
+  finally { $ErrorActionPreference = $old }
+  return @{ out = $out; code = $code }
+}
 function Up($port) { [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) }
 function Step($m) { Write-Host "`n== $m" -ForegroundColor Cyan }
 function Tsx($dir) { 'file:///' + ((Join-Path $root "$dir\node_modules\tsx\dist\esm\index.mjs") -replace '\\', '/') }
-function Spawn($name, $file, $argList, $log) {
-  $p = Start-Process -FilePath $file -ArgumentList $argList -WindowStyle Hidden -PassThru `
-    -RedirectStandardOutput (Join-Path $logs "$log.log") -RedirectStandardError (Join-Path $logs "$log.err")
+# Starts a background process that logs to .tandem\logs. It goes through ShellExecute so it does
+# not inherit this script's handles: whoever ran start.ps1 (a terminal, a script, Claude Code)
+# gets control back right away instead of waiting on the workers' output.
+function Spawn($name, $file, [string[]]$argList, $log, $cwd = $root) {
+  $quoted = ($argList | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
+  $out = Join-Path $logs "$log.log"; $err = Join-Path $logs "$log.err"
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $env:ComSpec
+  $psi.Arguments = "/d /s /c `"`"$file`" $quoted > `"$out`" 2> `"$err`"`""
+  $psi.UseShellExecute = $true
+  $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+  $psi.WorkingDirectory = $cwd
+  $p = [System.Diagnostics.Process]::Start($psi)
   $script:pids += @{ name = $name; pid = $p.Id }
 }
 
@@ -50,7 +76,8 @@ Step 'Installing packages (first run only)'
 foreach ($dir in 'brain\spacetimedb', 'brain', 'mcp', 'dashboard', 'launcher', 'manager') {
   if (-not (Test-Path (Join-Path $root "$dir\node_modules"))) {
     Write-Host "  npm install in $dir"
-    Push-Location (Join-Path $root $dir); npm install --silent --no-fund --no-audit | Out-Null; Pop-Location
+    Push-Location (Join-Path $root $dir); $r = Native 'npm.cmd' @('install', '--silent', '--no-fund', '--no-audit'); Pop-Location
+    if ($r.code -ne 0) { Write-Host $r.out; throw "npm install failed in $dir" }
   }
 }
 
@@ -66,11 +93,11 @@ if ($hosting) {
     Write-Host '  already running'
     if ($Lan) { Write-Host '  note: it was started without -Lan; run .\stop.ps1 -All, then .\start.ps1 -Lan, to open it to your network' -ForegroundColor Yellow }
   }
-  & spacetime server add dev3001 --url http://127.0.0.1:3001 --no-fingerprint 2>&1 | Out-Null
+  Native 'spacetime' @('server', 'add', 'dev3001', '--url', 'http://127.0.0.1:3001', '--no-fingerprint') | Out-Null
   $publish = @('publish', $Db, '--server', 'dev3001', '--no-config', '--module-path', (Join-Path $root 'brain\spacetimedb'), '--yes')
   if ($Fresh) { $publish += '--delete-data=always' }
-  $out = & spacetime @publish 2>&1 | Out-String
-  if ($LASTEXITCODE -ne 0) { Write-Host $out; throw "Publishing $Db failed. If the schema changed, try .\start.ps1 -Fresh (this wipes $Db)." }
+  $r = Native 'spacetime' $publish
+  if ($r.code -ne 0) { Write-Host $r.out; throw "Publishing $Db failed. If the schema changed, try .\start.ps1 -Fresh (this wipes $Db)." }
   Write-Host "  team '$Db' is ready"
   $uri = 'ws://127.0.0.1:3001'
 } else {
@@ -80,9 +107,7 @@ if ($hosting) {
 
 Step 'The page (http://localhost:5173)'
 if (-not (Up 5173)) {
-  Push-Location (Join-Path $root 'dashboard')
-  Spawn 'page' 'npx.cmd' @('vite', '--port', '5173', '--strictPort') 'page'
-  Pop-Location
+  Spawn 'page' 'npx.cmd' @('vite', '--port', '5173', '--strictPort') 'page' (Join-Path $root 'dashboard')
   for ($i = 0; $i -lt 40 -and -not (Up 5173); $i++) { Start-Sleep -Milliseconds 500 }
   Write-Host '  started'
 } else { Write-Host '  already running' }
@@ -93,19 +118,22 @@ if ($Workers -gt 0 -or ($hosting -and -not $NoManager)) {
   if (-not (Test-Path (Join-Path $Repo '.git'))) {
     Step "Creating a playground repo for the workers: $Repo"
     New-Item -ItemType Directory -Force $Repo | Out-Null
-    git -C $Repo init -q
+    Native 'git' @('-C', $Repo, 'init', '-q') | Out-Null
     Set-Content -Path (Join-Path $Repo 'README.md') -Value '# Tandem playground' -Encoding ascii
     Set-Content -Path (Join-Path $Repo '.gitignore') -Value '.worktrees/' -Encoding ascii
-    git -C $Repo add -A
-    git -C $Repo -c user.name=tandem -c user.email=tandem@localhost commit -q -m 'Start'
+    Native 'git' @('-C', $Repo, 'add', '-A') | Out-Null
+    $c = Native 'git' @('-C', $Repo, '-c', 'user.name=tandem', '-c', 'user.email=tandem@localhost', 'commit', '-q', '-m', 'Start')
+    if ($c.code -ne 0) { Write-Host $c.out; throw "Could not create the playground repo at $Repo" }
   }
 }
 
 $env:STDB_URI = $uri; $env:STDB_DB = $Db; $env:TANDEM_SESSION = 'live'
-if ($hosting -and -not $NoManager) {
+if ($hosting -and -not $NoManager -and (Running 'manager')) {
+  Step 'Manager'; Write-Host '  already running'
+} elseif ($hosting -and -not $NoManager) {
   Step 'Manager (plans every goal you type)'
   $env:TANDEM_TOKEN_FILE = Join-Path $root "mcp\.tandem\manager-token-$Db"
-  Spawn 'manager' 'node' @('--import', (Tsx 'manager'), (Join-Path $root 'manager\watch.ts'), '--repo', "`"$Repo`"", '--model', $Model, '--budget', $Budget) 'manager'
+  Spawn 'manager' 'node' @('--import', (Tsx 'manager'), (Join-Path $root 'manager\watch.ts'), '--repo', $Repo, '--model', $Model, '--budget', $Budget) 'manager'
   Write-Host '  started. The first time, the page asks you to approve "Manager Claude".'
 }
 
@@ -115,18 +143,16 @@ if ($Workers -gt 0) {
   $offset = if ($hosting) { 0 } else { 3 }   # joiners get other names than the host's workers
   for ($i = 0; $i -lt $Workers; $i++) {
     $name = $names[($i + $offset) % $names.Count] + $(if ($hosting) { '' } else { "-$env:COMPUTERNAME".ToLower() })
+    if (Running "worker $name") { Write-Host "  $name (already running)"; continue }
     $env:TANDEM_TOKEN_FILE = Join-Path $root "mcp\.tandem\worker-$name-$Db"
     $env:LAUNCHER_MODEL = $Model; $env:LAUNCHER_BUDGET_USD = $Budget
-    $nodeArgs = @('--import', (Tsx 'launcher'), (Join-Path $root 'launcher\launcher.ts'), '--name', $name, '--repo', "`"$Repo`"")
+    $nodeArgs = @('--import', (Tsx 'launcher'), (Join-Path $root 'launcher\launcher.ts'), '--name', $name, '--repo', $Repo)
     if ($Simulate) { $nodeArgs += @('--simulate', '--sim-ms', '3000') }
     Spawn "worker $name" 'node' $nodeArgs "worker-$name"
     Write-Host "  $name"
   }
 }
 
-$old = @()
-$pidFile = Join-Path $state 'pids.json'
-if (Test-Path $pidFile) { $old = @(Get-Content $pidFile -Raw | ConvertFrom-Json) }
 ConvertTo-Json -InputObject @(@($old) + $pids) -Depth 3 | Set-Content -Path $pidFile -Encoding utf8
 
 Step 'Ready'

@@ -3,10 +3,14 @@
 The planner: a Claude Code session with the tandem MCP that turns the operator's goals into tasks.
 
 ## How to run it
-1. The operator types a goal on the dashboard (My team). It waits as "Waiting for the manager".
-2. Run `powershell -File manager/run.ps1 -Db bilal-dev`. It prints the manager's identity.
-3. The first time, authorize that identity on the dashboard (Manage > Who can operate). Then run it again.
-4. The manager reads every waiting goal, splits each into tasks with file lists and dependencies, and marks the goal planned. Workers pick the tasks up.
+`.\start.ps1` in the repo root starts the manager for you (`watch.ts`). By hand: `cd manager && npm install && npx tsx watch.ts --repo <repo>` (env `STDB_URI`, `STDB_DB`).
+
+1. The first time, the watcher asks to manage the team. The page shows "Manager Claude wants to help manage this team"; click **Approve**. Its login is saved, so this happens once.
+2. You type a goal on the Board. Within a few seconds the watcher sees it and runs `run.ps1` once for all waiting goals.
+3. The manager splits each goal into tasks with file lists and dependencies, writes shared interfaces to Shared memory when needed, and marks the goal planned. Workers pick the tasks up.
+4. A goal that fails to plan twice is skipped, so one bad goal cannot use up your quota.
+
+`run.ps1` alone plans whatever is waiting once and stops (`powershell -File manager/run.ps1 -Db <team>`).
 
 `run.ps1` is one headless `claude -p` run (haiku, `--max-budget-usd 0.50` by default; change with `-Model` and `-MaxBudgetUsd`). It uses `--mcp-config`, so nothing is added to your Claude Code settings. For an interactive manager instead, start Claude Code with the tandem MCP and paste `PROMPT.md`.
 

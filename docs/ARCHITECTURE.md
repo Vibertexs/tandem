@@ -20,8 +20,9 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 ## The parts
 - **Brain** (`brain/`): the shared notebook. Holds goals, tasks, file locks, workers, an event log and shared notes. Its rules are the point: claiming a task, locking its files and unblocking waiting tasks each happen as one indivisible step.
 - **MCP server** (`mcp/`): the buttons Claude can press. 16 tools from `contract/tools.json`. One file (`src/brain-client.ts`) talks to the database. `BRAIN_MODE=mock` swaps in an in-memory copy.
-- **Dashboard** (`dashboard/`): one page. Demo is a private sandbox with simulated workers. My team is the real session: a prompt box, staged progress, Add a teammate, and Manage.
-- **Manager** (`manager/`): `PROMPT.md` plus `run.ps1`. A Claude that reads goals (`get_goals`), splits each into tasks with file lists and dependencies (`assign_task`, `create_job`), and marks it planned (`mark_goal`).
+- **Dashboard** (`dashboard/`): the web page. Start screen (host or join), then a Jira-style app: Board (prompt, next step, Waiting → To do → In progress → Done, task details), Goals, Team, Shared memory, Activity, Settings.
+- **Manager** (`manager/`): `watch.ts` waits for goals and runs `run.ps1` (a headless Claude with `PROMPT.md`) that reads goals (`get_goals`), splits each into tasks with file lists and dependencies (`assign_task`, `create_job`), and marks it planned (`mark_goal`).
+- **start.ps1 / stop.ps1**: one command starts the brain, the page, the manager and the workers (`-Simulate` for fake coding, `-Lan` to let others join, `-Join` to add workers to someone else's team).
 - **Worker rules** (`mcp/skill/SKILL.md`): what every worker Claude follows. Claim, touch only your files, respect locks, report, complete.
 - **Lock-check hook** (`mcp/hook/check-lock.mjs`): stops a Claude from editing a file another task holds. This is enforcement, not just a rule.
 - **Launcher** (`launcher/launcher.ts`): on each teammate's machine. Claims a task, runs `claude -p` in a git worktree on branch `task/<id>`, commits, completes. `--simulate` fakes the coding for demos.
@@ -47,15 +48,14 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 - **A worker hits its limit (usage 100):** it is capped and its running task goes back to the queue.
 
 ## How teammates join
-A teammate does not need approval to work. Either they run the launcher, or they connect their own Claude Code with one `claude mcp add` command (the dashboard's "Add a teammate" shows it) plus the worker skill. Only sending goals or changing the team needs an operator.
+A teammate does not need approval to work. On their computer they run `.\start.ps1 -Join ws://<host>:3001 -Db <team>` (the Team page shows the exact command), or connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Ask to make changes**, and the owner clicks **Approve**. The manager asks the same way.
 
 ## Who may do what
 - **Worker actions** (register, claim, lock, complete, heartbeat, report): open to everyone, in every session. No per-worker login yet.
-- **Manager actions** (create task or job, goals, shared notes, seed, reset): in the `live` session only an **operator** may do them. The first person to claim becomes the operator and authorizes others: their browser, or the manager Claude, whose identity `run.ps1` prints.
-- Demo sandboxes stay open.
+- **Manager actions** (goals, tasks and jobs, shared memory, clearing the board, approvals): only an **operator** may do them in the team's `live` session. The first visitor becomes the owner ("Make me the owner"); others ask, and an operator approves.
 
-## Sessions
-Every row has a `session_id`. The real team uses `live`. Each demo visitor gets their own session, so ten people never see each other's data, and Reset only clears your own.
+## Teams and sessions
+A team is one database on a brain (`-Db`, default `tandem-local`). The page and every Claude use its `live` session. The brain still supports other sessions (the tests use them to stay isolated).
 
 ## Open design questions
 - Who merges the `task/<id>` branches into `main`, and who resolves conflicts? Suggestion: an integrate task run by a worker Claude, escalating to a human, landing through a reviewed PR.
