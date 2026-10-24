@@ -2,8 +2,8 @@
 // worktree, so the files you have open in the repo are never touched. A branch that conflicts
 // is skipped (the merge is aborted) and reported; nothing is ever forced.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 // failed: branches that conflicted; conflicts: the files each one conflicted in.
 export type MergeResult = { target: string; merged: string[]; failed: string[]; missing: string[]; conflicts: Record<string, string[]> };
@@ -17,6 +17,7 @@ export function mergeGoal(repo: string, goalId: string, goalText: string, branch
   const tree = join(repo, '.worktrees', `merge-${goalId}`);
   const result: MergeResult = { target, merged: [], failed: [], missing: [], conflicts: {} };
   try {
+    ignoreWorktrees(repo);
     git(repo, 'worktree', 'prune');
     if (existsSync(tree)) git(repo, 'worktree', 'remove', '--force', tree);
     if (hasBranch(target)) git(repo, 'worktree', 'add', '-q', tree, target);
@@ -39,6 +40,18 @@ export function mergeGoal(repo: string, goalId: string, goalText: string, branch
     try { git(repo, 'worktree', 'remove', '--force', tree); } catch { /* already gone */ }
   }
   return result;
+}
+
+// Keeps .worktrees/ out of `git status` in the user's repo: a local-only ignore rule in
+// .git/info/exclude (never committed, so the repo itself is not changed).
+export function ignoreWorktrees(repo: string) {
+  try {
+    const exclude = resolve(repo, git(repo, 'rev-parse', '--git-common-dir'), 'info', 'exclude');
+    const now = existsSync(exclude) ? readFileSync(exclude, 'utf8') : '';
+    if (/^\/?\.worktrees\/?\s*$/m.test(now)) return;
+    mkdirSync(dirname(exclude), { recursive: true });
+    appendFileSync(exclude, `${now && !now.endsWith('\n') ? '\n' : ''}# Tandem's task worktrees\n.worktrees/\n`);
+  } catch { /* not a repo, or read-only: only cosmetic */ }
 }
 
 const conflictedFiles = (tree: string) => {

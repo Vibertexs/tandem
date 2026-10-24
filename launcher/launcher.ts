@@ -17,7 +17,7 @@ import { parseArgs } from 'node:util';
 import { BrainClient, type Task } from '../mcp/src/brain-client.js';
 import { loadRouting, route } from './routing.js';
 import { isRateLimit, resetTime } from './limits.js';
-import { filesWithMarkers, mergeInProgress, pushIfRemote, startConflictMerge } from '../manager/merge.js';
+import { filesWithMarkers, ignoreWorktrees, mergeInProgress, pushIfRemote, startConflictMerge } from '../manager/merge.js';
 import { conflictBranch } from '../manager/finish.js';
 
 const { values: opt } = parseArgs({
@@ -121,6 +121,7 @@ async function realRun(t: Task) {
   const tree = join(repo, '.worktrees', t.id);
   const branch = `task/${t.id}`;
   if (!existsSync(tree)) {
+    ignoreWorktrees(repo);
     mkdirSync(join(repo, '.worktrees'), { recursive: true });
     // A task added to a goal after its work was merged (like a test fix) starts from the goal branch.
     let base = 'HEAD';

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { mergeGoal, mergeNote, pushIfRemote } from '../merge.js';
+import { ignoreWorktrees, mergeGoal, mergeNote, pushIfRemote } from '../merge.js';
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail: unknown = '') => {
@@ -57,6 +57,18 @@ git('remote', 'add', 'origin', bare);
 check('push: with an origin remote, the goal branch is pushed', pushIfRemote(repo, 'tandem/g1') === 'pushed' &&
   execFileSync('git', ['--git-dir', bare, 'rev-parse', '--verify', '--quiet', 'refs/heads/tandem/g1'], { encoding: 'utf8' }).trim() === git('rev-parse', 'tandem/g1'));
 check('push: a branch that does not exist fails without throwing', pushIfRemote(repo, 'nope/branch') === 'failed');
+
+// your own repo, with no .gitignore for .worktrees: it stays out of `git status`, nothing is committed
+{
+  const own = mkdtempSync(join(tmpdir(), 'tandem-own-'));
+  const g = (...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@x', ...a], { cwd: own, encoding: 'utf8', stdio: 'pipe' }).trim();
+  g('init', '-q', '-b', 'main'); writeFileSync(join(own, 'app.py'), 'x = 1\n'); g('add', '-A'); g('commit', '-q', '-m', 'start');
+  mkdirSync(join(own, '.worktrees', 'task-1'), { recursive: true }); writeFileSync(join(own, '.worktrees', 'task-1', 'f'), 'x');
+  ignoreWorktrees(own); ignoreWorktrees(own); // twice: added once
+  const exclude = readFileSync(join(own, '.git', 'info', 'exclude'), 'utf8');
+  check('your repo: .worktrees/ is ignored locally (git status stays clean), once, with nothing committed',
+    g('status', '--porcelain') === '' && (exclude.match(/^\.worktrees\/$/gm) ?? []).length === 1 && !existsSync(join(own, '.gitignore')), [g('status', '--porcelain'), exclude]);
+}
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);
