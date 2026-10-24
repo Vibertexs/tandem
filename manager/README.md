@@ -6,13 +6,17 @@ The planner: a Claude Code session with the tandem MCP that turns the operator's
 `.\start.ps1` in the repo root starts the manager for you (`watch.ts`). By hand: `cd manager && npm install && npx tsx watch.ts --repo <repo>` (env `STDB_URI`, `STDB_DB`).
 
 1. The first time, the watcher asks to manage the team. The page shows "Manager Claude wants to help manage this team"; click **Approve**. Its login is saved, so this happens once.
-2. You type a goal on the Board. Within a few seconds the watcher sees it and runs `run.ps1` once for all waiting goals.
+2. You type a goal on the Board. Within a few seconds the watcher sees it and runs `plan.ts` once for all waiting goals.
 3. The manager splits each goal into tasks with file lists and dependencies, writes shared interfaces to Shared memory when needed, and marks the goal planned. Workers pick the tasks up.
 4. A goal that fails to plan twice is skipped, so one bad goal cannot use up your quota.
 
-`run.ps1` alone plans whatever is waiting once and stops (`powershell -File manager/run.ps1 -Db <team>`).
+`npx tsx plan.ts --db <team>` plans whatever is waiting once and stops (`run.ps1` is the same, for PowerShell scripts).
 
-`run.ps1` is one headless `claude -p` run (haiku, `--max-budget-usd 0.50` by default; change with `-Model` and `-MaxBudgetUsd`). It uses `--mcp-config`, so nothing is added to your Claude Code settings. For an interactive manager instead, start Claude Code with the tandem MCP and paste `PROMPT.md`.
+5. When every task of a goal is done, `finish.ts` merges the task branches into `tandem/<goal id>` (`merge.ts`, in a separate worktree), runs the project's tests on it (`verify.ts`: an npm `test` script or Python unittest files), and finishes the goal. If the tests fail, it adds one "Fix the failing tests" task to the goal first; the launcher starts that task from the goal branch. With `--push`, the goal branch is pushed to origin and, if the GitHub CLI is set up, a PR is opened.
+
+Tests: `npm test` here (merge, verify, finish, push; no Claude calls).
+
+Planning is one headless `claude -p` run (haiku, `--max-budget-usd 0.50` by default; `start.ps1 -ManagerModel` changes the model). It uses `--mcp-config`, so nothing is added to your Claude Code settings. For an interactive manager instead, start Claude Code with the tandem MCP and paste `PROMPT.md`.
 
 ## Checklist
 - [x] Finish `PROMPT.md` (fill in the [FILL] parts): goals come from `get_goals`; 1 worked example

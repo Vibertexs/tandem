@@ -1,75 +1,71 @@
-# Status: morning of 2026-10-24 (overnight run on `bilal/overnight`)
+# Status (morning of 2026-10-24, branch `bilal/polish`)
 
 ## In one line
-**The whole loop works.** You type a goal, a manager Claude plans it, two worker Claudes do it without colliding, and the page shows it all done. It passed with real Claude runs twice in a row.
+**Tandem works end to end as a product.**
+1. `.\start.ps1` starts everything and opens the page.
+2. You make yourself the owner, approve the manager with one click, and type a goal.
+3. The manager splits the goal into tasks, and the workers (real Claude runs or simulated) do them without colliding.
+4. Their work is merged into one `tandem/<goal>` branch, and your tests run on it.
+5. The page shows every step live.
 
-## Try this first (about 2 minutes, uses 3 small haiku runs)
-The local database (port 3001) and the dashboard (port 5173) were left running.
+## Try this first (about 2 minutes, one small Claude run for planning)
 ```
-powershell -File mcp\test\e2e\loop.ps1
+.\start.ps1 -Simulate
 ```
-Then open http://localhost:5173/?mode=team&db=bilal-loop to see the result: the goal "✓ Planned", 3 tasks in Done, and Alice and Bob on the team.
+On the page that opens:
+1. Click **Make me the owner**.
+2. Click **Approve** on "Manager Claude".
+3. Type *"A tiny Python calculator with add and sub, tests, and a README"* and press Send.
+4. Watch the board, then open **Goals**.
 
-Do it by hand instead:
-1. Open http://localhost:5173/?mode=team. If the page offers it, claim the team. Type a goal.
-2. Run `powershell -File manager/run.ps1 -Db bilal-dev`. The first time, paste the identity it prints into Manage > Who can operate, then run it again.
-3. Start workers: `cd launcher; npx tsx launcher.ts --name You --repo <a git repo>`. Or connect your own Claude Code with "Add a teammate".
+For the real thing, `.\start.ps1` (no `-Simulate`): each task becomes a real Claude Code run (haiku by default) in the playground repo next to this folder, and the goal ends as one branch you can `git checkout`.
 
-## What was built tonight
-| Milestone | What | Proof |
-|---|---|---|
-| M1 | `get_goals` and `mark_goal` added to `contract/tools.json` (16 tools) and the MCP server | mcp suites: 16 + 29 + 13 checks |
-| M2 | Manager: `manager/PROMPT.md` (rules + worked example), `manager/run.ps1` (headless, haiku, $0.50 cap) | full loop, both runs |
-| M3 | Worker rules skill `mcp/skill/SKILL.md`. "Add a teammate" now includes the skill step | full loop, both runs |
-| M4 | Full-loop test `mcp/test/e2e/loop.ps1`: goal → manager → 2 workers → done → dashboard | **LOOP PASSED x2** |
-| M5 | Lock-check hook `mcp/hook/check-lock.mjs` (PreToolUse, exit 2 blocks) | 13 checks, plus a real Claude blocked |
-| M6 | Launcher `launcher/launcher.ts`: worktrees, routing, hook, budget cap, `--simulate` | 19 checks, plus 1 real run |
-| M7 | This file, `docs/PR.md`, `docs/ARCHITECTURE.md`, README checklists | |
+`.\stop.ps1` stops it. `.\test.ps1` runs every test.
 
-### The full loop, both runs
-- The manager split "tiny Python calculator" into `Write calc.py` and `Write the README` in parallel, then `Test calc.py` after calc.py. It wrote the shared interface into context first.
-- Two workers (Alice, Bob) split the work. Nothing that shares a file overlapped. Every planned file exists, and `python -m unittest` on the workers' own tests passes.
-- The dashboard (My team) shows the goal "✓ Planned", "3 of 3 tasks done", every card in Done, and both workers.
+## What changed overnight
+| Area | What |
+|---|---|
+| Page | Start screen (Host a team / Join a team; "Can't reach" and "needs an update" screens). Jira-style app: Board, Goals, Team, Shared memory, Activity, Settings. One next step at a time, not a checklist. Demo mode removed. |
+| Access | "Make me the owner" for the first visitor. Anyone else (and the manager) clicks **Ask to make changes**; the owner clicks **Approve**. No identities to copy. |
+| Goals | Tasks remember their goal. Per-goal progress on the board, a goal filter, and goal cards with their tasks. A finished goal shows its branch and how it went ("Tests pass"). A toast when a goal is done. |
+| Result | When a goal's tasks are done, the manager merges their branches into `tandem/<goal>` (in a separate worktree, so your open files are never touched) and runs your tests on it. If the tests fail, it adds one "Fix the failing tests" task to the goal and tries again. |
+| Start | `start.ps1` / `stop.ps1`: one command for the brain, page, manager and workers (`-Simulate`, `-Lan`, `-Join`, `-Workers`, `-Repo`, `-Push`, `-Model auto`, `-Fresh`). Safe to run twice. Returns at once even when piped (no handle inheritance). `start.sh` / `stop.sh` for macOS and Linux. |
+| Connection | Workers and the manager reconnect by themselves after a brain restart. The page says "Reconnecting…" and recovers; it no longer doubles its subscriptions. The sidebar shows "Manager online". |
+| Teams on several computers | `-Push`: workers push their task branches and the manager pushes each goal branch (and opens a PR if the GitHub CLI is set up). |
+| Docs | New root README (with screenshots), `docs/ROADMAP.md`, architecture updated, the original spec moved to `docs/SPEC.md`. |
 
-### The hook with a real Claude
-A Claude told to rewrite `notes.txt`, while Alice's task held it, answered: "Blocked: a Tandem lock hook refused the write because notes.txt is locked by task t-notes (worker w-alice), so I stopped without changing the file." The file was unchanged.
+## Tested
+`.\test.ps1` on the final code: **9 suites, 245 checks, all pass** (no Claude calls).
 
-### The launcher with a real Claude
-It claimed `t-hello`, made a worktree on branch `task/t-hello`, ran haiku, committed `hello.py` on that branch, completed the task, and left `main` alone.
+| Suite | Checks |
+|---|---|
+| brain (atomic rules, sessions, goals, presence) | 57 |
+| brain: who may do what (owner, requests, approvals) | 28 |
+| mcp: mock mode | 16 |
+| mcp: 16 tools, real brain | 29 |
+| mcp: manager identity | 13 |
+| mcp: lock-check hook | 13 |
+| launcher (routing, simulate) | 19 |
+| manager: merge, test, finish, push | 27 |
+| page in Chrome (the whole first-use journey, desktop and phone) | 43 |
 
-## Automated suites on the final commit (no Claude calls)
-| Suite | Command | Result |
-|---|---|---|
-| brain | `cd brain && npm test` | 51 PASS |
-| brain auth | `npm run test:auth` | 17 PASS |
-| mcp mock | `cd mcp && npm run test:mock` | 16 PASS |
-| mcp real brain | `npm test` | 29 PASS |
-| mcp operator | `npm run test:operator` | 13 PASS |
-| mcp hook | `npm run test:hook` | 13 PASS |
-| launcher | `cd launcher && npm test` | 19 PASS |
-| dashboard scenarios | `cd dashboard && npm test` | 24 PASS |
-| dashboard in Chrome | `npm run build && npm run test:ui` (preview on 4173) | 64 PASS |
+Also passing:
+- `.\test.ps1 -Restart` (the page and a worker survive a brain restart): 6 checks.
+- Real Claude runs (haiku, each capped at $0.50):
+  - **`start.ps1` with real workers** (`FLOW_REAL=1`): goal typed on the page → manager planned 3 tasks → two real Claudes built them → merged into `tandem/<goal>` → the workers' tests pass on that branch. The git history shows the three task branches merged cleanly.
+  - `start.ps1 -Simulate`: goal → plan → done, twice (the second time through the new cross-platform `plan.ts`).
+  - Earlier in the night: the full loop twice, the hook blocking a real Claude, and the launcher in a worktree.
+- About 14 real runs were used in total, all haiku.
 
-`npx tsc`: 0 errors in `mcp/`, `launcher/` and `dashboard/`.
+## Not done, or not proven
+- Not tried on a Mac: `start.sh` was only checked in Git Bash.
+- The PR-per-goal step (`gh pr create`) is built but not tried, because `gh` is not installed here. Pushing to an origin is tested against a local bare repo.
+- Real rate limits, and a real "tests fail, fix task" round with real Claude. The fix round is tested with real git repos and a fake brain.
+- No per-worker login: anyone who can reach the brain can act as any worker. Managing the team is restricted to approved people.
+- Nothing is hosted on Maincloud (needs `spacetime login` in a browser).
 
-## Real Claude runs used: 8 of 12 (all haiku, each `--max-budget-usd 0.50`)
-| # | What | Result |
-|---|---|---|
-| 1-3 | Full loop, run 1 (manager, Alice, Bob) | passed |
-| 4 | Hook: Bob tries to edit a locked file | blocked, as it should be |
-| 5 | Launcher: one task in a worktree | passed |
-| 6-8 | Full loop, run 2 | passed |
+## Branches
+`bilal/polish` carries everything:
+`bilal/brain` → `bilal/mcp` → `bilal/brain-full` → `bilal/dashboard` → `bilal/operator` → `bilal/simple-ui` → `bilal/overnight` → `bilal/polish`.
 
-## Not done or not proven
-- **Hosting:** only this laptop can reach the brain. Publishing to Maincloud needs `spacetime login` in a browser, which only you can do.
-- **Launcher, untested paths:** real rate limits (it caps the worker, which requeues the task, but `reset_at` is not read) and the retry-at-higher-effort path have not been tested against real failures. It commits but does not push, because the test repo has no remote.
-- **No fail tool:** a task that fails twice waits for the 2-minute stale cleanup.
-- **Map-reduce from a real manager:** not tried. The tools and brain do it (tested), but no real "for every module" goal has been planned.
-- **`report_usage.py`:** the statusLine capacity reporter is not built. The placeholder is untouched.
-- **Interactive setup:** `claude mcp add` and the skill in `.claude/skills/` have not been tried by hand. Every real run used `--mcp-config` and pasted the skill into the prompt.
-- **No per-worker login.** Merging `task/<id>` branches back into `main` is still a manual step.
-
-## Notes for you
-- `contract/` changed in one way only: the two goal tools and a `goals` table, as you agreed. Other contract issues are in `mcp/NOTES.md`.
-- The Python placeholders are untouched. No settings file was changed. Nothing went to `main`. Nothing was published to `tandem` or Maincloud.
-- One PR from `bilal/overnight` into `main` carries everything. The description is in `docs/PR.md`. `gh` is not installed, so open it on GitHub: https://github.com/Vibertexs/tandem/pull/new/bilal/overnight
+Nothing is on `main`. The PR text is in `docs/PR.md`. Open it at https://github.com/Vibertexs/tandem/pull/new/bilal/polish
