@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Api, Goal, Snapshot, Task } from './brain';
 import { ApplyControl } from './Apply';
+import { FinishedStrip } from './Finished';
 import { Avatar, EV_ICON, agentLabel, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, modelFor, money, online, stageOf, took, why, type Stage } from './ui';
 
 type Props = { snap: Snapshot; api: Api | null; isOp: boolean; now: number; say: (m: string) => void; present: boolean; go: (page: string) => void };
@@ -212,13 +213,14 @@ function GoalLane({ lane, p, open, setOpen, flash }: { lane: Lane; p: Props; ope
   );
 }
 
-function Summary({ snap }: { snap: Snapshot }) {
-  const total = snap.tasks.length;
+// The progress of the work still going (finished goals are summed up in Activity).
+function Summary({ tasks }: { tasks: Task[] }) {
+  const total = tasks.length;
   const counts: Record<Stage, number> = { waiting: 0, todo: 0, doing: 0, done: 0 };
-  for (const t of snap.tasks) counts[stageOf(t)]++;
+  for (const t of tasks) counts[stageOf(t)]++;
   const pct = total ? Math.round((100 * counts.done) / total) : 0;
-  const jobs = [...new Set(snap.tasks.filter(t => t.jobId).map(t => t.jobId!))].map(id => {
-    const maps = snap.tasks.filter(t => t.jobId === id && t.kind === 'map');
+  const jobs = [...new Set(tasks.filter(t => t.jobId).map(t => t.jobId!))].map(id => {
+    const maps = tasks.filter(t => t.jobId === id && t.kind === 'map');
     return { id, done: maps.filter(t => t.status === 'done').length, total: maps.length };
   });
   return (
@@ -354,36 +356,39 @@ export function BoardPage(p: Props) {
     }
   }, [snap.tasks]);
 
-  // Goals still going come first (newest first), then tasks that belong to no goal, then
-  // finished goals. A cancelled goal with nothing left on it is not shown.
+  // The board is the work still going: a lane per goal that is not finished (newest first), then
+  // tasks that belong to no goal. Finished goals leave the board: a one-line strip below, and the
+  // full history in Activity.
   const lanes = useMemo((): Lane[] => {
     const goalLanes = snap.goals
-      .map(g => ({ key: g.id, goal: g, tasks: snap.tasks.filter(t => t.goalId === g.id) }))
-      .filter(l => l.goal.status !== 'cancelled' || l.tasks.length > 0);
+      .filter(g => !FINISHED.includes(g.status))
+      .map(g => ({ key: g.id, goal: g, tasks: snap.tasks.filter(t => t.goalId === g.id) }));
     const loose = snap.tasks.filter(t => !snap.goals.some(g => g.id === t.goalId));
-    return [
-      ...goalLanes.filter(l => !FINISHED.includes(l.goal.status)),
-      ...(loose.length ? [{ key: 'other', goal: null, tasks: loose }] : []),
-      ...goalLanes.filter(l => FINISHED.includes(l.goal.status)),
-    ];
+    return [...goalLanes, ...(loose.length ? [{ key: 'other', goal: null, tasks: loose }] : [])];
   }, [snap.goals, snap.tasks]);
+  const activeTasks = lanes.flatMap(l => l.tasks);
+  const hasFinished = snap.goals.some(g => g.status === 'done');
 
   return (
     <div className="page board-page">
       {!present && <NextStep {...p} openTask={setOpen} />}
       {!present && <Prompt {...p} />}
-      {snap.tasks.length > 0 && <Summary snap={snap} />}
+      {activeTasks.length > 0 && <Summary tasks={activeTasks} />}
       {lanes.length === 0 ? (
-        <div className="empty-board card">
-          <p><strong>Nothing yet.</strong></p>
-          <p className="muted">{p.isOp ? 'Describe what you want built above. The manager splits it into tasks, and workers pick them up.' : 'When a controller sends a goal, it shows up here with its tasks.'}</p>
-          <p className="small muted">New here? <a href="#/team">See how to get started</a>.</p>
-        </div>
+        !hasFinished && (
+          <div className="empty-board card">
+            <p><strong>Nothing yet.</strong></p>
+            <p className="muted">{p.isOp ? 'Describe what you want built above. The manager splits it into tasks, and workers pick them up.' : 'When a controller sends a goal, it shows up here with its tasks.'}</p>
+            <p className="small muted">New here? <a href="#/team">See how to get started</a>.</p>
+          </div>
+        )
       ) : (
         <div className="lanes">
           {lanes.map(l => <GoalLane key={l.key} lane={l} p={p} open={open} setOpen={setOpen} flash={flash} />)}
         </div>
       )}
+      {lanes.length === 0 && hasFinished && <p className="muted center">Nothing in progress. Describe the next thing you want built above.</p>}
+      <FinishedStrip snap={snap} api={p.api} isOp={p.isOp} say={say} />
       {task && <><div className="scrim" onClick={() => setOpen(null)} /><Drawer t={task} snap={snap} now={now} onClose={() => setOpen(null)} api={p.api} isOp={p.isOp} say={say} /></>}
     </div>
   );

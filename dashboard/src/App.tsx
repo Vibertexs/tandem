@@ -6,8 +6,6 @@ import { BoardPage } from './Board';
 import { ActivityPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
 import { Dock } from './Dock';
 import { OverviewPage } from './Overview';
-import { ResultsPage } from './Results';
-import { FilesPage } from './Files';
 import { UsagePage } from './Usage';
 import { CodeLine, JoinSteps, isManager, managerOnline, online, restartForSharingCommand, useNow } from './ui';
 import type { Snapshot } from './brain';
@@ -15,8 +13,6 @@ import type { Snapshot } from './brain';
 const PAGES = [
   { key: 'overview', label: 'Overview' },
   { key: 'board', label: 'Board' },
-  { key: 'results', label: 'Results' },
-  { key: 'files', label: 'Files' },
   { key: 'team', label: 'Team' },
   { key: 'memory', label: 'Shared memory' },
   { key: 'usage', label: 'Usage' },
@@ -27,7 +23,8 @@ type PageKey = typeof PAGES[number]['key'];
 
 const pageFromHash = (): PageKey => {
   const raw = location.hash.replace(/^#\/?/, '');
-  const k = raw === 'setup' ? 'team' : raw; // getting started is part of the Team page
+  // getting started is part of the Team page; finished goals are part of Activity
+  const k = raw === 'setup' ? 'team' : raw === 'results' ? 'activity' : raw;
   return (PAGES.find(p => p.key === k)?.key ?? 'board') as PageKey;
 };
 
@@ -146,8 +143,6 @@ export function App() {
         <main>
           {page === 'overview' && <OverviewPage {...common} go={go} />}
           {page === 'board' && <BoardPage {...common} isOp={isOp} present={config.present} go={go} />}
-          {page === 'results' && <ResultsPage {...common} />}
-          {page === 'files' && <FilesPage {...common} />}
           {page === 'usage' && <UsagePage {...common} />}
           {page === 'team' && <TeamPage {...common} team={team ?? { uri: '', db: 'sample' }} go={go} />}
           {page === 'memory' && <MemoryPage {...common} team={team ?? { uri: '', db: 'sample' }} />}

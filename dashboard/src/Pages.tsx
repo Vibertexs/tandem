@@ -5,6 +5,7 @@ import { shareable, type Team } from './config';
 import { GetStarted } from './Setup';
 import { LiveDatabase } from './Database';
 import { AgentCards } from './Agents';
+import { FinishedGoals } from './Finished';
 import { Avatar, Bar, CodeLine, EV_ICON, JoinSteps, WorkerStatus, agentLabel, ago, copy, isManager, money, online, restartForSharingCommand, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
@@ -145,12 +146,14 @@ const FILTERS = [
   { key: 'finished', label: 'Finished', keep: (type: string) => FINISHED.has(type) },
 ] as const;
 
-export function ActivityPage({ snap, now }: Common) {
+export function ActivityPage({ snap, api, isOp, say, now }: Common) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>('all');
   const keep = FILTERS.find(f => f.key === filter)!.keep;
   const shown = snap.events.filter(e => keep(e.type)).slice(0, 200);
   return (
     <div className="page">
+      <FinishedGoals snap={snap} api={api} isOp={isOp} say={say} />
+      <h2>Activity</h2>
       <p className="muted lead">What just happened, newest first.</p>
       <div className="row-actions filters" role="group" aria-label="Show">
         {FILTERS.map(f => (

@@ -20,12 +20,15 @@ const TABLES: TableView[] = [
 ];
 
 const text = (row: unknown) => JSON.stringify(row, (_k, v) => (v instanceof Date ? v.toISOString() : typeof v === 'string' && v.length > 90 ? `${v.slice(0, 87)}…` : v));
+// What decides that a table "changed". Heartbeats (a worker's or page's last_seen, refreshed every
+// few seconds) are left out, or the workers and presence cards would blink all the time.
+const signature = (row: unknown) => JSON.stringify(row, (k, v) => (k === 'lastSeen' ? undefined : v instanceof Date ? v.toISOString() : v));
 
 export function LiveDatabase({ snap, team }: { snap: Snapshot; team: Team }) {
   const live = !!team.uri;
   const rows = TABLES.map(t => t.rows(snap));
   // a table lights up for a moment when its rows change (a new row, or a row that changed)
-  const sigs = rows.map(r => text(r));
+  const sigs = rows.map(r => signature(r));
   const before = useRef<string[]>(sigs);
   const [lit, setLit] = useState<Set<string>>(new Set());
   const key = sigs.join('\u0000');

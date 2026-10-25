@@ -15,8 +15,6 @@ const svg = (children: ReactNode) => (
 );
 const ICONS: Record<string, ReactNode> = {
   overview: svg(<><rect x="3" y="3" width="7" height="7" rx="1.8" /><rect x="14" y="3" width="7" height="7" rx="1.8" /><rect x="3" y="14" width="7" height="7" rx="1.8" /><rect x="14" y="14" width="7" height="7" rx="1.8" /></>),
-  results: svg(<><rect x="3" y="3" width="18" height="18" rx="5" /><path d="m8 12.5 3 3 5-6" /></>),
-  files: svg(<><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></>),
   usage: svg(<path d="M5 20v-7M12 20V5M19 20v-10" />),
   board: svg(<><rect x="3" y="4" width="5" height="16" rx="1.5" /><rect x="10" y="4" width="5" height="10" rx="1.5" /><rect x="17" y="4" width="4" height="6" rx="1.5" /></>),
   team: svg(<><circle cx="9" cy="8" r="3.2" /><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" /><circle cx="17" cy="9" r="2.4" /><path d="M17.5 13.6c2.2.3 3.5 2 3.5 4.4" /></>),

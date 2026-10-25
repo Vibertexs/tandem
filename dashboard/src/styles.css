@@ -358,6 +358,9 @@ ol.log.card { padding: 6px 20px; }
 .stat-card { display: flex; flex-direction: column; gap: 2px; }
 .stat-value { font-size: 1.9rem; font-weight: 600; letter-spacing: -0.03em; line-height: 1.2; }
 .page > section > h2, .page > section > .row-actions { margin-bottom: 8px; }
+.finished-strip { display: flex; flex-direction: column; gap: 6px; padding: 14px 18px; }
+.finished-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.finished-goals { display: flex; flex-direction: column; gap: 12px; }
 .result { display: flex; flex-direction: column; gap: 8px; }
 .result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .result-title { font-size: 1rem; }
