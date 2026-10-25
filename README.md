@@ -17,6 +17,8 @@ Give Tandem one outcome. It splits the work across your team's agents, keeps the
 
 </div>
 
+https://github.com/user-attachments/assets/5382ae73-4773-4435-af94-7a36a0ffcc84
+
 ## Overview
 
 1. **One prompt for the whole team.** The conductor turns a goal into small tasks, each with the exact files it
