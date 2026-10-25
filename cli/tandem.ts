@@ -9,7 +9,7 @@
 // Run `tandem help` for the options. Every person's Claude Code runs under their own login.
 import { spawn, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
-import { existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { hostname, networkInterfaces } from 'node:os';
 import { basename, delimiter, dirname, join, resolve } from 'node:path';
@@ -31,7 +31,8 @@ const SIM_LIMIT = Number(process.env.TANDEM_SIM_LIMIT ?? 0);
 
 const HELP = `tandem: your team's Claude Codes, working as one.
 
-  Quick: "tandem start" in your project, then "tandem -d" any time to open the dashboard.
+  Quick: "tandem --start" in your project, then "tandem" any time to open the dashboard.
+  Every command works as a word or a flag: tandem start = tandem --start, tandem stop = tandem --stop.
 
   tandem start              Start a team for the git repo you are in. Prints the invite address.
     --workers N             workers on this computer (default 1, one Claude per person; 0 = none)
@@ -59,7 +60,10 @@ const HELP = `tandem: your team's Claude Codes, working as one.
   tandem stop               Stop what this computer started (the brain keeps running).
     --all                   also stop the brain
 
-  tandem                    On its own: shows what is running and opens the dashboard.
+  tandem install            Put tandem on your PATH, so it works in any new terminal (once).
+  tandem uninstall          Take it off again.
+
+  tandem                    On its own: opens the dashboard. It shows what is running, or how to get started.
   tandem -d                 Open the dashboard (also: tandem dashboard, tandem open, tandem --dashboard).
   tandem status             What is running, with each team's links.
   tandem logs [part]        The latest log lines: all, or one part (manager, alex, brain, page).
@@ -297,6 +301,15 @@ function startWorkers(team: string, uri: string, repo: string, count: number, op
   return names;
 }
 
+// Starts the dashboard page if it is not running. Returns true if it had to start it.
+async function ensurePage(): Promise<boolean> {
+  if (await reachable('127.0.0.1', PAGE_PORT)) return false;
+  installPackages(['dashboard']);
+  background('page', '', process.execPath, [join(ROOT, 'dashboard', 'node_modules', 'vite', 'bin', 'vite.js'), '--port', String(PAGE_PORT), '--strictPort'], join(ROOT, 'dashboard'));
+  if (!(await waitFor('127.0.0.1', PAGE_PORT, 20))) fail(`The page did not start. See ${join(LOGS, 'page.err')}`);
+  return true;
+}
+
 // ---------- tandem start ----------
 async function start(argv: string[]) {
   if (argv.some(arg => arg === '--demo' || arg.startsWith('--demo='))) {
@@ -351,11 +364,7 @@ async function start(argv: string[]) {
     if (goals > 0) say(dim(`            kept the board from last time (${goals} goal${goals === 1 ? '' : 's'}). To start over: tandem start --fresh`));
   }
 
-  if (!(await reachable('127.0.0.1', PAGE_PORT))) {
-    background('page', '', process.execPath, [join(ROOT, 'dashboard', 'node_modules', 'vite', 'bin', 'vite.js'), '--port', String(PAGE_PORT), '--strictPort'], join(ROOT, 'dashboard'));
-    if (!(await waitFor('127.0.0.1', PAGE_PORT, 20))) fail(`The page did not start. See ${join(LOGS, 'page.err')}`);
-    done('page', 'started');
-  } else done('page', 'running');
+  done('page', (await ensurePage()) ? 'started' : 'running');
 
   // the invite: only if the brain is really open to the network
   // (a VPN address such as Tailscale's is preferred; the venue wifi's address is shown as the other way)
@@ -416,7 +425,8 @@ async function start(argv: string[]) {
   } else say(`  ${bold('Invite')}   ${dim('only this computer can join (--local)')}`);
   say(`  ${bold('Stop')}     tandem stop`);
   say();
-  say(dim('  You control this team from that page. Open it with: tandem -d'));
+  say(dim('  You control this team from that page. Open it any time with: tandem'));
+  if (!which('tandem')) say(dim(`  Tip: run ${ownCommand()} install once, then "tandem" works in any new terminal.`));
   if (invite && WIN) say(dim('  If Windows asks whether node and spacetime may use the network, allow private networks.'));
   if (!o['no-browser']) openBrowser(page);
 }
@@ -628,21 +638,87 @@ function logs(argv: string[]) {
   }
 }
 
-const [cmd, ...rest] = process.argv.slice(2);
+// ---------- tandem install: so "tandem" works in any terminal ----------
+// Windows: adds the Tandem folder to your user PATH (this user only, no administrator needed).
+// macOS and Linux: links `tandem` into ~/.local/bin. Nothing else is changed. `tandem uninstall`
+// undoes it. (The tests keep the PATH in a file, TANDEM_TEST_PATH_FILE, instead of the registry.)
+const samePath = (a: string, b: string) => a.trim().replace(/[\\/]+$/, '').toLowerCase() === b.trim().replace(/[\\/]+$/, '').toLowerCase();
+function readUserPath(): string {
+  const file = process.env.TANDEM_TEST_PATH_FILE;
+  if (file) return existsSync(file) ? readFileSync(file, 'utf8') : '';
+  return run('powershell', ['-NoProfile', '-Command', "[Environment]::GetEnvironmentVariable('Path','User')"]).out.trim();
+}
+function writeUserPath(value: string) {
+  const file = process.env.TANDEM_TEST_PATH_FILE;
+  if (file) { writeFileSync(file, value); return; }
+  const r = run('powershell', ['-NoProfile', '-Command', `[Environment]::SetEnvironmentVariable('Path', '${value.replace(/'/g, "''")}', 'User')`]);
+  if (!r.ok) fail(`Could not change your PATH:\n${r.out}`);
+}
+const localBin = () => join(process.env.HOME ?? process.env.USERPROFILE ?? '', '.local', 'bin');
+function installCmd() {
+  if (WIN || process.env.TANDEM_TEST_PATH_FILE) {
+    const entries = readUserPath().split(';').filter(Boolean);
+    if (entries.some(e => samePath(e, ROOT))) { say(`\n  ${green('✓')} Already on your PATH: ${ROOT}\n  ${dim('If "tandem" is not found, open a new terminal: an open one does not see the change.')}`); return; }
+    writeUserPath([...entries, ROOT].join(';'));
+    say(`\n  ${green('✓')} Added ${ROOT} to your PATH (your user only).\n  Open a ${bold('new')} terminal, then ${bold('tandem --help')} works anywhere. An open terminal does not see the change.\n  ${dim('To undo it: tandem uninstall')}`);
+    return;
+  }
+  const link = join(localBin(), 'tandem');
+  mkdirSync(localBin(), { recursive: true });
+  rmSync(link, { force: true });
+  symlinkSync(join(ROOT, 'tandem'), link);
+  say(`\n  ${green('✓')} Linked ${link} to ${join(ROOT, 'tandem')}.`);
+  if (!(process.env.PATH ?? '').split(delimiter).some(p => samePath(p, localBin()))) say(`  ${localBin()} is not on your PATH yet. Add this line to your shell's startup file, then open a new terminal:\n    export PATH="$HOME/.local/bin:$PATH"`);
+  else say(`  Open a ${bold('new')} terminal, then ${bold('tandem --help')} works anywhere.`);
+  say(`  ${dim('To undo it: tandem uninstall')}`);
+}
+function uninstallCmd() {
+  if (WIN || process.env.TANDEM_TEST_PATH_FILE) {
+    const entries = readUserPath().split(';').filter(Boolean);
+    if (!entries.some(e => samePath(e, ROOT))) { say(`\n  Tandem is not on your PATH, so there is nothing to remove.`); return; }
+    writeUserPath(entries.filter(e => !samePath(e, ROOT)).join(';'));
+    say(`\n  ${green('✓')} Removed ${ROOT} from your PATH. Open a new terminal for it to take effect.`);
+    return;
+  }
+  const link = join(localBin(), 'tandem');
+  try { if (resolve(dirname(link), readlinkSync(link)) === join(ROOT, 'tandem')) { rmSync(link); say(`\n  ${green('✓')} Removed ${link}.`); return; } } catch { /* not a link */ }
+  say(`\n  ${link} is not a link to this Tandem, so it was left alone.`);
+}
+// how to run this Tandem by its own path, for the tip printed when "tandem" is not on the PATH
+const ownCommand = () => (WIN ? `& '${join(ROOT, 'tandem.cmd')}'` : `'${join(ROOT, 'tandem')}'`);
+
+const [first, ...rest] = process.argv.slice(2);
+// Every command also works as a flag: "tandem --start" is "tandem start".
+const WORDS = ['start', 'join', 'stop', 'status', 'open', 'dashboard', 'logs', 'account', 'accounts', 'install', 'uninstall', 'version', 'help'];
+const cmd = first && first.startsWith('--') && WORDS.includes(first.slice(2)) ? first.slice(2) : first;
 try {
   if (cmd === 'start') await start(rest);
   else if (cmd === 'join') await joinTeam(rest);
   else if (cmd === 'stop') await stop(rest);
   else if (cmd === 'status') await status();
-  else if (cmd === 'open' || cmd === 'dashboard' || cmd === '-d' || cmd === '--dashboard') await openPage(rest);
-  else if (cmd === '--version' || cmd === '-v' || cmd === 'version') say(JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version);
+  else if (cmd === 'open' || cmd === 'dashboard' || cmd === '-d') await openPage(rest);
+  else if (cmd === 'version' || cmd === '-v') say(JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version);
   else if (cmd === 'logs') logs(rest);
   else if (cmd === 'account' || cmd === 'accounts') await accountCmd(rest);
-  else if (!cmd && loadProcs().some(p => p.team)) { await status(); await openPage([]); } // just `tandem`: what is running, and open the dashboard
-  else { say(HELP); if (cmd && cmd !== 'help' && cmd !== '--help' && cmd !== '-h') process.exit(2); }
+  else if (cmd === 'install') installCmd();
+  else if (cmd === 'uninstall') uninstallCmd();
+  else if (cmd === 'help' || cmd === '-h') say(HELP);
+  else if (!cmd) {
+    // just `tandem`: open the page. A running team's board (with what is running); otherwise the
+    // page's start screen, which says how to start or join a team.
+    if (loadProcs().some(p => p.team)) { await status(); await openPage([]); }
+    else {
+      await ensurePage();
+      say(`\n  Opening the dashboard. It shows how to start a team.\n  ${dim('All the commands: tandem --help')}`);
+      await openPage([]);
+    }
+  } else {
+    console.error(`\n  "${cmd}" is not a tandem command. Run ${bold('tandem --help')} to see what you can do.`);
+    process.exit(2);
+  }
 } catch (e) {
   // a mistyped option: say so in one line, not a stack trace
   const code = (e as { code?: string }).code ?? '';
-  if (code.startsWith('ERR_PARSE_ARGS')) fail(`${(e as Error).message.split('.')[0]}. Run "tandem help" for the options.`);
+  if (code.startsWith('ERR_PARSE_ARGS')) fail(`${(e as Error).message.split('.')[0]}. Run "tandem --help" for the options.`);
   throw e;
 }

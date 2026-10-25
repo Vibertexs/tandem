@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "watch": "tsx watch.ts",
-    "test": "tsx test/merge.test.ts && tsx test/verify.test.ts && tsx test/finish.test.ts && tsx test/notify.test.ts && tsx test/watch.test.ts",
+    "test": "tsx test/merge.test.ts && tsx test/apply.test.ts && tsx test/verify.test.ts && tsx test/finish.test.ts && tsx test/notify.test.ts && tsx test/watch.test.ts",
     "test:two": "tsx test/two-computers.ts"
   },
   "devDependencies": {

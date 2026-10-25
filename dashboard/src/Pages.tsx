@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { Api, Snapshot } from './brain';
 import { shareable, type Team } from './config';
+import { GetStarted } from './Setup';
 import { Avatar, Bar, CodeLine, EV_ICON, JoinSteps, WorkerStatus, agentLabel, ago, copy, isManager, money, online, restartForSharingCommand, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
@@ -21,7 +22,7 @@ function useAct(say: (m: string) => void) {
 const list = (text: string) => text.split(/[,\n]/).map(x => x.trim()).filter(Boolean);
 
 // ---------- Team ----------
-export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
+export function TeamPage({ snap, now, say, team, isOp, go }: Common & { team: Team; go: (page: string) => void }) {
   const share = shareable(team);
   const uri = share?.uri ?? team.uri;
   // The manager says which repo the team works on (its origin). Real workers elsewhere need a clone.
@@ -31,6 +32,8 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
   const sorted = [...snap.workers].sort((a, b) => Number(online(b, now)) - Number(online(a, now)) || a.name.localeCompare(b.name));
   return (
     <div className="page">
+      <GetStarted snap={snap} team={team} now={now} say={say} go={go} isOp={isOp} />
+      <h2>Workers</h2>
       <p className="muted lead">Each worker is a Claude Code agent on someone's computer. They pick up tasks by themselves.</p>
       {sorted.length === 0 && <div className="card empty-board"><p className="muted">No workers yet. Add a computer below.</p></div>}
       <div className="worker-grid">

@@ -4,13 +4,11 @@ import { useBrain } from './useBrain';
 import { Landing, Unreachable } from './Landing';
 import { BoardPage } from './Board';
 import { ActivityPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
-import { SetupPage } from './Setup';
 import { Dock } from './Dock';
 import { CodeLine, JoinSteps, isManager, managerOnline, online, restartForSharingCommand, useNow } from './ui';
 import type { Snapshot } from './brain';
 
 const PAGES = [
-  { key: 'setup', label: 'Get started' },
   { key: 'board', label: 'Board' },
   { key: 'team', label: 'Team' },
   { key: 'memory', label: 'Shared memory' },
@@ -20,7 +18,8 @@ const PAGES = [
 type PageKey = typeof PAGES[number]['key'];
 
 const pageFromHash = (): PageKey => {
-  const k = location.hash.replace(/^#\/?/, '');
+  const raw = location.hash.replace(/^#\/?/, '');
+  const k = raw === 'setup' ? 'team' : raw; // getting started is part of the Team page
   return (PAGES.find(p => p.key === k)?.key ?? 'board') as PageKey;
 };
 
@@ -138,8 +137,7 @@ export function App() {
         {unowned && !config.host && !config.present && <div className="banner">Waiting for the host to take control. This board shows what happens once they do.</div>}
         <main>
           {page === 'board' && <BoardPage {...common} isOp={isOp} present={config.present} go={go} />}
-          {page === 'setup' && <SetupPage snap={snap} team={team ?? { uri: '', db: 'sample' }} now={now} say={say} go={go} isOp={isOp} />}
-          {page === 'team' && <TeamPage {...common} team={team ?? { uri: '', db: 'sample' }} />}
+          {page === 'team' && <TeamPage {...common} team={team ?? { uri: '', db: 'sample' }} go={go} />}
           {page === 'memory' && <MemoryPage {...common} />}
           {page === 'activity' && <ActivityPage {...common} />}
           {page === 'settings' && <SettingsPage {...common} team={team ?? { uri: '', db: 'sample' }} onLeave={leave} />}

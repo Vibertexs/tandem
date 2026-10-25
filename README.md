@@ -67,7 +67,7 @@ cd C:\path\to\your-project
 cd /path/to/your-project
 /path/to/tandem/tandem start
 ```
-That is the whole setup. There is nothing to install globally and no PATH to edit. It prints something like this and opens the board in your browser:
+That is the whole setup. There is nothing to install globally. It prints something like this and opens the board in your browser:
 ```
   ✓ brain    started
   ✓ team     "your-project"
@@ -79,9 +79,17 @@ That is the whole setup. There is nothing to install globally and no PATH to edi
   Open     http://localhost:5173/?db=your-project
   Invite   http://100.x.y.z:5173/?db=your-project
 ```
-**3. On the board, describe what you want built.** The page `tandem start` opens already knows you are the host: you control the team and the manager is approved for you, with nothing to click. Send your goal on the **Board**. (`tandem -d` opens the page again any time.) The manager splits it into tasks, each task runs as a Claude Code run in its own git branch, and when the goal is done the work is merged on one branch, `tandem/<goal>`, with your tests run on it.
+**3. On the board, describe what you want built.** The page `tandem start` opens already knows you are the host: you control the team and the manager is approved for you, with nothing to click. Send your goal on the **Board**. (`tandem` on its own opens the page again any time.) The manager splits it into tasks, each task runs as a Claude Code run in its own git branch, and when the goal is done the work is merged on one branch, `tandem/<words from your goal>`, with your tests run on it.
 
-The board's **Get started** page repeats these steps with your real folders already filled in, and ticks each one as it happens.
+**4. Get the code into your project.** Your project's folder does not change while the work is going on: it is on the branch. When a goal is done, press **Merge into my project** on its lane. Tandem merges the branch into the branch your project is on, and the code shows up in your folder. It refuses if you have uncommitted changes, undoes a merge that conflicts, and never forces anything. To look first: `git switch tandem/<branch>` (the lane has a **copy git checkout** link). A goal you send after merging starts from the merged work.
+
+The board's **Team** page repeats these steps (under **Get started**) with your real folders already filled in, and ticks each one as it happens.
+
+**Optional: type `tandem` anywhere.** Run this once, then open a new terminal:
+```powershell
+& "C:\path\to\tandem\tandem.cmd" install      # macOS / Linux: /path/to/tandem/tandem install
+```
+It adds the Tandem folder to your own PATH (no administrator needed). After that, `tandem --start` in your project starts the team, `tandem` on its own opens the dashboard, and `tandem --help` lists every command. Every command works as a word (`tandem start`) or a flag (`tandem --start`). Anything else says to use `tandem --help`. `tandem uninstall` takes it off again.
 
 > **Page not loading at `localhost:5173`?** Nothing is running. The board only exists after step 2. Run that command again.
 

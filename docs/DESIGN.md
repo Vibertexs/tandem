@@ -46,12 +46,14 @@ System font stack (`Inter` first if installed, then Segoe UI Variable on Windows
 
 ## Components
 - **Dock (navigation).** A white rounded panel floating on the left, vertically centred. Icons only; the name appears as a dark label to the right on hover or keyboard focus. The active page has the accent tint and accent-coloured icon. A badge (accent dot with a count) shows pending requests.
-  - **Behaviour.** Icons are 40px. When the mouse comes within about 90px of one it grows smoothly to at most 60px, and its neighbours grow less and push the rest away (like a dock). Clicking opens the page. The growth is computed in `Dock.tsx` (`dockSizes`) from the pointer position.
+  - **Pages.** Board, Team (its Get started steps are at the top), Shared memory, Activity and Settings (a gear).
+  - **Behaviour.** The dock keeps a fixed width (64px). Icons are 36px. When the mouse comes within about 80px of one it grows smoothly to at most 48px, which is as wide as the dock allows, and its neighbours grow less and push the rest away (like a dock). Clicking opens the page. The growth is computed in `Dock.tsx` (`dockSizes`) from the pointer position.
   - **Phone.** The dock becomes a floating bar at the bottom with fixed 46px targets and no growth. It is skipped for touch.
   - **Reduced motion.** With the operating system's reduced-motion setting on, transitions and the working bar's animation are off.
 - **Top bar.** Page title on the left. On the right: a team pill (team name, workers online, manager state), a chip that says whether you control the team, and the Invite button.
 - **Prompt.** One rounded card with a borderless input and a black Send button inside it. A soft coral ring shows when it has focus.
-- **Board.** Each goal is a white lane. Above the tasks, four round stage tags with a coloured dot: Waiting (grey), To do (amber), In progress (blue), Done (green).
+- **Board.** Each goal is a white lane. Inside it, above each column of tasks, a round stage tag with a coloured dot and a count: Waiting (grey), To do (amber), In progress (blue), Done (green). A finished goal shows its branch and a **Merge into my project** button.
+- **People.** Each worker's avatar gets its own soft colour, picked from their name (hue in `Avatar`, tints in `.avatar`), so who did what is easy to see across the board.
 - **Task card.** Title, then a rule, then label and value rows (Files, Worker) like an issue tracker. In progress adds a thin moving bar and the live note. Finished tasks collapse to one quiet line.
 - **Buttons.** Primary is solid ink. Secondary is white with a border. Destructive is secondary with red text. 38px tall (44px on a phone).
 - **Chips.** Round, small, tinted by meaning: green done or free, blue working, amber waiting, red failed.

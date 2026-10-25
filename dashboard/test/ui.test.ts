@@ -73,8 +73,8 @@ try {
   await A.goto(`${URL_}/?db=${DB}&host=1`);
   check('control: no claim-or-watch question; the host page takes control by itself and the prompt is on', await until(() => prompt(A).isEnabled()) && await A.getByText('Watch only').count() === 0);
   await shot(A, '02-owner');
-  check('control: the sidebar has Get started, Board, Team, Shared memory, Activity, Settings (goals live on the Board)',
-    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Get started|Board|Team|Shared memory|Activity|Settings');
+  check('control: the dock has Board, Team, Shared memory, Activity, Settings (goals live on the Board; getting started is on Team)',
+    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Board|Team|Shared memory|Activity|Settings');
   check('control: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
   check('control: it shows one next step: the manager is not connected yet', await seen(A, 'The manager is not connected yet', 3000));
   check('control: the sidebar says this browser controls the team', await seen(A, 'You control this team', 2000));
@@ -177,11 +177,25 @@ try {
   check('goal done: a finished goal moves below the work still going', (await A.locator('.goal-lane .goal-text').allInnerTexts()).join('|') === 'Other tasks|Build a tiny calculator with tests');
   await shot(A, '06-board-done', true);
 
+  // "Merge into my project": the page asks, the manager answers (here the answers are played by the test)
+  const mergeBtn = calc.getByRole('button', { name: 'Merge into my project' });
+  check('merge: a finished goal with a branch offers "Merge into my project"', await until(() => mergeBtn.isVisible(), 3000));
+  await mergeBtn.click();
+  const asked = await until(async () => {
+    const r = await fetch(`http://127.0.0.1:3001/v1/database/${DB}/sql`, { method: 'POST', body: `SELECT value FROM context WHERE key = 'apply_${goalId}'` });
+    return JSON.stringify(((await r.json()) as { rows: unknown[][] }[])[0]?.rows ?? []).includes('requested');
+  }, 4000);
+  check('merge: pressing it asks the manager, and the lane says it is merging', asked && await seen(A, 'Merging into your project', 3000));
+  await manager.reducers.setContext({ sessionId: 'live', key: `apply_${goalId}`, value: 'failed: You have uncommitted changes in the project (1 file). Commit or stash them, then try again.' });
+  check('merge: when the manager says it failed, the lane shows why and offers the button again', await seen(A, 'uncommitted changes in the project', 3000) && await mergeBtn.isVisible());
+  await manager.reducers.setContext({ sessionId: 'live', key: `apply_${goalId}`, value: 'done: Merged tandem/x into main: 2 files (cli.py, test_cli.py).' });
+  check('merge: when it is done, the lane says what was merged and the button is gone', await seen(A, 'Merged tandem/x into main', 3000) && await mergeBtn.count() === 0);
+
   // ---- 5b. Get started: host/controller distinction and one complete host command ----
   await manager.reducers.ping({ sessionId: 'live', name: 'Manager Claude', kind: 'manager' });
   await manager.reducers.setContext({ sessionId: 'live', key: 'tandem_dir', value: 'C:\\Code\\tandem' });
   await manager.reducers.setContext({ sessionId: 'live', key: 'project_dir', value: 'C:\\Code\\calc-demo' });
-  await nav(A, 'Get started');
+  await nav(A, 'Team');
   const steps = A.locator('.step');
   check('get started: three steps distinguish the project host from the team controller', await until(async () => await steps.count() === 3) &&
     await seen(A, 'project host', 1000) && await seen(A, 'team controller', 1000) && (await steps.first().innerText()).includes('Start the project host') && (await steps.last().innerText()).includes('Add a teammate'));
@@ -328,7 +342,7 @@ try {
   await P.goto(`${URL_}/?db=${DB}`);
   await until(() => prompt(P).isVisible(), 10_000);
   const bar = await P.locator('.sidebar').boundingBox();
-  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 820 && await P.locator('.nav a').count() === 6, bar);
+  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 820 && await P.locator('.nav a').count() === 5, bar);
   const small = await P.locator('.nav a, .btn').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent && (e as HTMLElement).offsetHeight < 44).length);
   check('phone: tap targets are at least 44px tall', small === 0, small);
   check('phone: no sideways scrolling', await P.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));

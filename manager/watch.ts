@@ -17,6 +17,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { BrainClient } from '../mcp/src/brain-client.js';
+import { applyBranch } from './apply.js';
 import { finishGoal, type FinishBrain } from './finish.js';
 import { goalDoneMessage, notify } from './notify.js';
 
@@ -133,6 +134,15 @@ for (;;) {
         }
       } catch (e) { log(`could not finish goal ${g.id}: ${(e as Error).message}`); }
     }
+  }
+  // "Merge into my project" pressed on the page: apply_<goal id> = requested. Answer with done: or failed:.
+  for (const [key, value] of Object.entries(brain.getContext())) {
+    if (!key.startsWith('apply_') || value !== 'requested') continue;
+    const goal = brain.listGoals().find(g => g.id === key.slice('apply_'.length));
+    await brain.setContext(key, 'working').catch(() => {}); // so it is not done twice
+    const result = goal?.branch ? applyBranch(REPO, goal.branch) : { ok: false, message: 'That goal has no branch to merge.' };
+    await brain.setContext(key, `${result.ok ? 'done' : 'failed'}: ${result.message}`).catch(() => {});
+    log(`merge into the project, goal ${goal?.id ?? key}: ${result.ok ? 'done' : 'failed'}: ${result.message}`);
   }
   await sleep(Number(opt.poll) * 1000);
 }
