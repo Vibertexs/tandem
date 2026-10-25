@@ -53,10 +53,10 @@ let file = '';
 try { file = git('show', 'task/t-cx:hello_codex.py'); } catch { /* missing */ }
 check('the branch has the file Codex wrote', file.includes('hello from codex'), file);
 check('the page sees a Codex worker on the "school" login', worker?.agent === 'codex' && worker.account === 'school', worker && [worker.agent, worker.account]);
-const seenFile = readdirSync(join(repo, '.worktrees')).find(f => f.endsWith('.seen.json'));
-const seen = seenFile ? JSON.parse(readFileSync(join(repo, '.worktrees', seenFile), 'utf8')) as { args: string[]; prompt: string; config: string } : null;
+const seenFile = readdirSync(join(repo, '.worktrees', '.tandem')).find(f => f.endsWith('.seen.json'));
+const seen = seenFile ? JSON.parse(readFileSync(join(repo, '.worktrees', '.tandem', seenFile), 'utf8')) as { args: string[]; prompt: string; config: string } : null;
 check('codex exec runs in the task\'s worktree, with full auto and the prompt on stdin',
-  !!seen && seen.args[0] === 'exec' && seen.args.includes('--full-auto') && seen.args[seen.args.indexOf('--cd') + 1].endsWith(join('.worktrees', 't-cx')) && seen.prompt.includes('task_id: t-cx'), seen?.args);
+  !!seen && seen.args[0] === 'exec' && seen.args.includes('--full-auto') && seen.args[seen.args.indexOf('--cd') + 1].endsWith(join('.worktrees', 'write-hello-codex-py-t-cx')) && seen.prompt.includes('task_id: t-cx'), seen?.args);
 check('its config has the tandem MCP server for this worker, and keeps the user\'s own setting',
   !!seen && seen.config.includes('[mcp_servers.tandem]') && seen.config.includes('TANDEM_WORKER_ID = "w-cody"') && seen.config.includes('model = "gpt-5-codex"'), seen?.config);
 

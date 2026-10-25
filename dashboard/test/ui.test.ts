@@ -89,8 +89,7 @@ try {
   await shot(A, '03-approve-manager');
 
   // ---- 4. send a goal ----
-  check('goal: a new controller gets example goals; clicking one fills the prompt', await A.locator('.chip.example').count() === 3 &&
-    await A.locator('.chip.example').first().click().then(() => prompt(A).inputValue()).then(v => v.startsWith('A tiny Python calculator')));
+  check('goal: the prompt is empty and there are no suggested goals', await A.locator('.chip.example').count() === 0 && await prompt(A).inputValue() === '' && await A.getByText('Try one').count() === 0);
   await A.locator('body').click({ position: { x: 5, y: 5 } });
   await A.keyboard.press('/');
   check('goal: "/" jumps to the prompt', await prompt(A).evaluate(el => el === document.activeElement));

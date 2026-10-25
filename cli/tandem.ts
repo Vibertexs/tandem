@@ -24,7 +24,6 @@ const PIDS = join(STATE, 'pids.json');
 const WIN = process.platform === 'win32';
 const BRAIN_PORT = 3001;
 const PAGE_PORT = 5173;
-const NAMES = ['Alex', 'Sam', 'Jordan', 'Taylor', 'Riley', 'Casey'];
 // Workers that fake the coding exist ONLY for Tandem's own automated tests. There is no option for
 // it: it takes this environment variable, which nothing in the product or the docs sets.
 const SIMULATE = process.env.TANDEM_SIMULATE === '1';
@@ -41,7 +40,8 @@ const HELP = `tandem: your team's Claude Codes, working as one.
     --fresh                 wipe the team's board first
     --push                  push task and goal branches to origin (a PR per goal with the GitHub CLI)
     --review                a worker reviews each goal before it is done
-    --model auto            pick the model by task difficulty (default: haiku for everything)
+    --model NAME            force one model for every task (default: auto = by task difficulty:
+                            easy haiku, normal sonnet, hard opus)
     --notify URL            post "goal done" to a Slack or Discord webhook
     --accounts all|a,b      one worker per saved account (see tandem account), instead of --workers
     --manager-account A     the Claude account the manager plans with
@@ -263,15 +263,18 @@ async function accountCmd(argv: string[]) {
   } else fail('tandem account add <label> [--agent codex] | tandem account list | tandem account remove <label>');
 }
 
-type WorkerOpts = { simulate: boolean; push: boolean; model: string; budget: string; suffix: string; offset: number; simLimit?: number; accounts?: Account[] };
+const modelNote = (model: string) => model === 'auto' ? 'model by task difficulty' : `${model} for every task`;
+type WorkerOpts = { simulate: boolean; push: boolean; model: string; budget: string; simLimit?: number; accounts?: Account[] };
 // Starts the workers that are not running yet: `count` on the default login, or one per account.
-// Returns how each is described ("Alex", or "Alex (work1, claude)").
+// Workers are named after the computer they run on ("bilal-pc", "bilal-pc-2"), or after the computer
+// and login when each account gets one ("bilal-pc-work1"). Returns how each is described.
 function startWorkers(team: string, uri: string, repo: string, count: number, opts: WorkerOpts): string[] {
   const names: string[] = [];
   const accts = opts.accounts?.length ? opts.accounts : null;
   for (let i = 0; i < (accts ? accts.length : count); i++) {
     const acct = accts?.[i];
-    const name = NAMES[(i + opts.offset) % NAMES.length] + opts.suffix;
+    const computer = slug(hostname());
+    const name = acct ? `${computer}-${slug(acct.label)}` : i === 0 ? computer : `${computer}-${i + 1}`;
     names.push(acct ? `${name} (${acct.label}, ${acct.agent})` : name);
     if (running(`worker ${name}`, team)) continue;
     const args = ['--import', tsx('launcher'), join(ROOT, 'launcher', 'launcher.ts'), '--name', name, '--repo', repo];
@@ -299,7 +302,7 @@ async function start(argv: string[]) {
     workers: { type: 'string', default: '1' },
     local: { type: 'boolean', default: false }, team: { type: 'string' }, fresh: { type: 'boolean', default: false },
     push: { type: 'boolean', default: false }, review: { type: 'boolean', default: false },
-    model: { type: 'string', default: 'haiku' }, 'manager-model': { type: 'string', default: 'haiku' },
+    model: { type: 'string', default: 'auto' }, 'manager-model': { type: 'string', default: 'haiku' },
     budget: { type: 'string', default: '0.50' }, notify: { type: 'string' },
     'no-browser': { type: 'boolean', default: false }, 'no-manager': { type: 'boolean', default: false },
     accounts: { type: 'string' }, 'manager-account': { type: 'string' },
@@ -381,8 +384,8 @@ async function start(argv: string[]) {
     }
   }
   if (workers > 0) {
-    const names = startWorkers(team, uri, repo, workers, { simulate: SIMULATE, push: o.push, model: o.model!, budget: o.budget!, suffix: '', offset: 0, simLimit: SIM_LIMIT, accounts: accts });
-    done('workers', `${names.join(', ')}${SIMULATE ? ' (test mode: fake coding)' : accts.length ? '' : o.model === 'auto' ? ' (Claude, model by difficulty)' : ` (Claude, ${o.model})`}`);
+    const names = startWorkers(team, uri, repo, workers, { simulate: SIMULATE, push: o.push, model: o.model!, budget: o.budget!, simLimit: SIM_LIMIT, accounts: accts });
+    done('workers', `${names.join(', ')}${SIMULATE ? ' (test mode: fake coding)' : accts.length ? '' : ` (Claude, ${modelNote(o.model!)})`}`);
   }
 
   // host=1 makes this browser the controller by itself; the invite link never carries it
@@ -452,7 +455,7 @@ function workClone(url: string, team: string): string {
 async function joinTeam(argv: string[]) {
   const { values: o, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
     workers: { type: 'string', default: '1' },
-    team: { type: 'string' }, model: { type: 'string', default: 'haiku' }, budget: { type: 'string', default: '0.50' },
+    team: { type: 'string' }, model: { type: 'string', default: 'auto' }, budget: { type: 'string', default: '0.50' },
     'no-browser': { type: 'boolean', default: false }, accounts: { type: 'string' },
     repo: { type: 'string' }, // use your own clone of the project instead of the one Tandem makes
   } });
@@ -490,9 +493,9 @@ async function joinTeam(argv: string[]) {
 
   if (workers > 0) {
     const names = startWorkers(team, `ws://${host}:${BRAIN_PORT}`, repo, workers, {
-      simulate: SIMULATE, push: !SIMULATE, model: o.model!, budget: o.budget!, suffix: `-${slug(hostname())}`, offset: 3, accounts: accts,
+      simulate: SIMULATE, push: !SIMULATE, model: o.model!, budget: o.budget!, accounts: accts,
     });
-    done('workers', `${names.join(', ')}${SIMULATE ? ' (test mode: fake coding)' : accts.length ? ' (they push their branches)' : ` (Claude, ${o.model}; they push their branches)`}`);
+    done('workers', `${names.join(', ')}${SIMULATE ? ' (test mode: fake coding)' : accts.length ? ' (they push their branches)' : ` (Claude, ${modelNote(o.model!)}; they push their branches)`}`);
   }
   const page = `http://${host}:${PAGE_PORT}/?db=${team}`;
   remember(team, { page, repo, host });

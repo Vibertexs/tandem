@@ -49,7 +49,7 @@ if (!existsSync(join(REPO, '.git'))) {
 }
 
 const started = tandem(['start', '--team', DB, '--workers', '2', ...(REVIEW ? ['--review'] : []), '--fresh', '--local', '--no-browser'], REPO);
-console.log(started.split('\n').filter(l => /==|started|ready|Open|Alex|Sam/i.test(l)).join('\n'));
+console.log(started.split('\n').filter(l => /==|started|ready|Open|workers/i.test(l)).join('\n'));
 check('tandem start, run in the project, finishes and says it is running for that project', started.includes(`Tandem is running for ${REPO}`), started.slice(-400));
 
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });

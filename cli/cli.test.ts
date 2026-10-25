@@ -3,7 +3,7 @@
 //   node cli/cli.test.ts
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,13 +46,16 @@ check('--simulate is not an option any more', /Unknown option '--simulate'/.test
 check('an unknown account is refused with how to add it', /No account "nope"/.test(tandem(['start', '--accounts', 'nope', '--local', '--no-manager', '--no-browser', '--team', TEAM], repo)));
 
 const out = tandem(['start', '--accounts', 'all', '--local', '--no-manager', '--no-browser', '--team', TEAM, '--fresh'], repo);
-check('start --accounts all: one worker per account, each labelled', /Alex \(work1, claude\), Sam \(school, codex\)/.test(out), out.slice(-500));
+const computer = hostname().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+check('start --accounts all: one worker per account, named after this computer and the account',
+  out.includes(`${computer}-work1 (work1, claude), ${computer}-school (school, codex)`), out.slice(-500));
 let rows: unknown[][] = [];
 const describe = () => rows.map(r => r.join(' ')).sort().join(' | ');
 // wait until both workers have registered AND said which agent and login they run
-for (let i = 0; i < 40 && describe() !== 'Alex claude work1 | Sam codex school'; i++) { await new Promise(r => setTimeout(r, 500)); rows = await sql("SELECT name, agent, account FROM workers WHERE session_id = 'live'"); }
+const expected = [`${computer}-school codex school`, `${computer}-work1 claude work1`].join(' | ');
+for (let i = 0; i < 40 && describe() !== expected; i++) { await new Promise(r => setTimeout(r, 500)); rows = await sql("SELECT name, agent, account FROM workers WHERE session_id = 'live'"); }
 const seen = describe();
-check('the brain knows which agent and account each worker runs', seen === 'Alex claude work1 | Sam codex school', seen);
+check('the brain knows which agent and account each worker runs', seen === expected, seen);
 const status = tandem([], repo);
 check('plain "tandem" shows the team and its workers, and opens the dashboard', status.includes(TEAM) && /2 workers/.test(status) && /http:\/\/localhost:5173\/\?db=/.test(status), status);
 check('tandem -d (and dashboard, open, --dashboard) gives the dashboard address', ['-d', 'dashboard', 'open', '--dashboard'].every(c => /http:\/\/localhost:5173\/\?db=/.test(tandem([c], repo))));
