@@ -106,6 +106,26 @@ try {
     const returned = pushed && git(repo, 'show-ref', '--verify', '--quiet', 'refs/heads/task/share-probe');
     check('a task branch pushed by the joiner appears in the host repo', Boolean(returned?.ok), pushed ? returned?.out : committed.out);
   } else check('a task branch pushed by the joiner appears in the host repo', false, 'work copy was not created');
+
+  // starting again keeps the board and says so; --fresh wipes it. (Its own team, with no manager, so no Claude runs.)
+  const KEPT = `${TEAM}-kept`;
+  const base = ['start', '--workers', '0', '--no-manager', '--no-browser', '--team', KEPT];
+  tandem([...base, '--fresh'], repo, hostState);
+  const boardOwner = await new Promise<DbConnection>((resolve, reject) => {
+    DbConnection.builder().withUri('ws://127.0.0.1:3001').withDatabaseName(KEPT)
+      .onConnect(c => { c.subscriptionBuilder().onApplied(() => resolve(c)).subscribe([tables.goals, tables.operators]); })
+      .onConnectError((_c, error) => reject(error)).build();
+  });
+  await boardOwner.reducers.claimOperator({});
+  await boardOwner.reducers.postGoal({ sessionId: 'live', id: 'g-keep', text: 'A goal that should survive a restart' });
+  await sleep(500);
+  const again = tandem(base, repo, hostState);
+  check('starting again keeps the board and says how to start over', /kept the board from last time \(1 goal\)/.test(again.out) && /tandem start --fresh/.test(again.out), again.out.slice(-400));
+  const wiped = tandem([...base, '--fresh'], repo, hostState);
+  check('start --fresh wipes the board: nothing is "kept"', wiped.ok && /fresh/.test(wiped.out) && !/kept the board/.test(wiped.out), wiped.out.slice(-400));
+  boardOwner.disconnect();
+  await sleep(300);
+  tandem(['stop', '--team', KEPT], repo, hostState);
 } finally {
   owner?.disconnect();
   tandem(['stop', '--team', TEAM], repo, joinerState);
