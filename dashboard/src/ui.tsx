@@ -1,5 +1,6 @@
 // Small shared pieces: time, avatars, status chips, bars, stages, plain-English explanations.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import routing from '../../launcher/routing.json';
 import type { Ev, Snapshot, Task, Worker } from './brain';
 
 export function ago(d: Date, now: number): string {
@@ -87,14 +88,26 @@ export function liveInfo(t: Task, events: Ev[]): { since: Date | null; note: str
 export const lockBlocking = (t: Task, snap: Snapshot) =>
   t.status === 'open' ? t.files.map(p => snap.locks.find(l => l.path === p && l.taskId !== t.id)).find(Boolean) : undefined;
 
-// The model a task runs with: the one set on it, else the launcher's routing by kind, then difficulty
-// (launcher/routing.json: easy haiku, normal sonnet, hard opus; map sonnet, reduce opus).
-export function modelFor(task: Task): string {
-  if (task.model) return task.model;
-  if (task.kind === 'map') return 'sonnet';
-  if (task.kind === 'reduce') return 'opus';
-  return task.difficulty === 'easy' ? 'haiku' : task.difficulty === 'hard' ? 'opus' : 'sonnet';
+// The model and effort a task runs with: the one set on it, else launcher/routing.json for its
+// goal's effort (low, medium, high), by kind (map / reduce), then difficulty. The same file the
+// workers read, so the page and the workers always agree.
+type Pick = { model: string; effort: string };
+type Level = { conductor: Pick; difficulty: Record<string, Pick>; kind: Record<string, Pick> };
+const LEVELS = (routing as { by_goal_effort: Record<string, Level> }).by_goal_effort;
+export const goalEffortOf = (task: Task, snap: Snapshot) => snap.goals.find(g => g.id === task.goalId)?.effort ?? 'medium';
+export function routeFor(task: Task, goalEffort = 'medium'): Pick {
+  const l = LEVELS[goalEffort] ?? LEVELS.medium;
+  const base = l.kind[task.kind] ?? l.difficulty[task.difficulty] ?? l.difficulty.normal;
+  return { model: task.model || base.model, effort: task.effort && task.effort !== 'default' ? task.effort : base.effort };
 }
+export const modelFor = (task: Task, goalEffort = 'medium') => routeFor(task, goalEffort).model;
+// what the conductor plans a goal with
+export const conductorPick = (goalEffort: string): Pick => (LEVELS[goalEffort] ?? LEVELS.medium).conductor;
+export const EFFORTS = [
+  { key: 'low', label: 'Low', hint: 'Quick and cheap: haiku plans it, and does most tasks.' },
+  { key: 'medium', label: 'Medium', hint: 'Balanced: sonnet plans it; each task gets haiku, sonnet or opus by how hard it is.' },
+  { key: 'high', label: 'High', hint: 'Best results: opus plans it, and does most tasks, thinking harder.' },
+] as const;
 
 // Plain-English reason for where a task is and who has it.
 export function why(task: Task, snap: Snapshot): string {
@@ -103,7 +116,7 @@ export function why(task: Task, snap: Snapshot): string {
     : task.kind === 'reduce' ? "combining a big job's results"
     : task.difficulty === 'easy' ? 'a small change'
     : task.difficulty === 'hard' ? 'a hard problem' : 'normal feature work';
-  const model = modelFor(task);
+  const model = modelFor(task, goalEffortOf(task, snap));
   if (task.status === 'done') return `Finished${who ? ` by ${who.name}` : ''}. It was ${kind}.`;
   if (task.status === 'failed') {
     return `${task.triedBy.map(id => nameOf(id, snap)).join(' and ')} could not finish it: ${task.resultSummary ?? 'no reason given'}. Check the task, then press Try again.`;
@@ -137,7 +150,7 @@ const isWindowsPath = (path: string) => /^[a-z]:[\\/]/i.test(path) || path.inclu
 const powershellQuote = (path: string) => `'${path.replace(/'/g, "''")}'`;
 const shellQuote = (path: string) => `'${path.replace(/'/g, "'\\''")}'`;
 
-// A complete command for the project host. Calling Tandem by its known path means the ordinary
+// A complete command for the conductor's computer. Calling Tandem by its known path means the ordinary
 // first-use path never asks someone to edit PATH or install anything globally.
 export function startCommand(tandemDir: string, projectDir: string) {
   if (!tandemDir || !projectDir || tandemDir.startsWith('<') || projectDir.startsWith('<')) return 'tandem start';
@@ -161,30 +174,30 @@ export function restartForSharingCommand(tandemDir: string, projectDir: string) 
   return `${shellQuote(command)} stop --all\n${startCommand(tandemDir, projectDir)}`;
 }
 
-// What a teammate copies to add their computer's workers: getting Tandem (once) and joining (every
-// time) are separate blocks, so the clone is not repeated. The join copies the project from the
-// host by itself, so there is no existing project folder to find or configure.
+// What a teammate copies to add their computer's workers. First time only: get Tandem and put it on
+// the PATH. Every time after: one command, from any folder. The join copies the conductor's project
+// by itself, so there is no existing project folder to find or configure.
 export function JoinSteps({ link, gitUrl, say, restart }: { link: string; gitUrl: string; say: (m: string) => void; restart?: string }) {
   if (!gitUrl) {
     return (
       <div className="join-steps">
-        <p className="small warn">The project is not ready to share yet. Others can watch the board, but cannot add workers until the project host restarts Tandem from its project folder.</p>
+        <p className="small warn">The project is not ready to share yet. Teammates can watch the board, but cannot add workers until the conductor restarts Tandem from the project folder.</p>
         {restart && <CodeLine code={restart} say={say} />}
       </div>
     );
   }
   return (
     <div className="join-steps">
-      <p className="small"><strong>1. Get Tandem</strong> <span className="muted">(first time only, in Windows PowerShell). Already have it? Skip this.</span></p>
-      <CodeLine code={`git clone ${TANDEM_REPO}`} say={say} />
-      <p className="small"><strong>2. Join the team</strong> <span className="muted">(any time, from the folder you cloned into). It makes Tandem&apos;s private copy of the host project and starts this computer&apos;s workers.</span></p>
-      <CodeLine code={`cd tandem\n.\\tandem.cmd join "${link}"`} say={say} />
+      <p className="small"><strong>1. First time only: get Tandem</strong> <span className="muted">(Windows PowerShell), then open a new terminal. Already have it? Skip this.</span></p>
+      <CodeLine code={`git clone ${TANDEM_REPO}\ncd tandem\n.\\tandem.cmd install`} say={say} />
+      <p className="small"><strong>2. Join the team</strong> <span className="muted">(any time after, from any folder). It makes Tandem&apos;s private copy of the conductor&apos;s project and starts this computer&apos;s workers.</span></p>
+      <CodeLine code={`tandem join "${link}"`} say={say} />
       <details className="join-platforms">
         <summary className="small">macOS or Linux</summary>
-        <CodeLine code={`git clone ${TANDEM_REPO}`} say={say} />
-        <CodeLine code={`cd tandem\n./tandem join "${link}"`} say={say} />
+        <CodeLine code={`git clone ${TANDEM_REPO}\ncd tandem\n./tandem install`} say={say} />
+        <CodeLine code={`tandem join "${link}"`} say={say} />
       </details>
-      <p className="small muted">It needs Node.js 22.18+, Git, and Claude Code signed in. The workers use that computer&apos;s own Claude login and quota; they do not change an existing project folder. To update Tandem later, run <code>git pull</code> in its folder.</p>
+      <p className="small muted">It needs Node.js 22.18+, Git, and Claude Code signed in (<code>tandem doctor</code> checks). The workers use that computer&apos;s own Claude login and quota; they do not change an existing project folder. To update Tandem later, run <code>git pull</code> in its folder.</p>
     </div>
   );
 }
@@ -205,15 +218,55 @@ export function CodeLine({ code, say }: { code: string; say: (m: string) => void
 export const EV_ICON: Record<string, string> = {
   task_created: '+', task_assigned: '→', task_claimed: '•', task_done: '✓', task_failed: '×', progress: '·',
   lock_taken: '•', lock_released: '•', worker_capped: '•', worker_idle: '•', job_progress: '•', merge_unblocked: '✓',
+  context_read: '≡',
 };
 
-export const isManager = (name: string) => /manager/i.test(name);
+// The conductor's planning Claude ("Conductor Claude"; "Manager Claude" on teams from before the rename).
+export const isManager = (name: string) => /conductor claude|manager/i.test(name);
+
+// A worker on the conductor's own computer (the conductor publishes its computer's name), or a teammate's.
+export const onConductor = (w: { name: string }, snap: Snapshot) => {
+  const host = snap.context.host_computer;
+  return !!host && (w.name === host || w.name.startsWith(`${host}-`));
+};
 
 // "Claude · work1", "Codex · school", "Claude" on the default login, or "Simulated" (fakes the coding)
 export const agentLabel = (w: { agent: string; account: string }) =>
   `${w.agent === 'codex' ? 'Codex' : w.agent === 'simulated' ? 'Simulated' : 'Claude'}${w.account ? ` · ${w.account}` : ''}`;
 // "$0.04" (or "$0.004" for tiny amounts), what a Claude run cost as reported by claude -p
 export const money = (usd: number) => `$${usd > 0 && usd < 0.01 ? usd.toFixed(3) : usd.toFixed(2)}`;
-// The manager pings every 15 seconds while it runs.
+// "850 tokens", "12.4k tokens", "1.2M tokens"
+export const tokenText = (n: number) =>
+  `${n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : Math.round(n)} tokens`;
+
+// Usage shows as dollars or as tokens; the choice is this browser's (Usage page and Settings).
+// Dollars are what the runs would cost at API prices: an estimate, so they carry a "~".
+export type Unit = 'dollars' | 'tokens';
+const UNIT_KEY = 'tandem-usage-unit';
+let unit: Unit = (() => { try { return localStorage.getItem(UNIT_KEY) === 'tokens' ? 'tokens' : 'dollars'; } catch { return 'dollars'; } })();
+const unitListeners = new Set<() => void>();
+export function setUnit(u: Unit) {
+  unit = u;
+  try { localStorage.setItem(UNIT_KEY, u); } catch { /* this visit only */ }
+  unitListeners.forEach(f => f());
+}
+export const useUnit = () => useSyncExternalStore(f => { unitListeners.add(f); return () => unitListeners.delete(f); }, () => unit);
+export const spendText = (usd: number, tokens: number, u: Unit) => (u === 'tokens' ? tokenText(tokens) : `~${money(usd)}`);
+export function Spend({ usd, tokens }: { usd: number; tokens: number }) {
+  const u = useUnit();
+  return <span className="spend" title={u === 'dollars' ? 'Estimated at Claude API prices. On a Pro or Max plan nothing is billed per run.' : 'Tokens used: input, output and cache'}>{spendText(usd, tokens, u)}</span>;
+}
+export function UnitSwitch() {
+  const u = useUnit();
+  return (
+    <div className="unit-switch" role="group" aria-label="Show usage as">
+      {(['dollars', 'tokens'] as const).map(k => (
+        <button key={k} type="button" className={`chip ${u === k ? 'on' : ''}`} aria-pressed={u === k} onClick={() => setUnit(k)}>{k === 'dollars' ? 'Dollars' : 'Tokens'}</button>
+      ))}
+    </div>
+  );
+}
+
+// The conductor pings every 15 seconds while it runs (its presence kind is still "manager").
 export const managerOnline = (snap: Snapshot, now: number) =>
   snap.presence.some(p => p.kind === 'manager' && now - p.lastSeen.getTime() < 45_000);

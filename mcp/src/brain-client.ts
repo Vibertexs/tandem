@@ -12,7 +12,8 @@ export type Task = {
   assignee: string | null; branch: string | null; depends_on: string[];
   result: unknown; result_summary: string | null; goal_id: string; cost_usd: number;
 };
-export type Goal = { id: string; text: string; status: string; created_at: string; branch: string; cost_usd: number };
+// effort: low | medium | high, chosen when the goal was sent. It picks the models that plan it and do its tasks.
+export type Goal = { id: string; text: string; status: string; created_at: string; branch: string; cost_usd: number; effort: string };
 export type Lock = { path: string; task_id: string; worker_id: string; created_at: string };
 export type Worker = {
   id: string; name: string; plan: string; status: string; usage_5h_pct: number | null;
@@ -67,6 +68,8 @@ const toTask = (r: TaskRow): Task => ({
   assignee: r.assignee ?? null, branch: r.branch ?? null, depends_on: [...r.dependsOn],
   result: r.result == null ? null : safeParse(r.result), result_summary: r.resultSummary ?? null, goal_id: r.goalId, cost_usd: r.costUsd,
 });
+type GoalRow = RowOf<DbConnection['db']['goals']>;
+const toGoal = (r: GoalRow): Goal => ({ id: r.id, text: r.text, status: r.status, created_at: iso(r.createdAt), branch: r.branch, cost_usd: r.costUsd, effort: r.effort || 'medium' });
 const toLock = (r: LockRow): Lock => ({ path: r.path, task_id: r.taskId, worker_id: r.workerId, created_at: iso(r.createdAt) });
 const toWorker = (r: WorkerRow): Worker => ({
   id: r.id, name: r.name, plan: r.plan, status: r.status, usage_5h_pct: r.usage5HPct ?? null,
@@ -227,13 +230,22 @@ export class BrainClient implements Brain {
     return [...this.conn.db.goals.iter()]
       .filter(r => r.sessionId === this.session && r.status === 'new')
       .sort((a, b) => Number(a.createdAt.microsSinceUnixEpoch - b.createdAt.microsSinceUnixEpoch))
-      .map(r => ({ id: r.id, text: r.text, status: r.status, created_at: iso(r.createdAt), branch: r.branch, cost_usd: r.costUsd }));
+      .map(toGoal);
   }
 
-  // --- not part of the tools: used by the manager watcher ---
+  // --- not part of the tools: used by the conductor watcher and the launcher ---
   listGoals(): Goal[] {
-    return [...this.conn.db.goals.iter()].filter(r => r.sessionId === this.session)
-      .map(r => ({ id: r.id, text: r.text, status: r.status, created_at: iso(r.createdAt), branch: r.branch, cost_usd: r.costUsd }));
+    return [...this.conn.db.goals.iter()].filter(r => r.sessionId === this.session).map(toGoal);
+  }
+
+  // The launcher gives a worker the shared notes before a task; this logs that it read them.
+  async noteRead(workerId: string, taskId: string, keys: string[]) {
+    await this.conn.reducers.noteRead({ sessionId: this.session, workerId, taskId, keys });
+  }
+
+  // The conductor stores the conductor's key, so the conductor's own page can always take control back.
+  async setHostKey(key: string) {
+    await this.conn.reducers.setHostKey({ sessionId: this.session, key });
   }
 
   async finishGoal(goalId: string, branch: string, note: string) {
@@ -249,12 +261,12 @@ export class BrainClient implements Brain {
     await this.conn.reducers.failGoal({ sessionId: this.session, id: goalId, note });
   }
 
-  async recordCost(workerId: string, taskId: string, usd: number) {
-    await this.conn.reducers.recordCost({ sessionId: this.session, workerId, taskId, usd });
+  async recordCost(workerId: string, taskId: string, usd: number, tokens = 0) {
+    await this.conn.reducers.recordCost({ sessionId: this.session, workerId, taskId, usd, tokens });
   }
 
-  async addGoalCost(goalId: string, usd: number) {
-    await this.conn.reducers.addGoalCost({ sessionId: this.session, id: goalId, usd });
+  async addGoalCost(goalId: string, usd: number, tokens = 0) {
+    await this.conn.reducers.addGoalCost({ sessionId: this.session, id: goalId, usd, tokens });
   }
 
   async ping(name: string, kind: string) {

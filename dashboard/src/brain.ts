@@ -15,18 +15,22 @@ export type Task = {
   difficulty: string; model: string; effort: string; status: string; assignee: string | null;
   branch: string | null; dependsOn: string[]; result: string | null; resultSummary: string | null; goalId: string; costUsd: number;
   triedBy: string[]; // workers that gave it back
+  tokens: number; // tokens its Claude runs used
 };
 export type Lock = { path: string; taskId: string; workerId: string; createdAt: Date };
 export type Ev = { id: number; time: Date; workerId: string | null; type: string; message: string };
-export type Goal = { id: string; text: string; status: string; createdAt: Date; branch: string; note: string; costUsd: number };
+// effort: low | medium | high, chosen when the goal was sent (it picks the models)
+export type Goal = { id: string; text: string; status: string; createdAt: Date; branch: string; note: string; costUsd: number; effort: string; tokens: number };
 export type Presence = { name: string; kind: string; lastSeen: Date };
 export type Person = { identity: string; name: string; at: Date }; // operators and access requests
+// who wrote a shared note last, and when (null = not known)
+export type NoteMeta = { by: string; at: Date | null };
 export type Snapshot = {
   workers: Worker[]; tasks: Task[]; locks: Lock[]; events: Ev[]; goals: Goal[];
-  context: Record<string, string>; operators: Person[]; requests: Person[]; presence: Presence[];
+  context: Record<string, string>; contextMeta: Record<string, NoteMeta>; operators: Person[]; requests: Person[]; presence: Presence[];
 };
 
-export const emptySnapshot: Snapshot = { workers: [], tasks: [], locks: [], events: [], goals: [], context: {}, operators: [], requests: [], presence: [] };
+export const emptySnapshot: Snapshot = { workers: [], tasks: [], locks: [], events: [], goals: [], context: {}, contextMeta: {}, operators: [], requests: [], presence: [] };
 
 const date = (ts: { microsSinceUnixEpoch: bigint }) => new Date(Number(ts.microsSinceUnixEpoch / 1000n));
 
@@ -43,7 +47,7 @@ export function readSnapshot(conn: DbConnection): Snapshot {
       files: [...r.files], difficulty: r.difficulty, model: r.model, effort: r.effort, status: r.status,
       assignee: r.assignee ?? null, branch: r.branch ?? null, dependsOn: [...r.dependsOn],
       result: r.result ?? null, resultSummary: r.resultSummary ?? null, goalId: r.goalId, costUsd: r.costUsd,
-      triedBy: r.triedBy.split(',').filter(Boolean),
+      triedBy: r.triedBy.split(',').filter(Boolean), tokens: r.tokens,
     })),
     locks: mine(conn.db.locks.iter()).map(r => ({
       path: r.path, taskId: r.taskId, workerId: r.workerId, createdAt: date(r.createdAt),
@@ -52,9 +56,10 @@ export function readSnapshot(conn: DbConnection): Snapshot {
       .map(r => ({ id: Number(r.id), time: date(r.timestamp), workerId: r.workerId ?? null, type: r.type, message: r.message }))
       .sort((a, b) => b.id - a.id),
     goals: mine(conn.db.goals.iter())
-      .map(r => ({ id: r.id, text: r.text, status: r.status, createdAt: date(r.createdAt), branch: r.branch, note: r.note, costUsd: r.costUsd }))
+      .map(r => ({ id: r.id, text: r.text, status: r.status, createdAt: date(r.createdAt), branch: r.branch, note: r.note, costUsd: r.costUsd, effort: r.effort || 'medium', tokens: r.tokens }))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
     context: Object.fromEntries(mine(conn.db.context.iter()).map(r => [r.key, r.value])),
+    contextMeta: Object.fromEntries(mine(conn.db.context.iter()).map(r => [r.key, { by: r.updatedBy, at: r.updatedAt > 0 ? new Date(r.updatedAt) : null }])),
     operators: [...conn.db.operators.iter()].map(r => ({ identity: r.identity.toHexString(), name: r.name, at: date(r.addedAt) })),
     requests: [...conn.db.operatorRequests.iter()].map(r => ({ identity: r.identity.toHexString(), name: r.name, at: date(r.createdAt) })),
     presence: [...conn.db.presence.iter()].filter(r => r.sessionId === SESSION).map(r => ({ name: r.name, kind: r.kind, lastSeen: date(r.lastSeen) })),
@@ -62,7 +67,7 @@ export function readSnapshot(conn: DbConnection): Snapshot {
 }
 
 // The browser keeps its login (token) so it stays the same identity between visits.
-// That is what lets this browser stay a controller of the team it opened.
+// That is what lets this browser stay the conductor of the team it opened.
 const tokenKey = (uri: string, database: string) => `tandem-token:${uri}|${database}`;
 function loadToken(key: string): string | undefined {
   try { return globalThis.localStorage?.getItem(key) ?? undefined; } catch { return undefined; }
@@ -130,7 +135,9 @@ export function makeApi(conn: DbConnection) {
     approve: (identity: string) => conn.reducers.approveOperator({ identity: ident(identity) }),
     dismiss: (identity: string) => conn.reducers.dismissRequest({ identity: ident(identity) }),
     removeOperator: (identity: string) => conn.reducers.removeOperator({ identity: ident(identity) }),
-    postGoal: (text: string) => conn.reducers.postGoal({ sessionId, id: newId('g'), text }),
+    postGoal: (text: string, effort = 'medium') => conn.reducers.postGoal({ sessionId, id: newId('g'), text, effort }),
+    // the conductor's own page takes control back with the conductor's key (from tandem --start)
+    claimAsHost: (key: string) => conn.reducers.claimAsHost({ sessionId, key }),
     createTask: (p: PieceSpec & { difficulty?: string }, assignee?: string) =>
       conn.reducers.createTask({ sessionId, kind: 'normal', assignee, task: toInput(newId('t'), p, p.difficulty) }),
     createJob: (goal: string, pieces: PieceSpec[], merge: PieceSpec) =>

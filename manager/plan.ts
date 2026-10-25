@@ -7,7 +7,7 @@
 // The manager's identity (printed first) must be allowed to manage the team; watch.ts asks for
 // that by itself. Uses your Claude quota. Nothing is added to your Claude Code settings.
 import { spawn } from 'node:child_process';
-import { spawnClaude } from './claude.js';
+import { spawnClaude, tokensOf } from './claude.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -23,6 +23,7 @@ const { values: opt } = parseArgs({
     'token-file': { type: 'string' },
     workdir: { type: 'string', default: process.cwd() },
     model: { type: 'string', default: 'haiku' },
+    effort: { type: 'string', default: 'default' }, // Claude Code's --effort; 'default' = not passed
     budget: { type: 'string', default: '0.50' },
     log: { type: 'string' },
   },
@@ -51,7 +52,8 @@ const prompt = readFileSync(join(here, 'PROMPT.md'), 'utf8') + '\n\nBegin now: c
 const [cmd, ...pre] = process.env.TANDEM_CLAUDE ? [process.execPath, process.env.TANDEM_CLAUDE] : ['claude'];
 const code = await new Promise<number>(done => {
   const args = ['-p', '--model', opt.model!, '--mcp-config', config, '--strict-mcp-config',
-    '--allowedTools', 'mcp__tandem', 'Read', 'Glob', 'Grep', '--max-budget-usd', opt.budget!, '--output-format', 'json'];
+    '--allowedTools', 'mcp__tandem', 'Read', 'Glob', 'Grep', '--max-budget-usd', opt.budget!, '--output-format', 'json',
+    ...(opt.effort && opt.effort !== 'default' ? ['--effort', opt.effort] : [])];
   const where = { cwd: resolve(opt.workdir!), windowsHide: true };
   const child = process.env.TANDEM_CLAUDE ? spawn(cmd, [...pre, ...args], where) : spawnClaude(args, where);
   let stdout = ''; let stderr = '';
@@ -63,7 +65,7 @@ const code = await new Promise<number>(done => {
     done(1);
   });
   child.on('close', async c => {
-    let json: { result?: string; total_cost_usd?: number; is_error?: boolean } = {};
+    let json: { result?: string; total_cost_usd?: number; is_error?: boolean; usage?: Record<string, number> } = {};
     try { json = JSON.parse(stdout.trim().split('\n').pop() ?? '{}'); } catch { /* plain text */ }
     console.log(json.result ?? stdout);
     // the last line watch.ts reads to tell the page why
@@ -72,10 +74,11 @@ const code = await new Promise<number>(done => {
       console.log(`Could not plan: ${(why ?? `claude exited with ${c}`).slice(0, 200)}`);
     }
     if (opt.log) writeFileSync(opt.log, `${json.result ?? stdout}\n${stderr}`);
-    // the planning cost, split over the goals this run planned
+    // the planning cost and tokens, split over the goals this run planned
     const usd = json.total_cost_usd ?? 0;
-    if (usd > 0 && waiting.length > 0) {
-      for (const id of waiting) await brain.addGoalCost(id, usd / waiting.length).catch(() => {});
+    const tokens = tokensOf(json.usage);
+    if ((usd > 0 || tokens > 0) && waiting.length > 0) {
+      for (const id of waiting) await brain.addGoalCost(id, usd / waiting.length, tokens / waiting.length).catch(() => {});
     }
     done(c === 0 && !json.is_error ? 0 : (c || 1));
   });

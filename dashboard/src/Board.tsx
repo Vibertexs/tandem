@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Api, Goal, Snapshot, Task } from './brain';
 import { ApplyControl } from './Apply';
 import { FinishedStrip } from './Finished';
-import { Avatar, EV_ICON, agentLabel, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, modelFor, money, online, stageOf, took, why, type Stage } from './ui';
+import { Avatar, EFFORTS, EV_ICON, Spend, agentLabel, STAGES, ago, copy, goalEffortOf, isManager, liveInfo, lockBlocking, managerOnline, online, routeFor, stageOf, took, why, type Stage } from './ui';
 
 type Props = { snap: Snapshot; api: Api | null; isOp: boolean; now: number; say: (m: string) => void; present: boolean; go: (page: string) => void };
 
@@ -22,10 +22,10 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
         <span className="next-icon" aria-hidden="true">✋</span>
         <div>
           <strong>{req.name} wants to control this team.</strong>
-          <p className="small muted">{isManager(req.name) ? 'This is the manager: approve it so it can plan your goals.' : 'Approve to let this browser send goals and change the team.'}{snap.requests.length > 1 ? ` (${snap.requests.length - 1} more in Settings)` : ''}</p>
+          <p className="small muted">{isManager(req.name) ? "This is the conductor's Claude: approve it so it can plan your goals." : 'Approve to let this browser send goals and change the team too.'}{snap.requests.length > 1 ? ` (${snap.requests.length - 1} more in Settings)` : ''}</p>
         </div>
         <div className="row-actions">
-          <button type="button" className="btn primary" disabled={busy || !api} onClick={() => act(() => api!.approve(req.identity), `${req.name} can now manage the team.`)}>Approve</button>
+          <button type="button" className="btn primary" disabled={busy || !api} onClick={() => act(() => api!.approve(req.identity), `${req.name} can now send goals too.`)}>Approve</button>
           <button type="button" className="btn" disabled={busy || !api} onClick={() => act(() => api!.dismiss(req.identity), 'Request dismissed.')}>Dismiss</button>
         </div>
       </div>
@@ -35,11 +35,11 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
   if (unplanned) {
     return (
       <div className="next card alert" role="status">
-        <div><strong>The manager could not plan "{unplanned.text.slice(0, 80)}".</strong>
+        <div><strong>The conductor could not plan "{unplanned.text.slice(0, 80)}".</strong>
           <p className="small muted">{unplanned.note}</p></div>
         <button type="button" className="btn" disabled={busy || !api} onClick={async () => {
           setBusy(true);
-          try { await api!.retryGoal(unplanned.id); say('Sent to the manager again.'); }
+          try { await api!.retryGoal(unplanned.id); say('Sent to the conductor again.'); }
           catch (e) { say('Could not do that: ' + (e as Error).message); }
           finally { setBusy(false); }
         }}>Try again</button>
@@ -60,8 +60,8 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
   if (hasManager && !managerOnline(snap, now) && snap.goals.some(g => g.status === 'new')) {
     return (
       <div className="next card subtle">
-        <div><strong>The manager is offline, so new goals are waiting.</strong>
-          <p className="small muted">On the host, run <code className="mono">tandem start</code> again in the project's folder. It picks up where it left off.</p></div>
+        <div><strong>The conductor is offline, so new goals are waiting.</strong>
+          <p className="small muted">On your computer, run <code className="mono">tandem --start</code> again in the project's folder. It picks up where it left off.</p></div>
       </div>
     );
   }
@@ -69,8 +69,8 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
     return (
       <div className="next card subtle">
         <span className="next-icon" aria-hidden="true">🧭</span>
-        <div><strong>The manager is not connected yet.</strong>
-          <p className="small muted">It turns your goals into tasks. On the host, run <code className="mono">tandem start</code> in the project's folder; then approve "Manager Claude" here. You can still add tasks by hand in Settings.</p></div>
+        <div><strong>The conductor is not connected yet.</strong>
+          <p className="small muted">It turns your goals into tasks. On your computer, run <code className="mono">tandem --start</code> in the project's folder; it connects by itself. You can still add tasks by hand in Settings.</p></div>
       </div>
     );
   }
@@ -78,7 +78,7 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
     return (
       <div className="next card subtle">
         <div><strong>No workers are online.</strong>
-          <p className="small muted">Tasks wait until a worker picks them up. Start workers with <code className="mono">tandem start</code>, or invite another computer.</p></div>
+          <p className="small muted">Tasks wait until a worker picks them up. Start workers with <code className="mono">tandem --start</code>, or invite a teammate's computer.</p></div>
         <button type="button" className="btn" onClick={() => go('team')}>Connect a computer</button>
       </div>
     );
@@ -89,8 +89,9 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
 function Prompt({ snap, api, isOp, say }: Props) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  // how hard the conductor and the workers think about this goal; it picks every model
+  const [effort, setEffort] = useState('medium');
   const input = useRef<HTMLInputElement>(null);
-  const latest = snap.goals[0];
   // "/" jumps to the prompt, like search boxes do
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -104,7 +105,7 @@ function Prompt({ snap, api, isOp, say }: Props) {
     e.preventDefault();
     if (!api || !text.trim() || busy) return;
     setBusy(true);
-    try { await api.postGoal(text.trim()); setText(''); say('Sent. The manager is planning it.'); }
+    try { await api.postGoal(text.trim(), effort); setText(''); say(`Sent with ${effort} effort. The conductor is planning it.`); }
     catch (err) { say('Could not send: ' + (err as Error).message); }
     finally { setBusy(false); }
   };
@@ -116,12 +117,23 @@ function Prompt({ snap, api, isOp, say }: Props) {
           placeholder={isOp ? 'Describe what you want built…' : 'Watching: request control to send work'} />
         <button type="submit" className="btn primary" disabled={!isOp || busy || !text.trim()}>Send</button>
       </form>
+      {isOp && (
+        <div className="effort-pick">
+          <div className="unit-switch" role="radiogroup" aria-label="Effort">
+            <span className="small muted">Effort</span>
+            {EFFORTS.map(e => (
+              <button key={e.key} type="button" role="radio" aria-checked={effort === e.key} className={`chip ${effort === e.key ? 'on' : ''}`} onClick={() => setEffort(e.key)}>{e.label}</button>
+            ))}
+          </div>
+          <span className="small muted effort-hint">{EFFORTS.find(e => e.key === effort)!.hint}</span>
+        </div>
+      )}
     </section>
   );
 }
 
 export function GoalChip({ status }: { status: string }) {
-  const text = status === 'new' ? 'Waiting for the manager' : status === 'planning' ? 'Being planned'
+  const text = status === 'new' ? 'Waiting for the conductor' : status === 'planning' ? 'Being planned'
     : status === 'done' ? 'Done' : status === 'failed' ? 'Could not plan' : status === 'cancelled' ? 'Cancelled' : 'Planned';
   return <span className={`chip goal-${status}`}>{text}</span>;
 }
@@ -131,7 +143,7 @@ export function GoalChip({ status }: { status: string }) {
 type Lane = { key: string; goal: Goal | null; tasks: Task[] };
 const FINISHED = ['done', 'cancelled'];
 const EMPTY_LANE: Record<string, string> = {
-  new: 'Waiting for the manager to plan it.', planning: 'The manager is splitting it into tasks…',
+  new: 'Waiting for the conductor to plan it.', planning: 'The conductor is splitting it into tasks…',
   planned: 'No tasks.', cancelled: 'Cancelled before any work started.', done: 'Done.', failed: '',
 };
 
@@ -147,13 +159,13 @@ function GoalLane({ lane, p, open, setOpen, flash }: { lane: Lane; p: Props; ope
   };
   const done = lane.tasks.filter(t => t.status === 'done').length;
   const cost = (g?.costUsd ?? 0) + lane.tasks.reduce((sum, t) => sum + t.costUsd, 0);
+  const tokens = (g?.tokens ?? 0) + lane.tasks.reduce((sum, t) => sum + t.tokens, 0);
   // when it was finished, from the brain's "Goal done" log line
   const short = g && (g.text.length > 60 ? g.text.slice(0, 57) + '...' : g.text);
   const doneAt = g?.status === 'done' ? snap.events.find(e => e.type === 'merge_unblocked' && e.message.startsWith(`Goal done: ${short}`))?.time : undefined;
   const meta = g ? [
     `sent ${ago(g.createdAt, now)}`,
     doneAt ? `done in ${took(g.createdAt, doneAt.getTime())}` : '',
-    cost > 0 ? `${money(cost)} of Claude usage` : '',
   ].filter(Boolean).join(' · ') : 'Added by hand, not part of a goal';
   const warn = g && (g.status === 'failed' || /fail|could not|not on this|by hand/i.test(g.note));
   return (
@@ -162,7 +174,7 @@ function GoalLane({ lane, p, open, setOpen, flash }: { lane: Lane; p: Props; ope
         <button type="button" className="lane-toggle" aria-expanded={expanded} aria-label={expanded ? 'Fold' : 'Unfold'} onClick={() => setExpanded(!expanded)}><span className={`chevron ${expanded ? 'open' : ''}`} aria-hidden="true" /></button>
         <div className="lane-title">
           <strong className="goal-text">{g ? g.text : 'Other tasks'}</strong>
-          <span className="small muted">{meta}</span>
+          <span className="small muted">{meta}{(cost > 0 || tokens > 0) && <> · <Spend usd={cost} tokens={tokens} /></>}</span>
         </div>
         {lane.tasks.length > 0 && (
           <span className="lane-progress">
@@ -170,6 +182,7 @@ function GoalLane({ lane, p, open, setOpen, flash }: { lane: Lane; p: Props; ope
             <span className="small muted nowrap">{done}/{lane.tasks.length}</span>
           </span>
         )}
+        {g && <span className={`chip effort-chip effort-${g.effort}`} title={EFFORTS.find(e => e.key === g.effort)?.hint}>{EFFORTS.find(e => e.key === g.effort)?.label ?? g.effort} effort</span>}
         {g && <GoalChip status={g.status} />}
         {g && isOp && api && !FINISHED.includes(g.status) && !confirm && (
           <button type="button" className="link small cancel-goal" onClick={() => setConfirm(true)}>Cancel goal</button>
@@ -191,7 +204,7 @@ function GoalLane({ lane, p, open, setOpen, flash }: { lane: Lane; p: Props; ope
             </span>
           )}
           {g?.branch && g.status === 'done' && <ApplyControl g={g} snap={snap} api={api} isOp={isOp} say={say} />}
-          {g && isOp && api && g.status === 'failed' && <button type="button" className="btn small-btn" disabled={busy} onClick={() => act(() => api.retryGoal(g.id), 'Sent to the manager again.')}>Try again</button>}
+          {g && isOp && api && g.status === 'failed' && <button type="button" className="btn small-btn" disabled={busy} onClick={() => act(() => api.retryGoal(g.id), 'Sent to the conductor again.')}>Try again</button>}
         </div>
       )}
       {expanded && (lane.tasks.length === 0
@@ -315,9 +328,9 @@ function Drawer({ t, snap, now, onClose, api, isOp, say }: { t: Task; snap: Snap
         <dt>Assignee</dt><dd>{who ? <span className="who"><Avatar name={who.name} size={22} /> {who.name} <span className="small muted">{agentLabel(who)}</span></span> : t.assignee ? `Reserved for ${t.assignee}` : 'Nobody yet'}</dd>
         <dt>Files</dt><dd className="mono small">{t.files.map(f => <div key={f}>{f}{snap.locks.some(l => l.path === f) ? ' (locked)' : ''}</div>)}</dd>
         {deps.length > 0 && <><dt>After</dt><dd>{deps.map(d => <div key={d.id}>{d.status === 'done' ? '✓' : '○'} {d.title}</div>)}</dd></>}
-        <dt>Model</dt><dd>{modelFor(t)} · {t.difficulty} task <span className="small muted">(the timeline shows what ran)</span></dd>
+        <dt>Model</dt><dd>{(r => `${r.model}${r.effort === 'default' ? '' : ` · ${r.effort} effort`}`)(routeFor(t, goalEffortOf(t, snap)))} · {t.difficulty} task <span className="small muted">(the timeline shows what ran)</span></dd>
         {t.branch && <><dt>Branch</dt><dd className="mono small">{t.branch}</dd></>}
-        {t.costUsd > 0 && <><dt>Cost</dt><dd>{money(t.costUsd)}</dd></>}
+        {(t.costUsd > 0 || t.tokens > 0) && <><dt>Used</dt><dd><Spend usd={t.costUsd} tokens={t.tokens} /></dd></>}
       </dl>
       {t.description && <section><h3>What to do</h3><p>{t.description}</p></section>}
       <section><h3>Why it is here</h3><p>{why(t, snap)}</p>
@@ -378,7 +391,7 @@ export function BoardPage(p: Props) {
         !hasFinished && (
           <div className="empty-board card">
             <p><strong>Nothing yet.</strong></p>
-            <p className="muted">{p.isOp ? 'Describe what you want built above. The manager splits it into tasks, and workers pick them up.' : 'When a controller sends a goal, it shows up here with its tasks.'}</p>
+            <p className="muted">{p.isOp ? 'Describe what you want built above. The conductor splits it into tasks, and workers pick them up.' : 'When the conductor sends a goal, it shows up here with its tasks.'}</p>
             <p className="small muted">New here? <a href="#/team">See how to get started</a>.</p>
           </div>
         )

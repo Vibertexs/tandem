@@ -41,8 +41,8 @@ check('before any operator: a stranger cannot write notes or reset live',
   await rejects(a.conn.reducers.resetSession({ sessionId: 'live' })) &&
   await rejects(a.conn.reducers.seedTasks({ sessionId: 'live', group: 'demo' })));
 
-check('before any operator: a stranger cannot post a goal in live', await rejects(a.conn.reducers.postGoal({ sessionId: 'live', id: 'g0', text: 'hi' })));
-check('before any operator: goals are open in judge sandboxes', !(await rejects(a.conn.reducers.postGoal({ sessionId: 'judge-1', id: 'g0', text: 'hi' }))));
+check('before any operator: a stranger cannot post a goal in live', await rejects(a.conn.reducers.postGoal({ sessionId: 'live', id: 'g0', text: 'hi', effort: 'medium' })));
+check('before any operator: goals are open in judge sandboxes', !(await rejects(a.conn.reducers.postGoal({ sessionId: 'judge-1', id: 'g0', text: 'hi', effort: 'medium' }))));
 
 await a.conn.reducers.claimOperator({});
 await sleep(300);
@@ -53,8 +53,8 @@ check('operator: can create a task in live', !(await rejects(create(a.conn, 'liv
 check('operator: can write notes in live', !(await rejects(a.conn.reducers.setContext({ sessionId: 'live', key: 'k', value: 'v' }))));
 check('non-operator: still cannot create a task in live', await rejects(create(b.conn, 'live', 'x3')));
 check('operator can post a goal in live, a non-operator cannot',
-  !(await rejects(a.conn.reducers.postGoal({ sessionId: 'live', id: 'g1', text: 'Build it' }))) &&
-  await rejects(b.conn.reducers.postGoal({ sessionId: 'live', id: 'g2', text: 'Build it' })) &&
+  !(await rejects(a.conn.reducers.postGoal({ sessionId: 'live', id: 'g1', text: 'Build it', effort: 'medium' }))) &&
+  await rejects(b.conn.reducers.postGoal({ sessionId: 'live', id: 'g2', text: 'Build it', effort: 'medium' })) &&
   await rejects(b.conn.reducers.setGoalStatus({ sessionId: 'live', id: 'g1', status: 'planned' })));
 check('non-operator: cannot add themselves as operator', await rejects(b.conn.reducers.addOperator({ identity: b.identity })));
 check('non-operator: worker actions stay open in live (register_worker)', !(await rejects(b.conn.reducers.registerWorker({ sessionId: 'live', id: 'w-b', name: 'B', plan: 'pro' }))));
@@ -92,9 +92,26 @@ await a.conn.reducers.requestOperator({ name: 'already' });
 await sleep(200);
 check('request: an operator asking is a no-op', requests().length === 0);
 const owner = [...a.conn.db.operators.iter()].find(o => o.identity.isEqual(a.identity));
-check('claim: the first operator is named Owner', owner?.name === 'Owner', owner?.name);
+check('claim: the first operator (the conductor\'s page) is named Conductor', owner?.name === 'Conductor', owner?.name);
+const kRow = [...a.conn.db.context.iter()].find(r => r.sessionId === 'live' && r.key === 'k');
+check('notes: the context row says who wrote it (the operator\'s name)', kRow?.updatedBy === 'Conductor', kRow);
 
-check('add_goal_cost: a non-operator cannot add planning cost in live', await rejects(c.conn.reducers.addGoalCost({ sessionId: 'live', id: 'g1', usd: 1 })));
+// The conductor's key: the conductor's own page can always take control back.
+const key = 'ab'.repeat(16);
+check('host key: a non-operator cannot set it', await rejects(c.conn.reducers.setHostKey({ sessionId: 'live', key })));
+check('host key: it must look like a key', await rejects(a.conn.reducers.setHostKey({ sessionId: 'live', key: 'short' })));
+await a.conn.reducers.setHostKey({ sessionId: 'live', key });
+await sleep(200);
+check('host key: a wrong key does not give control', await rejects(c.conn.reducers.claimAsHost({ sessionId: 'live', key: 'cd'.repeat(16) })) &&
+  ![...a.conn.db.operators.iter()].some(o => o.identity.isEqual(c.identity)));
+await c.conn.reducers.claimAsHost({ sessionId: 'live', key });
+await sleep(300);
+const cRow = [...a.conn.db.operators.iter()].find(o => o.identity.isEqual(c.identity));
+check('host key: the right key gives control even though there already are operators', cRow?.name === 'Conductor', cRow);
+await a.conn.reducers.removeOperator({ identity: c.identity });
+await sleep(200);
+
+check('add_goal_cost: a non-operator cannot add planning cost in live', await rejects(c.conn.reducers.addGoalCost({ sessionId: 'live', id: 'g1', usd: 1, tokens: 0 })));
 check('finish_goal: a non-operator cannot finish a goal in live', await rejects(c.conn.reducers.finishGoal({ sessionId: 'live', id: 'g1', branch: '', note: '' })));
 
 // A worker belongs to the identity that registered it. Two fresh identities, neither an operator.
@@ -115,7 +132,7 @@ other.conn.disconnect();
 
 // Start over
 await create(a.conn, 'live', 'x9');
-await a.conn.reducers.postGoal({ sessionId: 'live', id: 'g9', text: 'again' });
+await a.conn.reducers.postGoal({ sessionId: 'live', id: 'g9', text: 'again', effort: 'medium' });
 await sleep(300);
 const liveWorkers = () => [...a.conn.db.workers.iter()].filter(w => w.sessionId === 'live').length;
 const workersBefore = liveWorkers();

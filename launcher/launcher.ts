@@ -24,7 +24,7 @@ import { loadRouting, route } from './routing.js';
 import { isRateLimit, resetTime } from './limits.js';
 import { filesWithMarkers, ignoreWorktrees, mergeInProgress, pushIfRemote, startConflictMerge, startFromBranches, worktreesDir, knownGoalBranch, nameWords } from '../manager/merge.js';
 import { REVIEW_TITLE, conflictBranch } from '../manager/finish.js';
-import { spawnClaude } from '../manager/claude.js';
+import { spawnClaude, tokensOf } from '../manager/claude.js';
 
 const { values: opt } = parseArgs({
   options: {
@@ -88,6 +88,10 @@ async function hitLimit(until: Date) {
 let simLimitUsed = false;
 async function simulate(t: Task) {
   const ms = Number(opt['sim-ms']);
+  // like a real run, the worker is given the shared notes first (logged, so the page shows it)
+  const context = brain.getContext();
+  const notes = NOTES.filter(([key]) => (context[key] ?? '').trim()).map(([key]) => key);
+  if (notes.length) await brain.noteRead(workerId, t.id, notes).catch(() => {});
   await brain.reportProgress(workerId, t.id, 'started');
   await sleep(ms);
   if (Number(opt['sim-limit']) > 0 && !simLimitUsed) {
@@ -128,21 +132,28 @@ function runClaude(cwd: string, prompt: string, model: string, effort: string, e
     '--allowedTools', 'mcp__tandem', ...tools, '--permission-mode', 'acceptEdits',
     '--max-budget-usd', BUDGET, '--output-format', 'json'];
   if (effort && effort !== 'default') args.push('--effort', effort);
-  return new Promise<{ code: number; out: string; result: string; cost: number; isError: boolean }>(done => {
+  return new Promise<RunResult>(done => {
     const child = spawnClaude(args, { cwd, windowsHide: true, env: { ...process.env, TANDEM_WORKER_ID: workerId, TANDEM_SESSION: SESSION, STDB_URI: URI, STDB_DB: DB, ...extraEnv } });
     let stdout = ''; let stderr = '';
     child.stdout.on('data', d => { stdout += d; });
     child.stderr.on('data', d => { stderr += d; });
     child.on('error', e => { stderr += String(e); });
     child.on('close', code => {
-      // --output-format json: one JSON object with the final text, the cost and whether it failed
-      let json: { result?: string; total_cost_usd?: number; is_error?: boolean } = {};
+      // --output-format json: one JSON object with the final text, the cost, the tokens and whether it failed
+      let json: { result?: string; total_cost_usd?: number; is_error?: boolean; usage?: Record<string, number> } = {};
       try { json = JSON.parse(stdout.trim().split('\n').pop() ?? '{}'); } catch { /* plain text */ }
-      done({ code: code ?? 1, out: stdout + stderr, result: json.result ?? stdout, cost: json.total_cost_usd ?? 0, isError: json.is_error === true });
+      done({ code: code ?? 1, out: stdout + stderr, result: json.result ?? stdout, cost: json.total_cost_usd ?? 0, tokens: tokensOf(json.usage), isError: json.is_error === true });
     });
     child.stdin.end(prompt);
   });
 }
+
+type RunResult = { code: number; out: string; result: string; cost: number; tokens: number; isError: boolean };
+// A retry thinks at least as hard as the first try.
+const EFFORT_ORDER = ['default', 'low', 'medium', 'high', 'xhigh', 'max'];
+const atLeast = (effort: string, floor: string) => (EFFORT_ORDER.indexOf(effort) >= EFFORT_ORDER.indexOf(floor) ? effort : floor);
+// The shared notes every worker gets before a task (the rest of the context is facts for the page).
+const NOTES: [string, string][] = [['project_summary', 'Project summary'], ['interfaces', 'Interfaces'], ['decisions', 'Decisions']];
 
 // Codex reads its MCP servers from config.toml in its login folder (CODEX_HOME). The tandem
 // server goes between two marker lines, so anything else you set there is kept.
@@ -173,7 +184,7 @@ function runCodex(cwd: string, prompt: string, readOnly: boolean) {
   const shell = !fake && process.platform === 'win32';
   const cmd = fake ? process.execPath : 'codex';
   const argv = fake ? [fake, ...args] : shell ? args.map(a => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a)) : args;
-  return new Promise<{ code: number; out: string; result: string; cost: number; isError: boolean }>(done => {
+  return new Promise<RunResult>(done => {
     const child = spawn(cmd, argv, { cwd, shell, windowsHide: true, env: { ...process.env, TANDEM_WORKER_ID: workerId } });
     let out = '';
     child.stdout.on('data', d => { out += d; });
@@ -183,7 +194,7 @@ function runCodex(cwd: string, prompt: string, readOnly: boolean) {
       let result = '';
       try { result = readFileSync(last, 'utf8').trim(); } catch { /* no final message */ }
       // a ChatGPT plan has no per-run price to report
-      done({ code: code ?? 1, out, result: result || out, cost: 0, isError: code !== 0 });
+      done({ code: code ?? 1, out, result: result || out, cost: 0, tokens: 0, isError: code !== 0 });
     });
     child.stdin.end(prompt);
   });
@@ -225,10 +236,19 @@ async function realRun(t: Task) {
   }
   const me = brain.getCapacity().find(w => w.id === workerId);
   const routing = loadRouting();
-  let { model, effort } = route(t, me?.usage_5h_pct ?? null, routing);
+  // the effort chosen when the goal was sent picks this task's model (routing.json)
+  const goalEffort = (t.goal_id && brain.listGoals().find(g => g.id === t.goal_id)?.effort) || 'medium';
+  let { model, effort } = route(t, me?.usage_5h_pct ?? null, routing, goalEffort);
   if (process.env.LAUNCHER_MODEL) model = process.env.LAUNCHER_MODEL;
   const skill = readFileSync(join(mcpDir, 'skill', 'SKILL.md'), 'utf8').replace(/^---[\s\S]*?---\s*/, '');
-  const prompt = `${skill}\n\n## Your task (already claimed for you)\nThe launcher claimed this task for you and will complete it when you finish. ` +
+  // The team's shared memory: the notes go into the prompt, and the brain logs that this worker read them.
+  const context = brain.getContext();
+  const notes = NOTES.filter(([key]) => (context[key] ?? '').trim());
+  if (notes.length) await brain.noteRead(workerId, t.id, notes.map(([key]) => key)).catch(() => {});
+  const shared = notes.length
+    ? `## Shared notes (the team's shared memory; follow them)\n${notes.map(([key, title]) => `### ${title}\n${context[key].trim()}`).join('\n\n')}\n\n`
+    : '';
+  const prompt = `${skill}\n\n${shared}## Your task (already claimed for you)\nThe launcher claimed this task for you and will complete it when you finish. ` +
     `Do NOT call register_worker, claim_task or complete_task. Do use report_progress and lock_files.\n` +
     `task_id: ${t.id}\ntitle: ${t.title}\ndescription: ${t.description || '(none)'}\nfiles: ${t.files.join(', ')}\n` +
     (resolving ? `The merge of ${resolving} is already in progress in this worktree. Do not run git. Conflict markers are in: ${conflicted.join(', ')}.\n` : '') +
@@ -240,18 +260,18 @@ async function realRun(t: Task) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     const runs = AGENT === 'codex' ? 'codex' : `${model}${effort !== 'default' ? `/${effort}` : ''}`;
     log(`running ${t.id} with ${runs} (attempt ${attempt})`);
-    await brain.reportProgress(workerId, t.id, `started (${AGENT === 'codex' ? 'codex' : model})`);
-    const { code, out, result, cost, isError } = AGENT === 'codex'
+    await brain.reportProgress(workerId, t.id, `started (${AGENT === 'codex' ? 'codex' : `${model}${effort !== 'default' ? `, ${effort} effort` : ''}`})`);
+    const { code, out, result, cost, tokens, isError } = AGENT === 'codex'
       ? await runCodex(tree, prompt, reviewing)
       : await runClaude(tree, prompt, model, effort, {}, reviewing ? READ_TOOLS : EDIT_TOOLS);
     // Claude may have given the task back itself (give_back_task): then it is no longer ours.
     if (brain.getStatus().tasks.find(x => x.id === t.id)?.assignee !== workerId) return 'given back';
-    if (cost > 0) await brain.recordCost(workerId, t.id, cost).catch(() => {});
+    if (cost > 0 || tokens > 0) await brain.recordCost(workerId, t.id, cost, tokens).catch(() => {});
     if (isRateLimit(out) && (code !== 0 || isError)) return hitLimit(resetTime(out));
     const leftover = resolving && code === 0 && !isError ? filesWithMarkers(tree, conflicted) : [];
     if (leftover.length > 0) {
       lastError = `conflict markers are still in ${leftover.join(', ')}`;
-      effort = routing.retry_effort;
+      effort = atLeast(effort, routing.retry_effort);
       continue;
     }
     if (code === 0 && !isError) {
@@ -259,7 +279,7 @@ async function realRun(t: Task) {
       git(tree, 'add', '-A');
       const dirty = git(tree, 'status', '--porcelain');
       if (dirty) git(tree, '-c', 'user.name=tandem', '-c', 'user.email=tandem@localhost', 'commit', '-q', '-m', t.title);
-      // With --push the branch reaches the host's manager even from another computer.
+      // With --push the branch reaches the conductor even from another computer.
       if (opt.push) {
         const pushed = pushIfRemote(tree, branch);
         if (pushed !== 'pushed') await brain.reportProgress(workerId, t.id, pushed === 'no-remote' ? 'no origin remote: branch not pushed' : 'could not push the branch');
@@ -271,7 +291,7 @@ async function realRun(t: Task) {
       return 'done';
     }
     lastError = (result || out).trim().split('\n').filter(Boolean).pop()?.slice(0, 200) ?? '';
-    effort = routing.retry_effort; // retry once at higher effort
+    effort = atLeast(effort, routing.retry_effort); // retry once, thinking at least this hard
   }
   // Hand it back: a different worker gets it, and after two workers it waits for a person.
   await brain.giveBackTask(workerId, t.id, `failed twice${lastError ? `: ${lastError}` : ''}`);

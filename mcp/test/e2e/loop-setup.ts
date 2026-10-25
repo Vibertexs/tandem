@@ -15,7 +15,7 @@ const conn = await new Promise<DbConnection>((resolve, reject) => {
 });
 await conn.reducers.claimOperator({});
 await conn.reducers.addOperator({ identity: Identity.fromString(process.env.MANAGER_IDENTITY!) });
-await conn.reducers.postGoal({ sessionId: 'live', id: 'g-loop', text: process.env.GOAL_TEXT! });
+await conn.reducers.postGoal({ sessionId: 'live', id: 'g-loop', text: process.env.GOAL_TEXT!, effort: 'medium' });
 console.log(`setup: operator claimed, manager authorized, goal posted in ${db}/live`);
 conn.disconnect();
 setTimeout(() => process.exit(0), 300);

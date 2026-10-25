@@ -208,6 +208,7 @@ await sleep(400);
 check('progress: event logged', main.events().some(e => e.type === 'progress' && e.message.includes('halfway')));
 const ctxRows = [...admin.db.context.iter()].filter(c => c.sessionId === S && c.key === 'decisions');
 check('context: set twice keeps one row with the latest value', ctxRows.length === 1 && ctxRows[0].value === 'use spaces', ctxRows);
+check('context: it remembers when it was last written', ctxRows[0].updatedAt > Date.now() - 60_000 && ctxRows[0].updatedAt <= Date.now() + 5_000, ctxRows[0].updatedAt);
 
 // 11. reset_session loads the seed workers and context; seed_tasks adds the scenario tasks.
 const R = `r-${run}`;
@@ -233,16 +234,21 @@ check('reset: other sessions are untouched', main.tasks().size > 5 && s2.tasks()
 // 12. Goals: the operator's plain-words request, waiting for the manager.
 const G = `g-${run}`;
 const goals = () => [...admin.db.goals.iter()].filter(g => g.sessionId === G);
-await admin.reducers.postGoal({ sessionId: G, id: 'g1', text: '  Build a login page  ' });
+await admin.reducers.postGoal({ sessionId: G, id: 'g1', text: '  Build a login page  ', effort: 'medium' });
 await sleep(400);
 check('goals: a posted goal is saved trimmed with status new', goals().length === 1 && goals()[0].text === 'Build a login page' && goals()[0].status === 'new', goals());
-check('goals: an empty goal is rejected', await rejects(admin.reducers.postGoal({ sessionId: G, id: 'g2', text: '   ' })));
-check('goals: the same id twice is rejected', await rejects(admin.reducers.postGoal({ sessionId: G, id: 'g1', text: 'again' })));
+check('goals: an empty goal is rejected', await rejects(admin.reducers.postGoal({ sessionId: G, id: 'g2', text: '   ', effort: 'medium' })));
+check('goals: the same id twice is rejected', await rejects(admin.reducers.postGoal({ sessionId: G, id: 'g1', text: 'again', effort: 'medium' })));
 await admin.reducers.setGoalStatus({ sessionId: G, id: 'g1', status: 'planned' });
 await sleep(300);
 check('goals: the manager can mark it planned', goals()[0].status === 'planned');
 check('goals: a bad status is rejected', await rejects(admin.reducers.setGoalStatus({ sessionId: G, id: 'g1', status: 'done' })));
-check('goals: a log line tells the team', [...admin.db.events.iter()].some(e => e.sessionId === G && e.message.startsWith('Goal sent to the manager')));
+check('goals: a log line tells the team', [...admin.db.events.iter()].some(e => e.sessionId === G && e.message.startsWith('Goal sent to the conductor')));
+await admin.reducers.postGoal({ sessionId: G, id: 'g-hi', text: 'Think hard', effort: 'high' });
+await admin.reducers.postGoal({ sessionId: G, id: 'g-odd', text: 'Strange effort', effort: 'turbo' });
+await sleep(300);
+check('goals: the effort is saved (low, medium or high), and anything else becomes medium',
+  goals().find(g => g.id === 'g-hi')?.effort === 'high' && goals().find(g => g.id === 'g-odd')?.effort === 'medium' && goals().find(g => g.id === 'g1')?.effort === 'medium', goals().map(g => [g.id, g.effort]));
 await admin.reducers.resetSession({ sessionId: G });
 await sleep(400);
 check('goals: reset wipes them', goals().length === 0);
@@ -251,25 +257,37 @@ check('goals: reset wipes them', goals().length === 0);
 const K = `ct-${run}`;
 const kv = view(K);
 await admin.reducers.registerWorker({ sessionId: K, id: 'w-x', name: 'X', plan: 'pro' });
-await admin.reducers.postGoal({ sessionId: K, id: 'g', text: 'costly' });
+await admin.reducers.postGoal({ sessionId: K, id: 'g', text: 'costly', effort: 'medium' });
 await admin.reducers.setGoalStatus({ sessionId: K, id: 'g', status: 'planning' });
 await newTask(K, 'paid', ['p.txt']);
 await admin.reducers.claimTask({ sessionId: K, workerId: 'w-x' });
-await admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: 0.03 });
-await admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: 0.02 });
-await admin.reducers.addGoalCost({ sessionId: K, id: 'g', usd: 0.01 });
+await admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: 0.03, tokens: 0 });
+await admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: 0.02, tokens: 0 });
+await admin.reducers.addGoalCost({ sessionId: K, id: 'g', usd: 0.01, tokens: 0 });
 await sleep(400);
 check('cost: a task adds up the cost of its runs', Math.abs(kv.tasks().get('paid')!.costUsd - 0.05) < 1e-9, kv.tasks().get('paid')!.costUsd);
-check('cost: only the task\'s worker can add to it', await rejects(admin.reducers.recordCost({ sessionId: K, workerId: 'w-other', taskId: 'paid', usd: 1 })));
-check('cost: nonsense amounts are ignored', !(await rejects(admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: -5 }))) && Math.abs(kv.tasks().get('paid')!.costUsd - 0.05) < 1e-9);
+check('cost: only the task\'s worker can add to it', await rejects(admin.reducers.recordCost({ sessionId: K, workerId: 'w-other', taskId: 'paid', usd: 1, tokens: 0 })));
+check('cost: nonsense amounts are ignored', !(await rejects(admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: -5, tokens: 0 }))) && Math.abs(kv.tasks().get('paid')!.costUsd - 0.05) < 1e-9);
 check('cost: planning cost is kept on the goal', Math.abs([...admin.db.goals.iter()].find(g => g.sessionId === K)!.costUsd - 0.01) < 1e-9);
+await admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: 0, tokens: 1200 });
+await admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: 0, tokens: 800.4 });
+await admin.reducers.recordCost({ sessionId: K, workerId: 'w-x', taskId: 'paid', usd: 0, tokens: -50 });
+await admin.reducers.addGoalCost({ sessionId: K, id: 'g', usd: 0, tokens: 3000 });
+await sleep(400);
+check('tokens: a task adds up the tokens of its runs (whole numbers; nonsense ignored)', kv.tasks().get('paid')!.tokens === 2000, kv.tasks().get('paid')!.tokens);
+check('tokens: planning tokens are kept on the goal', [...admin.db.goals.iter()].find(g => g.sessionId === K)!.tokens === 3000);
+await admin.reducers.noteRead({ sessionId: K, workerId: 'w-x', taskId: 'paid', keys: ['interfaces', 'decisions'] });
+await sleep(300);
+check('note read: the log says which worker read which notes before which task',
+  kv.events().some(e => e.type === 'context_read' && e.workerId === 'w-x' && e.message === 'X read the shared notes (Interfaces, Decisions) before "paid"'), kv.events().filter(e => e.type === 'context_read'));
+check('note read: an unknown task is refused', await rejects(admin.reducers.noteRead({ sessionId: K, workerId: 'w-x', taskId: 'nope', keys: ['interfaces'] })));
 
 // 13. Tasks remember their goal; a goal can be finished with its branch; presence.
 const H = `gl-${run}`;
 const hv = view(H);
 const goalRow = (id: string) => [...admin.db.goals.iter()].find(g => g.sessionId === H && g.id === id)!;
-await admin.reducers.postGoal({ sessionId: H, id: 'g1', text: 'Build the calculator' });
-await admin.reducers.postGoal({ sessionId: H, id: 'g2', text: 'Write the docs' });
+await admin.reducers.postGoal({ sessionId: H, id: 'g1', text: 'Build the calculator', effort: 'medium' });
+await admin.reducers.postGoal({ sessionId: H, id: 'g2', text: 'Write the docs', effort: 'medium' });
 await admin.reducers.setGoalStatus({ sessionId: H, id: 'g1', status: 'planning' });
 await newTask(H, 'c1', ['calc.py']);
 await newTask(H, 'c2', ['test_calc.py'], { dependsOn: ['c1'] });
@@ -293,7 +311,7 @@ await admin.reducers.setGoalStatus({ sessionId: H, id: 'g2', status: 'new' });
 await sleep(300);
 check('fail goal: sending it again makes it new and forgets the reason', goalRow('g2').status === 'new' && goalRow('g2').note === '');
 // cancel: g3 has a running task and a waiting one
-await admin.reducers.postGoal({ sessionId: H, id: 'g3', text: 'Something else' });
+await admin.reducers.postGoal({ sessionId: H, id: 'g3', text: 'Something else', effort: 'medium' });
 await admin.reducers.setGoalStatus({ sessionId: H, id: 'g3', status: 'planning' });
 await newTask(H, 'x1', ['x1.py']);
 await newTask(H, 'x2', ['x2.py'], { dependsOn: ['x1'] });

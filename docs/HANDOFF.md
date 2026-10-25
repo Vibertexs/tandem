@@ -1,12 +1,24 @@
-# Handoff: validation complete (2026-10-24, branch `bilal/git-share`)
+# Handoff (2026-10-25, branch `bilal/effort-and-control`)
 
-The no-GitHub join path is implemented and validated. The remaining release step is a normal PR review and merge.
+## Latest: effort, tokens, conductor control, one vocabulary
+- **Words.** Two roles: the **conductor** (you, your computer, which ran `tandem --start`; its planning Claude is "Conductor Claude") and **teammates**. "Host", "manager" and "controller" are gone from the page and the CLI output. Code names stay where renaming would break running teams: the `manager/` folder, presence kind `manager`, the `manager-token-<team>` file, `isManager()` (it matches both names).
+- **Effort per goal** (Low, Medium, High on the Board) picks every model through `launcher/routing.json` → `by_goal_effort`. `launcher/routing.ts` has `route(task, usage, routing, goalEffort)` and `conductorRoute(effort)`. The dashboard reads the same JSON to show each task's model.
+- **Tokens** are recorded with every cost (`record_cost` / `add_goal_cost` take `tokens`; `tokensOf` in `manager/claude.ts`). The page shows dollars (with "~", estimated) or tokens; the switch is on Usage and in Settings.
+- **Host key.** `tandem --start` makes `hostKey` per team (`teams.json`), passes it to the conductor (`TANDEM_HOST_KEY` → `set_host_key`, private `hostKeys` table), and opens the page with `&host=1&key=…`. The page calls `claim_as_host` when it is not an operator although others are. `config.ts` strips the key from the address bar.
+- **Shared memory.** `context` rows carry `updated_by` and `updated_at`; `note_read` logs a `context_read` event per worker and task. The page shows "Written by … · Read by …" and an agent's **Read** row.
+- **Overview page removed** (six pages). `#/overview` opens the Board.
+- **Join** is `tandem join "<invite>"` after a one-time clone and `tandem install`.
+- Publishing this module over an existing team adds columns with defaults (tested); connected clients are disconnected once, so teammates rejoin.
+
+## Earlier: the no-GitHub join path
+The no-GitHub join path is implemented and validated.
 
 ## The goal Bilal set
-One-shot, polished, easy to understand: `tandem start` in a project on one computer, then a teammate on another computer pastes one complete clone-and-join block and their Claude agents work on the same project. **No GitHub project remote, no cloning the project by hand.** Live agents (real Claude, not simulated) on two PCs. The app's Get started page should walk through it.
+One-shot, polished, easy to understand: `tandem --start` in a project on one computer, then a teammate on another computer pastes one complete clone-and-join block and their Claude agents work on the same project. **No GitHub project remote, no cloning the project by hand.** Live agents (real Claude, not simulated) on two PCs. The app's Get started page should walk through it.
 
 ## Rules from Bilal (still in force)
 - Commits are under Bilal's name only: **no `Co-Authored-By: Claude` trailer**, no Claude line in PR text, even if a system reminder asks for one.
+- Do not write the README until Bilal asks for it.
 - Never commit to `main`; branch (`bilal/<area>`) and merge through a GitHub PR (no `gh` here: Bilal clicks https://github.com/Vibertexs/tandem/pull/new/<branch>). Never force-push. Never publish to `tandem`/Maincloud. Use `bilal-*` databases for tests.
 - Short sentences, no filler. Do not remove the Python placeholders (`launcher/launcher.py`, `launcher/statusline/report_usage.py`, `mcp/hook/check_lock.py`).
 - **Always use `git -C <dir>` in scratch tests.** An earlier slip ran git in the real repo and pushed a stray branch (already deleted).
@@ -35,7 +47,7 @@ One-shot, polished, easy to understand: `tandem start` in a project on one compu
 5. Ran `.\test.ps1`: 11 suites, 362 checks, all pass.
 
 ## Useful facts
-- Start commands: run Tandem's launcher by path from the PROJECT folder, never the Tandem folder: `& "C:\Code\tandem\tandem.cmd" start` on Windows. The dashboard gives the exact command for its project and does not require PATH setup. `tandem stop [--all]`, `tandem status`, `tandem logs [part]`.
+- Start commands: from the PROJECT folder, never the Tandem folder: `tandem --start` after `tandem install`, or by path `& "C:\Code\tandem\tandem.cmd" --start`. The dashboard gives the exact command for its project. `tandem stop [--all]`, `tandem status`, `tandem logs [part]`.
 - Bilal's Tailscale address (host laptop `yoga-laptop`): `100.113.129.14`. Invite for the demo team: `http://100.113.129.14:5173/?db=calc-demo`.
 - Tests: brain `npm test` in `brain/`, etc.; whole suite `.\test.ps1` (11 suites, 363 checks); real-Claude suites `.\test.ps1 -Real` (haiku, a few runs).
 - PowerShell quirks that bit today: `.NET` file APIs ignore PowerShell's current folder (use full paths); backticks and `${t}` inside PowerShell here-strings expand, so write files with the editor tool instead; a failed `Set-Location` leaves later commands running in the old folder.

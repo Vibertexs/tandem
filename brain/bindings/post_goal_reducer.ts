@@ -14,4 +14,5 @@ export default {
   sessionId: __t.string(),
   id: __t.string(),
   text: __t.string(),
+  effort: __t.string(),
 };

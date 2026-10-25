@@ -1,27 +1,41 @@
 {
-  "_note": "PROPOSED. Aliases and effort levels vary by Claude Code version and plan. Check /model and /effort on each machine. 'default' means do not pass the flag.",
-  "by_difficulty": {
-    "easy": {
-      "model": "haiku",
-      "effort": "default"
+  "_note": "Which models plan a goal and do its tasks, by the effort chosen when the goal was sent (low, medium, high). 'conductor' plans the goal; 'difficulty' is for ordinary tasks (the conductor rates each easy, normal or hard); 'kind' is for the pieces of a big map-reduce job. effort is Claude Code's --effort (low, medium, high, xhigh, max); 'default' means do not pass the flag.",
+  "by_goal_effort": {
+    "low": {
+      "conductor": { "model": "haiku", "effort": "default" },
+      "difficulty": {
+        "easy": { "model": "haiku", "effort": "default" },
+        "normal": { "model": "haiku", "effort": "default" },
+        "hard": { "model": "sonnet", "effort": "medium" }
+      },
+      "kind": {
+        "map": { "model": "haiku", "effort": "default" },
+        "reduce": { "model": "sonnet", "effort": "medium" }
+      }
     },
-    "normal": {
-      "model": "sonnet",
-      "effort": "default"
+    "medium": {
+      "conductor": { "model": "sonnet", "effort": "medium" },
+      "difficulty": {
+        "easy": { "model": "haiku", "effort": "default" },
+        "normal": { "model": "sonnet", "effort": "default" },
+        "hard": { "model": "opus", "effort": "high" }
+      },
+      "kind": {
+        "map": { "model": "sonnet", "effort": "default" },
+        "reduce": { "model": "opus", "effort": "high" }
+      }
     },
-    "hard": {
-      "model": "opus",
-      "effort": "high"
-    }
-  },
-  "by_kind": {
-    "map": {
-      "model": "sonnet",
-      "effort": "default"
-    },
-    "reduce": {
-      "model": "opus",
-      "effort": "high"
+    "high": {
+      "conductor": { "model": "opus", "effort": "high" },
+      "difficulty": {
+        "easy": { "model": "sonnet", "effort": "medium" },
+        "normal": { "model": "opus", "effort": "medium" },
+        "hard": { "model": "opus", "effort": "xhigh" }
+      },
+      "kind": {
+        "map": { "model": "opus", "effort": "medium" },
+        "reduce": { "model": "opus", "effort": "xhigh" }
+      }
     }
   },
   "downgrade_above_usage_pct": 80,

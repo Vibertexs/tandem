@@ -44,7 +44,7 @@ const conn = await new Promise<DbConnection>((res, rej) => {
     .onConnect(c => { c.subscriptionBuilder().onApplied(() => res(c)).subscribe([tables.tasks, tables.events]); })
     .onConnectError((_c, e) => rej(e)).build();
 });
-await conn.reducers.postGoal({ sessionId: S, id: 'g1', text: 'Add mul and div' });
+await conn.reducers.postGoal({ sessionId: S, id: 'g1', text: 'Add mul and div', effort: 'medium' });
 await conn.reducers.setGoalStatus({ sessionId: S, id: 'g1', status: 'planning' });
 await conn.reducers.createTask({
   sessionId: S, kind: 'normal',

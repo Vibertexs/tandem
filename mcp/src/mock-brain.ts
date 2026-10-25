@@ -132,7 +132,7 @@ export class MockBrain implements Brain {
   getGoals() {
     if (this.goals.length === 0 && !this.seededGoal) {
       this.seededGoal = true;
-      this.goals.push({ id: 'g-demo', text: 'Build a login page with an API', status: 'new', created_at: new Date().toISOString(), branch: '', cost_usd: 0 });
+      this.goals.push({ id: 'g-demo', text: 'Build a login page with an API', status: 'new', created_at: new Date().toISOString(), branch: '', cost_usd: 0, effort: 'medium' });
     }
     return this.goals.filter(g => g.status === 'new').map(g => ({ ...g }));
   }

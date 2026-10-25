@@ -51,8 +51,8 @@ try {
 
   // ---- 1. nothing connected: start a project or open an invite ----
   await A.goto(URL_);
-  check('start: with nothing connected, the page explains project host versus dashboard and offers an invite',
-    await seen(A, 'Start a team for a project') && await seen(A, "Open a teammate's team", 1000) && await A.getByText('tandem start', { exact: true }).first().isVisible() && await seen(A, 'does not host or copy the project', 1000));
+  check('start: with nothing connected, the page explains that starting makes this computer the conductor, and offers an invite',
+    await seen(A, 'Start a team for a project') && await seen(A, "Open a teammate's team", 1000) && await A.getByText('tandem --start', { exact: true }).first().isVisible() && await seen(A, 'That makes this computer the conductor', 1000));
   await shot(A, '01-start');
   await A.getByLabel('Invite link').fill('not an invite');
   await A.getByRole('button', { name: 'Open team' }).click();
@@ -62,22 +62,24 @@ try {
   check('start: an invite nobody answers says it cannot reach the team, with Try again', await seen(A, `Can't reach "${DB}"`, 12_000) && await A.getByRole('button', { name: 'Try again' }).isVisible());
   await A.getByRole('button', { name: 'Choose another team' }).click();
   check('start: "Choose another team" goes back to the start', await seen(A, 'Start a team for a project', 4000));
-  // ---- 2. a teammate opening the invite before the host has taken control only watches ----
+  // ---- 2. a teammate opening the invite before the conductor has taken control only watches ----
   const V = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   await V.goto(`${URL_}/?db=${DB}`);
-  check('viewer: an invite to a team nobody controls yet says it is waiting for the host, with no way to take control',
-    await seen(V, 'Waiting for the host to take control', 8000) && await V.getByRole('button', { name: 'Request control' }).count() === 0 && await V.getByRole('button', { name: 'Control this team' }).count() === 0);
+  check('viewer: an invite to a team nobody controls yet says it is waiting for the conductor, with no way to take control',
+    await seen(V, 'Waiting for the conductor to take control', 8000) && await V.getByRole('button', { name: 'Request control' }).count() === 0 && await V.getByRole('button', { name: 'Control this team' }).count() === 0);
   await V.context().close();
 
-  // ---- 3. the page `tandem start` opens (host=1) takes control by itself ----
+  // ---- 3. the page `tandem --start` opens (host=1) takes control by itself: that browser is the conductor ----
   await A.goto(`${URL_}/?db=${DB}&host=1`);
-  check('control: no claim-or-watch question; the host page takes control by itself and the prompt is on', await until(() => prompt(A).isEnabled()) && await A.getByText('Watch only').count() === 0);
+  check('control: no claim-or-watch question; the conductor page takes control by itself and the prompt is on', await until(() => prompt(A).isEnabled()) && await A.getByText('Watch only').count() === 0);
   await shot(A, '02-owner');
-  check('control: the dock has Overview, Board, Team, Shared memory, Usage, Activity, Settings (getting started is on Team, finished goals are in Activity)',
-    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Overview|Board|Team|Shared memory|Usage|Activity|Settings');
+  check('control: the dock has Board, Team, Shared memory, Usage, Activity, Settings (no Overview: the Board and Usage cover it)',
+    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Board|Team|Shared memory|Usage|Activity|Settings');
+  await A.goto(`${URL_}/?db=${DB}&host=1#/overview`);
+  check('control: an old #/overview link opens the Board', await until(async () => (await A.locator('.topbar h1').innerText()) === 'Board', 4000));
   check('control: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
-  check('control: it shows one next step: the manager is not connected yet', await seen(A, 'The manager is not connected yet', 3000));
-  check('control: the sidebar says this browser controls the team', await seen(A, 'You control this team', 2000));
+  check('control: it shows one next step: the conductor is not connected yet', await seen(A, 'The conductor is not connected yet', 3000));
+  check('control: the top bar says this browser is the conductor', await seen(A, 'You are the conductor', 2000));
   {
     // the dock: the icon under the pointer grows and pushes its neighbour away, and it shrinks back
     const link = (i: number) => A.locator('.nav li a').nth(i);
@@ -95,13 +97,13 @@ try {
     check('dock: it shrinks back when the pointer leaves', await until(async () => (await link(2).boundingBox())!.width === before.width, 3000));
   }
 
-  // ---- 4. the manager requests control, and the host page approves it by itself ----
+  // ---- 4. the conductor's Claude requests control, and the conductor page approves it by itself ----
   const manager = await new Promise<DbConnection>((res, rej) => {
     DbConnection.builder().withUri('ws://127.0.0.1:3001').withDatabaseName(DB)
       .onConnect(c => { c.subscriptionBuilder().onApplied(() => res(c)).subscribe([tables.goals]); }).onConnectError((_c, e) => rej(e)).build();
   });
-  await manager.reducers.requestOperator({ name: 'Manager Claude' });
-  check('approve: the host page approves the manager without a click, and the next step is "No workers are online"', await seen(A, 'No workers are online.', 8000) && await A.getByRole('button', { name: 'Approve' }).count() === 0);
+  await manager.reducers.requestOperator({ name: 'Conductor Claude' });
+  check('approve: the conductor page approves its Claude without a click, and the next step is "No workers are online"', await seen(A, 'No workers are online.', 8000) && await A.getByRole('button', { name: 'Approve' }).count() === 0);
   await shot(A, '03-approve-manager');
 
   // ---- 4. send a goal ----
@@ -109,15 +111,22 @@ try {
   await A.locator('body').click({ position: { x: 5, y: 5 } });
   await A.keyboard.press('/');
   check('goal: "/" jumps to the prompt', await prompt(A).evaluate(el => el === document.activeElement));
+  check('effort: the prompt offers Low, Medium and High, Medium picked, with what it means',
+    (await A.getByRole('radiogroup', { name: 'Effort' }).getByRole('radio').allInnerTexts()).join('|') === 'Low|Medium|High' &&
+    await A.getByRole('radio', { name: 'Medium' }).getAttribute('aria-checked') === 'true' && await seen(A, 'sonnet plans it', 1000));
+  await A.getByRole('radio', { name: 'High' }).click();
+  check('effort: picking High says opus plans it', await seen(A, 'opus plans it', 2000));
   await prompt(A).fill('Build a tiny calculator with tests');
   await A.getByRole('button', { name: /^Send/ }).click();
-  check('goal: the goal gets its own lane on the board, waiting for the manager',
-    await until(async () => /Waiting for the manager/.test(await lane(A, 'Build a tiny calculator with tests').innerText().catch(() => '')), 4000));
-  check('manager: approved but not running, with a goal waiting, the next step says the manager is offline', await seen(A, 'The manager is offline, so new goals are waiting.', 4000) && await seen(A, 'Manager offline', 1000));
-  await manager.reducers.ping({ sessionId: 'live', name: 'Manager Claude', kind: 'manager' });
-  check('manager: once it pings, the sidebar says Manager online and the offline step goes away',
-    await seen(A, 'Manager online', 4000) && await until(() => A.getByText('The manager is offline').count().then(n => n === 0), 4000));
-  // play the manager: plan the goal into two tasks that belong to it
+  check('goal: the goal gets its own lane on the board, waiting for the conductor, with the effort it was sent with',
+    await until(async () => { const t = await lane(A, 'Build a tiny calculator with tests').innerText().catch(() => ''); return /Waiting for the conductor/.test(t) && t.includes('High effort'); }, 4000));
+  check('effort: the goal is saved with the effort picked (high)', await until(async () => [...manager.db.goals.iter()].find(g => g.sessionId === 'live')?.effort === 'high', 4000));
+  check('effort: after sending, the picker keeps the choice for the next goal', await A.getByRole('radio', { name: 'High' }).getAttribute('aria-checked') === 'true');
+  check('conductor: approved but not running, with a goal waiting, the next step says the conductor is offline', await seen(A, 'The conductor is offline, so new goals are waiting.', 4000) && await seen(A, 'Conductor offline', 1000));
+  await manager.reducers.ping({ sessionId: 'live', name: 'Conductor Claude', kind: 'manager' });
+  check('conductor: once it pings, the top bar says Conductor online and the offline step goes away',
+    await seen(A, 'Conductor online', 4000) && await until(() => A.getByText('The conductor is offline').count().then(n => n === 0), 4000));
+  // play the conductor: plan the goal into two tasks that belong to it
   const goalId = [...manager.db.goals.iter()].find(g => g.sessionId === 'live')!.id;
   await manager.reducers.setGoalStatus({ sessionId: 'live', id: goalId, status: 'planning' });
   for (const [id, title, file] of [['t-calc', 'Write calc.py', 'calc.py'], ['t-test', 'Test calc.py', 'test_calc.py']]) {
@@ -129,6 +138,10 @@ try {
     await until(async () => { const t = await calc.innerText(); return t.includes('0/2') && t.includes('Planned'); }, 6000) &&
     await calc.locator('.column[aria-label="To do"] .task', { hasText: 'Write calc.py' }).count() === 1 &&
     await calc.locator('.column[aria-label="Waiting"] .task', { hasText: 'Test calc.py' }).count() === 1, await calc.innerText().catch(() => ''));
+  await calc.locator('.column[aria-label="To do"] .task', { hasText: 'Write calc.py' }).click();
+  const easyHigh = await A.getByRole('dialog').innerText().catch(() => '');
+  check('effort: an easy task of a high-effort goal runs on sonnet with medium effort (from routing.json)', easyHigh.includes('sonnet · medium effort · easy task'), easyHigh);
+  await A.keyboard.press('Escape');
 
   // ---- 5. add work by hand, then simulated workers pick it up ----
   await nav(A, 'Settings');
@@ -165,8 +178,8 @@ try {
   await A.keyboard.press('Escape');
   check('details: Escape closes it', await until(() => drawer.count().then(n => n === 0), 2000));
   check('board: everything finishes (7 of 7) and the big job reaches 3/3', await seen(A, '7 of 7 tasks done', 90_000) && await seen(A, 'Big job: 3/3 pieces done', 1000));
-  // what the runs cost (a real launcher and the manager report this)
-  await manager.reducers.addGoalCost({ sessionId: 'live', id: goalId, usd: 0.01 });
+  // what the runs used (a real launcher and the conductor report this)
+  await manager.reducers.addGoalCost({ sessionId: 'live', id: goalId, usd: 0.01, tokens: 1500 });
   await manager.reducers.finishGoal({ sessionId: 'live', id: goalId, branch: `tandem/${goalId}`, note: 'Tests pass (python -m unittest).' });
   const fin = A.getByRole('region', { name: 'Finished goals' });
   check('goal done: the finished goal leaves the board, and a "Finished" strip says where its work is',
@@ -178,10 +191,10 @@ try {
   await nav(A, 'Activity');
   const finishedCard = A.getByRole('article', { name: /^Result: Build a tiny calculator/ });
   check('goal done: Activity shows its result: how it went, how long it took, what it cost and its branch',
-    await until(() => finishedCard.isVisible(), 3000) && await (async () => { const t = await finishedCard.innerText(); return t.includes('Tests pass') && /built in \d/.test(t) && t.includes('$0.01 of Claude usage') && t.includes(`tandem/${goalId}`); })(), await finishedCard.innerText().catch(() => 'no card'));
+    await until(() => finishedCard.isVisible(), 3000) && await (async () => { const t = await finishedCard.innerText(); return t.includes('Tests pass') && /built in \d/.test(t) && t.includes('~$0.01 used') && t.includes('high effort') && t.includes(`tandem/${goalId}`); })(), await finishedCard.innerText().catch(() => 'no card'));
   await nav(A, 'Board');
 
-  // "Merge into my project": the page asks, the manager answers (here the answers are played by the test)
+  // "Merge into my project": the page asks, the conductor answers (here the answers are played by the test)
   const mergeBtn = fin.getByRole('button', { name: 'Merge into my project' });
   check('merge: a finished goal with a branch offers "Merge into my project"', await until(() => mergeBtn.isVisible(), 3000));
   await mergeBtn.click();
@@ -189,27 +202,27 @@ try {
     const r = await fetch(`http://127.0.0.1:3001/v1/database/${DB}/sql`, { method: 'POST', body: `SELECT value FROM context WHERE key = 'apply_${goalId}'` });
     return JSON.stringify(((await r.json()) as { rows: unknown[][] }[])[0]?.rows ?? []).includes('requested');
   }, 4000);
-  check('merge: pressing it asks the manager, and the lane says it is merging', asked && await seen(A, 'Merging into your project', 3000));
+  check('merge: pressing it asks the conductor, and the lane says it is merging', asked && await seen(A, 'Merging into your project', 3000));
   await manager.reducers.setContext({ sessionId: 'live', key: `apply_${goalId}`, value: 'failed: You have uncommitted changes in the project (1 file). Commit or stash them, then try again.' });
-  check('merge: when the manager says it failed, the lane shows why and offers the button again', await seen(A, 'uncommitted changes in the project', 3000) && await mergeBtn.isVisible());
+  check('merge: when the conductor says it failed, the lane shows why and offers the button again', await seen(A, 'uncommitted changes in the project', 3000) && await mergeBtn.isVisible());
   await manager.reducers.setContext({ sessionId: 'live', key: `apply_${goalId}`, value: 'done: Merged tandem/x into main: 2 files (cli.py, test_cli.py).' });
   check('merge: when it is done, the lane says what was merged and the button is gone', await seen(A, 'Merged tandem/x into main', 3000) && await mergeBtn.count() === 0);
 
-  // ---- 5b. Get started: host/controller distinction and one complete host command ----
-  await manager.reducers.ping({ sessionId: 'live', name: 'Manager Claude', kind: 'manager' });
+  // ---- 5b. Get started: the two roles (conductor and teammate) and one complete start command ----
+  await manager.reducers.ping({ sessionId: 'live', name: 'Conductor Claude', kind: 'manager' });
   await manager.reducers.setContext({ sessionId: 'live', key: 'tandem_dir', value: 'C:\\Code\\tandem' });
   await manager.reducers.setContext({ sessionId: 'live', key: 'project_dir', value: 'C:\\Code\\calc-demo' });
   await nav(A, 'Team');
   const steps = A.locator('.step');
-  check('get started: three steps distinguish the project host from the team controller', await until(async () => await steps.count() === 3) &&
-    await seen(A, 'project host', 1000) && await seen(A, 'team controller', 1000) && (await steps.first().innerText()).includes('Start the project host') && (await steps.nth(1).innerText()).includes('Add a teammate') && (await steps.last().innerText()).includes('Send a goal'));
+  check('get started: three steps, and the two roles: the conductor (you) and teammates', await until(async () => await steps.count() === 3) &&
+    await seen(A, 'There are two roles', 1000) && await seen(A, 'You are the conductor.', 1000) && (await steps.first().innerText()).includes('Start the conductor (your computer)') && (await steps.nth(1).innerText()).includes('Add a teammate') && (await steps.last().innerText()).includes('Send a goal'));
   check('get started: one whole PowerShell block carries this computer\'s real folders without a PATH edit', await until(async () => {
     const s = await A.locator('.setup').innerText();
     return s.includes("Set-Location -LiteralPath 'C:\\Code\\calc-demo'") && s.includes("& 'C:\\Code\\tandem\\tandem.cmd' start") && !s.includes('$env:Path');
   }, 4000));
-  check('get started: the order is host, then connect a teammate, then send a goal; the host and goal steps tick while adding a teammate stays optional',
+  check('get started: the order is conductor, then connect a teammate, then send a goal; the conductor and goal steps tick while adding a teammate stays optional',
     await steps.nth(0).evaluate(e => e.classList.contains('done')) && !(await steps.nth(1).evaluate(e => e.classList.contains('done'))) && await steps.nth(2).evaluate(e => e.classList.contains('done')));
-  check('get started: a local-only team explains that an invite needs a non-local host',
+  check('get started: a local-only team explains that an invite needs a conductor started without --local',
     await steps.nth(1).innerText().then(t => t.includes('only available on this computer') && t.includes('without --local')));
   await shot(A, '06a-setup');
 
@@ -221,7 +234,7 @@ try {
   check('team: a team only this computer can reach says so, with the restart command but no join command that cannot work',
     connect.includes('Right now only this computer can join') && connect.includes('stop --all') && /tandem(\.cmd')? start/.test(connect) && !/tandem(\.cmd')? join/.test(connect), connect.slice(0, 300));
   {
-    // tandem start opens the page with &lan=<ip> when the brain is open to the network
+    // tandem --start opens the page with &lan=<ip> when the brain is open to the network
     const L = await (await browser.newContext({ viewport: desktop })).newPage();
     await L.goto(`${URL_}/?db=${DB}&lan=10.1.2.3`);
     const invite = `http://10.1.2.3:${new URL(URL_).port}/?db=${DB}`;
@@ -231,16 +244,16 @@ try {
     await L.keyboard.press('Escape');
     await nav(L, 'Team');
     const lan = await L.locator('.connect').innerText().catch(() => '');
-    check('team: without a shared project it says what is missing, and shows no join command that could not work', lan.includes('project is not ready to share yet') && !lan.includes('tandem.cmd join'), lan.slice(0, 400));
-    // the manager publishes the host's Git address: then the steps are one bulk get-Tandem + join block
+    check('team: without a shared project it says what is missing, and shows no join command that could not work', lan.includes('project is not ready to share yet') && !/tandem(\.cmd)? join/.test(lan), lan.slice(0, 400));
+    // the conductor publishes its Git address: then the steps are get Tandem (once) and one join command
     await manager.reducers.setContext({ sessionId: 'live', key: 'git_url', value: 'http://10.1.2.3:9418/bilal-ux' });
     const withShare = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/Vibertexs/tandem'), 4000);
     const lan2 = await L.locator('.connect').innerText();
     const blocks = await L.locator('.connect pre').allInnerTexts();
-    check('team: with a host-shared project, getting Tandem (git clone, first time only) and joining are two separate blocks',
-      withShare && blocks.some(b => b.trim() === 'git clone https://github.com/Vibertexs/tandem') &&
-      blocks.some(b => b.includes('cd tandem') && b.includes(`.\\tandem.cmd join "${invite}"`) && !b.includes('git clone')) &&
-      lan2.includes('first time only') && lan2.includes('private copy of the host project'), [blocks, lan2.slice(0, 300)]);
+    check('team: with a shared project, getting Tandem (clone and install, first time only) and joining (one command, any folder) are two blocks',
+      withShare && blocks.some(b => b.includes('git clone https://github.com/Vibertexs/tandem') && b.includes('.\\tandem.cmd install') && !b.includes('join')) &&
+      blocks.some(b => b.trim() === `tandem join "${invite}"`) &&
+      /first time only/i.test(lan2) && lan2.includes("private copy of the conductor's project"), [blocks, lan2.slice(0, 300)]);
     await manager.reducers.setContext({ sessionId: 'live', key: 'git_url', value: '' });
     await L.context().close();
   }
@@ -249,14 +262,20 @@ try {
   await A.getByLabel('Project summary').fill('A tiny calculator. Python 3, unittest.');
   await A.locator('.memory-note', { hasText: 'Project summary' }).getByRole('button', { name: /^Save/ }).click();
   check('memory: saving a note says so', await seen(A, 'Project summary saved.', 4000));
+  const summaryNote = A.locator('.memory-note', { hasText: 'Project summary' });
+  check('memory: a note says who wrote it (the conductor) and that no worker has read it yet',
+    await until(async () => { const t = await summaryNote.innerText(); return t.includes('Written by Conductor') && t.includes('No worker has read it yet'); }, 4000), await summaryNote.innerText().catch(() => ''));
   await shot(A, '08-memory');
   {
-    // how the team shares one memory: the agents, and what each is doing, holding and sees
+    // how the team shares one memory: the agents, and what each is doing, holding and read
+    await manager.reducers.setContext({ sessionId: 'live', key: 'host_computer', value: 'Alex' });
     check('memory: it explains that the code is in git and SpacetimeDB holds what the agents agree on', await seen(A, 'The code is not stored here.', 2000) && await seen(A, 'SpacetimeDB holds what the agents must agree on', 1000));
     const alex = A.getByRole('article', { name: 'Agent Alex' });
-    check('memory: each agent has a card: what it is working on, the files it holds, and the notes it sees',
-      await alex.isVisible() && /Working on/.test(await alex.innerText()) && /Holding/.test(await alex.innerText()) && /Project summary/.test(await alex.innerText()), await alex.innerText().catch(() => ''));
-    check('memory: the manager has a card too', await A.getByRole('article', { name: 'Manager' }).isVisible());
+    check('memory: each agent has a card: what it is working on, the files it holds, and the notes it read',
+      await alex.isVisible() && /Working on/.test(await alex.innerText()) && /Holding/.test(await alex.innerText()) && /No notes read yet/.test(await alex.innerText()), await alex.innerText().catch(() => ''));
+    check("memory: a worker on the conductor's computer says so; the others are teammates",
+      await until(async () => (await alex.innerText()).includes("Conductor's computer"), 3000) && (await A.getByRole('article', { name: 'Agent Sam' }).innerText()).includes('Teammate'));
+    check('memory: the conductor has a card too', await A.getByRole('article', { name: 'Conductor' }).isVisible());
     await A.locator('.under-hood > summary').click(); // the raw tables are under "Under the hood"
   }
   {
@@ -276,15 +295,22 @@ try {
     check('memory: the workers table does not light up on heartbeats, only when something real changes', blinks === 0, blinks);
   }
 
-  // ---- the other pages: Overview and Usage ----
-  await nav(A, 'Overview');
-  check('overview: four numbers, the agents, the goals and the latest news',
-    await until(async () => await A.locator('.stat-card').count() === 4, 3000) && await until(() => A.getByRole('article', { name: 'Agent Sam' }).isVisible(), 3000) && await seen(A, 'Build a tiny calculator with tests', 2000) && await seen(A, 'Latest', 1000), await A.locator('.page').innerText().catch(() => ''));
-  await shot(A, '08a-overview');
+  // ---- Usage: dollars (estimated) or tokens ----
   await nav(A, 'Usage');
-  check('usage: the total, each computer and each goal, with what it spent',
-    await seen(A, 'Spent in total', 2000) && await A.getByRole('article', { name: 'Usage Alex' }).isVisible() && (await A.locator('.page').innerText()).includes('$0.01'), await A.locator('.page').innerText().catch(() => ''));
+  check('usage: the total, each computer and each goal, estimated in dollars and marked as estimated',
+    await seen(A, 'Used in total', 2000) && await A.getByRole('article', { name: 'Usage Alex' }).isVisible() && (await A.locator('.page').innerText()).includes('~$0.01') && await seen(A, 'estimated at Claude API prices', 1000), await A.locator('.page').innerText().catch(() => ''));
+  check('usage: a computer that reports no quota shows no empty bars, it says so instead',
+    await until(async () => (await A.getByRole('article', { name: 'Usage Alex' }).innerText()).includes('Quota not reported'), 2000) && await A.getByRole('article', { name: 'Usage Alex' }).locator('.bar').count() === 0);
+  await A.getByRole('group', { name: 'Show usage as' }).getByRole('button', { name: 'Tokens' }).click();
+  check('usage: switched to tokens, the same numbers show as tokens',
+    await until(async () => { const t = await A.locator('.page').innerText(); return t.includes('1.5k tokens') && !t.includes('~$0.01'); }, 2000), await A.locator('.page').innerText().catch(() => ''));
   await shot(A, '08d-usage');
+  await nav(A, 'Activity');
+  check('usage: the choice holds on other pages (Activity shows tokens too)', await until(async () => (await finishedCard.innerText()).includes('1.5k tokens used'), 2000));
+  await nav(A, 'Settings');
+  await A.getByRole('group', { name: 'Show usage as' }).getByRole('button', { name: 'Dollars' }).click();
+  check('settings: the same switch is in Settings, and switches back to dollars', await A.getByRole('group', { name: 'Show usage as' }).getByRole('button', { name: 'Dollars' }).getAttribute('aria-pressed') === 'true');
+  check('settings: it links the projector view', (await A.getByRole('link', { name: 'the big-type board' }).getAttribute('href'))?.includes('view=present') === true);
   await nav(A, 'Activity');
   check('activity: it also holds the finished goals: branch, who built it, its files, and what the merge said',
     await until(() => finishedCard.isVisible(), 3000) && await (async () => { const t = await finishedCard.innerText(); return /Built by/.test(t) && /Files/.test(t) && t.includes('Merged tandem/x into main'); })(), await finishedCard.innerText().catch(() => ''));
@@ -298,16 +324,34 @@ try {
   const ctxB = await browser.newContext({ viewport: desktop });
   const B = await ctxB.newPage();
   await B.goto(`${URL_}/?db=${DB}`);
-  check('viewer: someone else sees the board but cannot send', await until(() => prompt(B).isDisabled(), 10_000) && await seen(B, 'Watching', 2000));
+  check('viewer: a teammate sees the board but cannot send', await until(() => prompt(B).isDisabled(), 10_000) && await seen(B, 'Teammate · watching', 2000));
   await B.getByRole('button', { name: 'Request control' }).click();
   await B.getByLabel('Your name').fill('Omar');
   await B.getByRole('button', { name: /^Request$/ }).click();
-  check('viewer: after asking, it says it is waiting for a controller', await seen(B, 'Waiting for a controller to approve you', 4000));
+  check('viewer: after asking, it says it is waiting for the conductor', await seen(B, 'Waiting for the conductor to approve you', 4000));
   await nav(A, 'Board');
-  check('viewer: a controller sees "Omar wants to control this team"', await seen(A, 'Omar wants to control this team.', 5000));
+  check('viewer: the conductor sees "Omar wants to control this team"', await seen(A, 'Omar wants to control this team.', 5000));
   await A.getByRole('button', { name: 'Approve' }).click();
   check('viewer: once approved, Omar can send goals without reloading', await until(() => prompt(B).isEnabled(), 6000));
   await ctxB.close();
+
+  // ---- 7b. the conductor can always take control back (its page link carries the conductor's key) ----
+  const hostKey = 'ab'.repeat(16);
+  await manager.reducers.setHostKey({ sessionId: 'live', key: hostKey });
+  {
+    const W = await (await browser.newContext({ viewport: desktop })).newPage();
+    await W.goto(`${URL_}/?db=${DB}&host=1&key=${'cd'.repeat(16)}`);
+    await until(() => prompt(W).isVisible(), 10_000);
+    await sleep(1500);
+    check('reclaim: a wrong key does not give control', await prompt(W).isDisabled());
+    await W.context().close();
+    const H = await (await browser.newContext({ viewport: desktop })).newPage(); // a browser that never had control
+    await H.goto(`${URL_}/?db=${DB}&host=1&key=${hostKey}`);
+    check("reclaim: the conductor's page takes control back with its key, though others already have it",
+      await until(() => prompt(H).isEnabled(), 10_000) && await seen(H, 'You are the conductor', 2000));
+    check('reclaim: the key is taken out of the address bar', !H.url().includes('key=') && H.url().includes('host=1'), H.url());
+    await H.context().close();
+  }
 
   // ---- 8. remembered team, then start over ----
   await A.goto(URL_);
@@ -331,6 +375,12 @@ try {
   await x2.reducers.registerWorker({ sessionId: 'live', id: 'w-lee', name: 'Lee', plan: 'pro' });
   await manager.reducers.createTask({ sessionId: 'live', kind: 'normal', assignee: 'w-kim', task: { id: 't-hard', title: 'Port it to COBOL', description: '', files: ['calc.cob'], difficulty: 'hard', model: '', effort: 'default', dependsOn: [] } });
   await x1.reducers.claimTask({ sessionId: 'live', workerId: 'w-kim' });
+  // the launcher gives the shared notes to the worker's Claude and logs it: the note and the agent card say so
+  await x1.reducers.noteRead({ sessionId: 'live', workerId: 'w-kim', taskId: 't-hard', keys: ['project_summary'] });
+  await nav(A, 'Shared memory');
+  check('memory: a note says which workers read it', await until(async () => (await A.locator('.memory-note', { hasText: 'Project summary' }).innerText()).includes('Read by Kim'), 4000), await A.locator('.memory-note', { hasText: 'Project summary' }).innerText().catch(() => ''));
+  check("memory: the worker's card says which notes it read", await until(async () => /Read\s*Project summary/.test(await A.getByRole('article', { name: 'Agent Kim' }).innerText()), 3000), await A.getByRole('article', { name: 'Agent Kim' }).innerText().catch(() => ''));
+  await nav(A, 'Board');
   await x1.reducers.giveBackTask({ sessionId: 'live', workerId: 'w-kim', taskId: 't-hard', reason: 'no COBOL compiler here' });
   check('give back: the card stays in To do, marked "given back"', await until(async () => (await col(A, 'To do').locator('.task', { hasText: 'Port it to COBOL' }).innerText().catch(() => '')).includes('Given back'), 5000));
   await x2.reducers.claimTask({ sessionId: 'live', workerId: 'w-lee' });
@@ -347,20 +397,20 @@ try {
   check('retry: Try again puts it back for any worker', await seen(A, 'Back on the board for any worker.', 4000) &&
     await until(() => A.getByText('needs you').count().then(n => n === 0), 4000));
   await A.keyboard.press('Escape');
-  // a goal the manager could not plan says why, and Try again sends it back
-  await manager.reducers.postGoal({ sessionId: 'live', id: 'g-bad', text: 'Something the manager cannot plan' });
-  await manager.reducers.failGoal({ sessionId: 'live', id: 'g-bad', note: 'The manager could not plan this: Invalid API key · Please run /login' });
-  check('could not plan: the board says so, with the reason', await seen(A, 'The manager could not plan "Something the manager cannot plan".', 5000) && await seen(A, 'Invalid API key', 1000));
+  // a goal the conductor could not plan says why, and Try again sends it back
+  await manager.reducers.postGoal({ sessionId: 'live', id: 'g-bad', text: 'Something the conductor cannot plan', effort: 'medium' });
+  await manager.reducers.failGoal({ sessionId: 'live', id: 'g-bad', note: 'The conductor could not plan this: Invalid API key · Please run /login' });
+  check('could not plan: the board says so, with the reason', await seen(A, 'The conductor could not plan "Something the conductor cannot plan".', 5000) && await seen(A, 'Invalid API key', 1000));
   await A.locator('.next').getByRole('button', { name: 'Try again' }).click();
-  check('could not plan: Try again sends it to the manager again', await seen(A, 'Sent to the manager again.', 4000) &&
+  check('could not plan: Try again sends it to the conductor again', await seen(A, 'Sent to the conductor again.', 4000) &&
     await until(async () => [...manager.db.goals.iter()].find(g => g.id === 'g-bad')?.status === 'new', 4000));
   // cancelling that goal (it never got tasks, so its lane goes away)
-  const bad = lane(A, 'Something the manager cannot plan');
-  check('could not plan: back to waiting, its lane says so', await until(async () => /Waiting for the manager/.test(await bad.innerText()), 4000));
+  const bad = lane(A, 'Something the conductor cannot plan');
+  check('could not plan: back to waiting, its lane says so', await until(async () => /Waiting for the conductor/.test(await bad.innerText()), 4000));
   await bad.getByRole('button', { name: 'Cancel goal' }).click();
   await bad.getByRole('button', { name: 'Yes, cancel it' }).click();
   check('cancel: the owner can cancel a goal (with a confirm); with no work done, it leaves the board', await seen(A, 'Goal cancelled.', 4000) &&
-    await until(() => A.locator('.goal-lane', { hasText: 'Something the manager cannot plan' }).count().then(n => n === 0), 4000));
+    await until(() => A.locator('.goal-lane', { hasText: 'Something the conductor cannot plan' }).count().then(n => n === 0), 4000));
   // a worker that hit its usage limit says until when
   await x1.reducers.updateCapacity({ sessionId: 'live', workerId: 'w-kim', usage5H: 100, usageWeek: undefined, resetAt: Timestamp.fromDate(new Date(Date.now() + 3600_000)), status: undefined });
   await nav(A, 'Team');
@@ -384,7 +434,7 @@ try {
   await P.goto(`${URL_}/?db=${DB}`);
   await until(() => prompt(P).isVisible(), 10_000);
   const bar = await P.locator('.sidebar').boundingBox();
-  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 820 && await P.locator('.nav a').count() === 7, bar);
+  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 820 && await P.locator('.nav a').count() === 6, bar);
   const small = await P.locator('.nav a, .btn').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent && (e as HTMLElement).offsetHeight < 44).length);
   check('phone: tap targets are at least 44px tall', small === 0, small);
   check('phone: no sideways scrolling', await P.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));

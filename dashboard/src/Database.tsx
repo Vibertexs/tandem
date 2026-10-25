@@ -8,13 +8,13 @@ import type { Team } from './config';
 type TableView = { name: string; about: string; rows: (s: Snapshot) => unknown[] };
 
 const TABLES: TableView[] = [
-  { name: 'goals', about: 'What was asked for. The manager reads each one and plans it into tasks.', rows: s => s.goals },
+  { name: 'goals', about: 'What was asked for, and at what effort. The conductor reads each one and plans it into tasks.', rows: s => s.goals },
   { name: 'tasks', about: 'The work: its files, its owner, its result. A worker claims one in a single atomic step.', rows: s => s.tasks },
   { name: 'workers', about: 'Each coding agent: whose it is, which Claude, how much of its quota is used.', rows: s => s.workers },
   { name: 'locks', about: 'Files being edited right now, so two workers never touch the same one.', rows: s => s.locks },
   { name: 'events', about: 'The activity log: everything that happened, newest first.', rows: s => s.events },
   { name: 'context', about: 'The shared notes above, and facts like where the project is. Every Claude reads them.', rows: s => Object.entries(s.context) },
-  { name: 'presence', about: 'Who is connected right now: the manager and every page that is open.', rows: s => s.presence },
+  { name: 'presence', about: 'Who is connected right now: the conductor and every page that is open.', rows: s => s.presence },
   { name: 'operators', about: 'Who may send goals and approve people.', rows: s => s.operators },
   { name: 'operator_requests', about: 'People who asked for that permission and are waiting.', rows: s => s.requests },
 ];

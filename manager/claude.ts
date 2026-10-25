@@ -22,6 +22,11 @@ export function claudeCommand(pathVar = process.env.PATH ?? '', platform = proce
 // An argument cmd.exe will read as one piece.
 const quote = (a: string) => (/[\s"&|<>^()%!]/.test(a) || a === '' ? `"${a.replace(/"/g, '\\"')}"` : a);
 
+// All the tokens a run used: input, output, and cache reads and writes (claude -p's "usage").
+export const tokensOf = (usage: Record<string, number> | undefined) =>
+  ['input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens']
+    .reduce((sum, k) => sum + (Number.isFinite(usage?.[k]) ? usage![k] : 0), 0);
+
 // stdin, stdout and stderr are pipes (no `stdio` option), as every caller uses them.
 export function spawnClaude(args: string[], options: Omit<SpawnOptions, 'stdio'>, pathVar?: string): ChildProcessWithoutNullStreams {
   const c = claudeCommand(pathVar);

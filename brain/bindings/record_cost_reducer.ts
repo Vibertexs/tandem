@@ -15,4 +15,5 @@ export default {
   workerId: __t.string(),
   taskId: __t.string(),
   usd: __t.f64(),
+  tokens: __t.f64(),
 };

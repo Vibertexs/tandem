@@ -15,6 +15,8 @@ export const Context = __t.object("Context", {
   sessionId: __t.string(),
   key: __t.string(),
   value: __t.string(),
+  updatedBy: __t.string(),
+  updatedAt: __t.f64(),
 });
 export type Context = __Infer<typeof Context>;
 
@@ -38,8 +40,16 @@ export const Goals = __t.object("Goals", {
   branch: __t.string(),
   note: __t.string(),
   costUsd: __t.f64(),
+  effort: __t.string(),
+  tokens: __t.f64(),
 });
 export type Goals = __Infer<typeof Goals>;
+
+export const HostKeys = __t.object("HostKeys", {
+  sessionId: __t.string(),
+  key: __t.string(),
+});
+export type HostKeys = __Infer<typeof HostKeys>;
 
 export const Locks = __t.object("Locks", {
   pk: __t.string(),
@@ -107,6 +117,7 @@ export const Tasks = __t.object("Tasks", {
   goalId: __t.string(),
   costUsd: __t.f64(),
   triedBy: __t.string(),
+  tokens: __t.f64(),
 });
 export type Tasks = __Infer<typeof Tasks>;
 

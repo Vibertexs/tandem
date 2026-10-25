@@ -1,9 +1,10 @@
 // Which team this page shows, and how. A "team" is a brain address plus a team name (the database).
-//   ?db=<team>&uri=<ws://host:3001>   open a team (tandem start opens the page this way); remembered
-//   &lan=<ip>                           the host's network address, for links others can use
+//   ?db=<team>&uri=<ws://host:3001>   open a team (tandem --start opens the page this way); remembered
+//   &lan=<ip>                           the conductor's network address, for links others can use
+//   &host=1&key=<hex>                   the conductor's own page, and its key to take control back
 //   ?view=present                       big type, no controls
 //   ?mock=1                             a still picture from contract/seed.json, no brain
-// Without ?db, the last team you opened is used. With none, the page asks: host or join?
+// Without ?db, the last team you opened is used. With none, the page asks: start or join?
 const q = new URLSearchParams(location.search);
 const KEY = 'tandem-team';
 
@@ -50,8 +51,18 @@ export const config = {
   team: initialTeam(),
   mock: q.get('mock') === '1',
   present: q.get('view') === 'present',
-  // The localhost page `tandem start` opens carries host=1: the person who started Tandem is the
-  // controller. Invite links never carry it, so teammates open the board as viewers.
+  // The localhost page `tandem --start` opens carries host=1: the person who started Tandem is the
+  // conductor. Invite links never carry it, so teammates open the board as viewers.
   host: q.get('host') === '1',
+  // ...and the conductor's key, with which that page can always take control back
+  hostKey: q.get('key') ?? '',
   local: ['localhost', '127.0.0.1', ''].includes(location.hostname),
 };
+
+// The key has done its job once it is read: keep it out of the address bar (and so out of anything
+// copied from it). `tandem` opens the conductor's page with it again whenever needed.
+if (config.hostKey) {
+  const url = new URL(location.href);
+  url.searchParams.delete('key');
+  history.replaceState(history.state, '', url.toString());
+}

@@ -14,4 +14,5 @@ export default {
   sessionId: __t.string(),
   id: __t.string(),
   usd: __t.f64(),
+  tokens: __t.f64(),
 };
