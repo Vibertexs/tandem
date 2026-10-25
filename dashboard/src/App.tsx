@@ -5,16 +5,17 @@ import { Landing, Unreachable } from './Landing';
 import { BoardPage } from './Board';
 import { ActivityPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
 import { SetupPage } from './Setup';
+import { Dock } from './Dock';
 import { CodeLine, JoinSteps, isManager, managerOnline, online, restartForSharingCommand, useNow } from './ui';
 import type { Snapshot } from './brain';
 
 const PAGES = [
-  { key: 'setup', label: 'Get started', icon: '✓' },
-  { key: 'board', label: 'Board', icon: '▦' },
-  { key: 'team', label: 'Team', icon: '◉' },
-  { key: 'memory', label: 'Shared memory', icon: '✎' },
-  { key: 'activity', label: 'Activity', icon: '≡' },
-  { key: 'settings', label: 'Settings', icon: '⚙' },
+  { key: 'setup', label: 'Get started' },
+  { key: 'board', label: 'Board' },
+  { key: 'team', label: 'Team' },
+  { key: 'memory', label: 'Shared memory' },
+  { key: 'activity', label: 'Activity' },
+  { key: 'settings', label: 'Settings' },
 ] as const;
 type PageKey = typeof PAGES[number]['key'];
 
@@ -109,40 +110,26 @@ export function App() {
 
   return (
     <div className={`shell ${config.present ? 'present' : ''}`}>
-      {!config.present && (
-        <nav className="sidebar" aria-label="Sections">
-          <div className="brand"><span className="brand-mark" aria-hidden="true" /><span>Tandem</span></div>
-          <div className="team-chip" title={team?.uri}>
-            <span className={`dot ${status === 'connected' ? 'on' : 'off'}`} aria-hidden="true" />
-            <span className="team-name">{config.mock ? 'Sample data' : team!.db}</span>
-            <span className="small muted">{status === 'connected' ? `${workersOnline} worker${workersOnline === 1 ? '' : 's'} online` : 'Reconnecting…'}</span>
-            {status === 'connected' && !config.mock && (
-              <span className="small muted">{managerOnline(snap, now) ? '● Manager online' : snap.operators.some(o => isManager(o.name)) ? '○ Manager offline' : '○ No manager yet'}</span>
-            )}
-          </div>
-          <ul className="plain nav">
-            {PAGES.map(p => (
-              <li key={p.key}>
-                <a href={`#/${p.key}`} aria-current={page === p.key ? 'page' : undefined}>
-                  <span className="nav-icon" aria-hidden="true">{p.icon}</span><span className="nav-label">{p.label}</span>
-                  {badge[p.key] ? <span className="badge-count" aria-label={`${badge[p.key]} new`}>{badge[p.key]}</span> : null}
-                </a>
-              </li>
-            ))}
-          </ul>
-          <div className="you small">
-            {config.mock ? <span className="chip">Read only</span> : isOp ? <span className="chip st-busy">✓ You control this team</span> : <span className="chip">Watching</span>}
-          </div>
-        </nav>
-      )}
+      {!config.present && <Dock items={PAGES} active={page} badge={badge} />}
       <div className="main">
         <header className="topbar">
           <h1>{config.present ? `${team?.db ?? 'Tandem'}` : title}</h1>
           <span className="spacer" />
+          {!config.present && (
+            <div className="team-pill" title={team?.uri}>
+              <span className={`dot ${status === 'connected' ? 'on' : 'off'}`} aria-hidden="true" />
+              <span className="team-name">{config.mock ? 'Sample data' : team!.db}</span>
+              <span className="small muted">{status === 'connected' ? `${workersOnline} worker${workersOnline === 1 ? '' : 's'} online` : 'Reconnecting…'}</span>
+              {status === 'connected' && !config.mock && (
+                <span className="small muted">{managerOnline(snap, now) ? 'Manager online' : snap.operators.some(o => isManager(o.name)) ? 'Manager offline' : 'No manager yet'}</span>
+              )}
+            </div>
+          )}
+          {!config.present && (config.mock ? <span className="chip">Read only</span> : isOp ? <span className="chip st-busy">You control this team</span> : <span className="chip">Watching</span>)}
           {!config.mock && !config.present && team && <Invite team={team} snap={snap} say={say} />}
           {!config.mock && !isOp && !unowned && !config.present && status === 'connected' && (
             asked
-              ? <span className="chip goal-new">⏳ Waiting for a controller to approve you</span>
+              ? <span className="chip goal-new">Waiting for a controller to approve you</span>
               : <AskToManage onAsk={name => api!.askToManage(name).then(() => say('Control request sent. A controller sees it on the Board.'), e => say('Could not ask: ' + (e as Error).message))} />
           )}
         </header>

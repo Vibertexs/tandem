@@ -52,13 +52,16 @@ Plain words. Everything meets in one shared notebook, the brain. Nothing talks t
 - **With `--review`:** before the goal is done, the manager adds one "Review the goal's work" task. The launcher runs it with read-only tools on the goal branch, and its findings go into the goal's note and the PR.
 
 ## How teammates join
-A teammate does not need controller approval to work. The Invite box first gives them a board link to watch. To add their computer's workers, they paste one whole Windows PowerShell block:
+A teammate does not need controller approval to work. The Invite box first gives them a board link to watch. To add their computer's workers, they run two separate blocks in Windows PowerShell. First, once only, to get Tandem:
 ```powershell
 git clone https://github.com/Vibertexs/tandem
-Set-Location tandem
+```
+Then, any time, to join:
+```powershell
+cd tandem
 .\tandem.cmd join "<invite>"
 ```
-It gets Tandem once, copies the project from the project host into Tandem's private work folder and starts workers that push task branches back to the host. It does not change an existing project folder. The Team page shows the exact commands; macOS/Linux uses the same clone, `cd tandem`, and `./tandem join "<invite>"`. The host's Git server has no separate login, so the invite must stay on a trusted private network such as Tailscale. A teammate can instead connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Request control**; a current controller clicks **Approve**. The manager requests the same browser permission.
+The join copies the project from the project host into Tandem's private work folder and starts workers that push task branches back to the host. It does not change an existing project folder. The Team page shows the exact commands; macOS/Linux uses the same clone, then `cd tandem` and `./tandem join "<invite>"`. The host's Git server has no separate login, so the invite must stay on a trusted private network such as Tailscale. A teammate can instead connect their own Claude Code with one `claude mcp add` command plus the worker skill. To send goals or change the team, they click **Request control**; a current controller clicks **Approve**. The manager requests the same browser permission.
 
 ## Who may do what
 - **Worker actions** (claim, lock, complete, heartbeat, report, cost): only by the identity that registered that worker (or an operator). Anyone may register a new worker; a name in use can only be taken over after its owner has been quiet for 2 minutes.
