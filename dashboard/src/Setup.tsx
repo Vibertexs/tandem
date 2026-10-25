@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { Snapshot } from './brain';
 import { shareable, type Team } from './config';
 import { CodeLine, JoinSteps, managerOnline, onConductor, online, restartForSharingCommand, startCommand } from './ui';
+import { ProjectStarter } from './ProjectStarter';
 
 function Step({ done, title, children }: { done: boolean; title: string; children?: ReactNode }) {
   return (
@@ -35,6 +36,7 @@ export function TeamSetup({ snap, team, now, say, go, isOp }: { snap: Snapshot; 
   const startCode = <CodeLine code={startCommand(tandemDir, projectDir)} say={say} />;
 
   return (
+    <>
     <section className="card setup" aria-labelledby="get-started-h">
       <h2 id="get-started-h">Get started: add a teammate</h2>
       <p className="small muted">The <strong>conductor</strong> is you: the computer that ran <code className="mono">tandem --start</code> holds the project, plans goals and merges the work. A <strong>teammate</strong> is another computer that joins with the invite and lends its Claude workers.</p>
@@ -81,5 +83,7 @@ export function TeamSetup({ snap, team, now, say, go, isOp }: { snap: Snapshot; 
         </Step>
       </ol>
     </section>
+    <ProjectStarter tandemDir={ctx.tandem_dir} projectDir={ctx.project_dir} say={say} idPrefix="team" />
+    </>
   );
 }

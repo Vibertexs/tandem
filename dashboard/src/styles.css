@@ -152,6 +152,13 @@ textarea { resize: vertical; }
 .start-help summary, .join-platforms summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
 .start-help summary:hover, .join-platforms summary:hover { color: var(--ink); }
 .start-help p { margin: 0; }
+.project-starter { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; margin-top: 2px; border-top: 1px solid var(--line); }
+.project-starter h2 { font-size: 1rem; }
+.project-starter > p { margin: 0; }
+.project-starter-form { gap: 8px; }
+.project-starter-form .row2 { align-items: start; }
+.check-row { display: flex !important; flex-direction: row !important; align-items: center; gap: 8px; color: var(--ink) !important; cursor: pointer; }
+.check-row input { width: auto !important; min-height: auto !important; }
 
 /* ---- the floating dock ---- */
 .shell { min-height: 100vh; }
@@ -258,6 +265,7 @@ button.top-item:hover { background: var(--fill); }
 .setup .steps-list { gap: 0; max-width: none; }
 .setup .step { border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; background: none; padding: 16px 0 4px; }
 .setup .step-body > details > summary, .setup .connect summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.page > .project-starter { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-sm); margin-top: 0; }
 .prefs { grid-template-columns: 120px 1fr; align-items: center; }
 .prefs dd { flex-direction: row; align-items: center; gap: 12px; flex-wrap: wrap; }
 
