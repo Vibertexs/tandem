@@ -24,10 +24,13 @@ export function useNow(): number {
   return now;
 }
 
+// Each person gets their own colour (from their name), so a worker is easy to spot across the board.
+const HUES = [18, 38, 150, 188, 212, 262, 320, 350];
 export function Avatar({ name, size = 28 }: { name: string; size?: number }) {
+  const hue = HUES[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % HUES.length];
   const initials = name.split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase();
   return (
-    <span className="avatar" title={name} aria-hidden="true" style={{ width: size, height: size, fontSize: size * 0.42 }}>
+    <span className="avatar" title={name} aria-hidden="true" style={{ width: size, height: size, fontSize: size * 0.42, '--h': hue } as React.CSSProperties}>
       {initials}
     </span>
   );

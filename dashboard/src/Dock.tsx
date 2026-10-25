@@ -3,11 +3,12 @@
 // that page. On a phone it becomes a bar at the bottom, without the growing.
 import { useState, type CSSProperties, type ReactNode } from 'react';
 
-const BASE = 40;   // an icon's size when the pointer is far away
-const MAX = 60;    // and when the pointer is right on it
-const REACH = 92;  // how far away the pointer still has an effect
+// The dock keeps its width (64px with its padding): icons only grow up to the room inside it (48px).
+const BASE = 36;   // an icon's size when the pointer is far away
+const MAX = 48;    // and when the pointer is right on it, never more than the dock is wide
+const REACH = 80;  // how far away the pointer still has an effect
 const GAP = 6;
-const ROOM = 24;   // spare room above and below, so growing icons do not move the whole dock
+const ROOM = 20;   // spare room above and below, so growing icons do not move the whole dock
 
 const svg = (children: ReactNode) => (
   <svg className="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
