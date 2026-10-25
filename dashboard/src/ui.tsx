@@ -88,6 +88,15 @@ export function liveInfo(t: Task, events: Ev[]): { since: Date | null; note: str
 export const lockBlocking = (t: Task, snap: Snapshot) =>
   t.status === 'open' ? t.files.map(p => snap.locks.find(l => l.path === p && l.taskId !== t.id)).find(Boolean) : undefined;
 
+// The model a task runs with: the one set on it, else the launcher's routing by kind, then difficulty
+// (launcher/routing.json: easy haiku, normal sonnet, hard opus; map sonnet, reduce opus).
+export function modelFor(task: Task): string {
+  if (task.model) return task.model;
+  if (task.kind === 'map') return 'sonnet';
+  if (task.kind === 'reduce') return 'opus';
+  return task.difficulty === 'easy' ? 'haiku' : task.difficulty === 'hard' ? 'opus' : 'sonnet';
+}
+
 // Plain-English reason for where a task is and who has it.
 export function why(task: Task, snap: Snapshot): string {
   const who = snap.workers.find(w => w.id === task.assignee);
@@ -95,7 +104,7 @@ export function why(task: Task, snap: Snapshot): string {
     : task.kind === 'reduce' ? "combining a big job's results"
     : task.difficulty === 'easy' ? 'a small change'
     : task.difficulty === 'hard' ? 'a hard problem' : 'normal feature work';
-  const model = task.model ? `${task.model} model` : 'the model picked by difficulty';
+  const model = modelFor(task);
   if (task.status === 'done') return `Finished${who ? ` by ${who.name}` : ''}. It was ${kind}.`;
   if (task.status === 'failed') {
     return `${task.triedBy.map(id => nameOf(id, snap)).join(' and ')} could not finish it: ${task.resultSummary ?? 'no reason given'}. Check the task, then press Try again.`;

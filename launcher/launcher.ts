@@ -101,18 +101,25 @@ async function simulate(t: Task) {
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
 
-const EDIT_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep'];
+// A worker's own config files live in .worktrees/.tandem/, so .worktrees/ holds only task folders.
+function scratchFile(cwd: string, name: string) {
+  const dir = join(cwd, '..', '.tandem');
+  mkdirSync(dir, { recursive: true });
+  return join(dir, name);
+}
+
+const EDIT_TOOLS =['Read', 'Write', 'Edit', 'Glob', 'Grep'];
 const READ_TOOLS = ['Read', 'Glob', 'Grep']; // for the review task: it must not change anything
 
 function runClaude(cwd: string, prompt: string, model: string, effort: string, extraEnv: Record<string, string>, tools = EDIT_TOOLS) {
   const tsxEsm = 'file:///' + join(mcpDir, 'node_modules/tsx/dist/esm/index.mjs').split('\\').join('/');
-  const mcpConfig = join(cwd, '..', `.tandem-mcp-${workerId}.json`);
+  const mcpConfig = scratchFile(cwd, `mcp-${workerId}.json`);
   writeFileSync(mcpConfig, JSON.stringify({ mcpServers: { tandem: {
     command: process.execPath, args: ['--import', tsxEsm, join(mcpDir, 'src', 'server.ts')],
     env: { STDB_URI: URI, STDB_DB: DB, TANDEM_SESSION: SESSION, TANDEM_WORKER_ID: workerId, ...(process.env.TANDEM_TOKEN_FILE ? { TANDEM_TOKEN_FILE: process.env.TANDEM_TOKEN_FILE } : {}) },
   } } }));
   // the lock-check hook, for this run only
-  const settings = join(cwd, '..', `.tandem-settings-${workerId}.json`);
+  const settings = scratchFile(cwd, `settings-${workerId}.json`);
   writeFileSync(settings, JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Edit|Write|MultiEdit|NotebookEdit',
     hooks: [{ type: 'command', command: `"${process.execPath}" "${join(mcpDir, 'hook', 'check-lock.mjs')}"` }] }] } }));
   const args = ['-p', '--model', model, '--mcp-config', mcpConfig, '--strict-mcp-config', '--settings', settings,
@@ -156,7 +163,7 @@ function writeCodexConfig(home: string) {
 // One codex exec run in the worktree, the prompt on stdin. Reviews run read-only.
 function runCodex(cwd: string, prompt: string, readOnly: boolean) {
   writeCodexConfig(process.env.CODEX_HOME!);
-  const last = join(cwd, '..', `.tandem-codex-${workerId}.txt`);
+  const last = scratchFile(cwd, `codex-${workerId}.txt`);
   const args = ['exec', '--skip-git-repo-check', '--cd', cwd, '--output-last-message', last,
     ...(readOnly ? ['--sandbox', 'read-only'] : ['--full-auto']), '-'];
   // npm installs codex as a .cmd shim on Windows, which needs a shell
@@ -182,7 +189,9 @@ function runCodex(cwd: string, prompt: string, readOnly: boolean) {
 
 async function realRun(t: Task) {
   const repo = resolve(opt.repo!);
-  const tree = join(repo, '.worktrees', t.id);
+  // the folder says what the task is: .worktrees/write-calc-py-t-bu3yoo (the branch stays task/<id>)
+  const words = t.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
+  const tree = join(repo, '.worktrees', words ? `${words}-${t.id}` : t.id);
   const branch = `task/${t.id}`;
   let startedFrom: string[] = [];
   if (!existsSync(tree)) {

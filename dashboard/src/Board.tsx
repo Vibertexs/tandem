@@ -1,7 +1,7 @@
 // The main page: tell the team what to build, then watch the tasks move across the board.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Api, Goal, Snapshot, Task } from './brain';
-import { Avatar, EV_ICON, agentLabel, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, money, online, stageOf, took, why, type Stage } from './ui';
+import { Avatar, EV_ICON, agentLabel, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, modelFor, money, online, stageOf, took, why, type Stage } from './ui';
 
 type Props = { snap: Snapshot; api: Api | null; isOp: boolean; now: number; say: (m: string) => void; present: boolean; go: (page: string) => void };
 
@@ -88,13 +88,6 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
   return null;
 }
 
-// For a first-time controller: goals small enough to finish in a few minutes.
-const EXAMPLES = [
-  'A tiny Python calculator: calc.py with add and sub, unittest tests, and a README',
-  'A command-line to-do list in Python that saves to todo.json, with unittest tests',
-  'A one-page pomodoro timer: index.html, styles.css and app.js',
-];
-
 function Prompt({ snap, api, isOp, say }: Props) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -125,11 +118,6 @@ function Prompt({ snap, api, isOp, say }: Props) {
           placeholder={isOp ? 'Describe what you want built…' : 'Watching: request control to send work'} />
         <button type="submit" className="btn primary" disabled={!isOp || busy || !text.trim()}>Send</button>
       </form>
-      {isOp && !latest && !text && (
-        <p className="small examples"><span className="muted">Try one:</span>
-          {EXAMPLES.map(x => <button key={x} type="button" className="chip example" onClick={() => { setText(x); input.current?.focus(); }}>{x}</button>)}
-        </p>
-      )}
     </section>
   );
 }
@@ -323,7 +311,7 @@ function Drawer({ t, snap, now, onClose, api, isOp, say }: { t: Task; snap: Snap
         <dt>Assignee</dt><dd>{who ? <span className="who"><Avatar name={who.name} size={22} /> {who.name} <span className="small muted">{agentLabel(who)}</span></span> : t.assignee ? `Reserved for ${t.assignee}` : 'Nobody yet'}</dd>
         <dt>Files</dt><dd className="mono small">{t.files.map(f => <div key={f}>{snap.locks.some(l => l.path === f) ? '🔒 ' : ''}{f}</div>)}</dd>
         {deps.length > 0 && <><dt>After</dt><dd>{deps.map(d => <div key={d.id}>{d.status === 'done' ? '✓' : '○'} {d.title}</div>)}</dd></>}
-        <dt>Model</dt><dd>{t.model || 'by difficulty'} · {t.difficulty}</dd>
+        <dt>Model</dt><dd>{modelFor(t)} · {t.difficulty} task <span className="small muted">(the timeline shows what ran)</span></dd>
         {t.branch && <><dt>Branch</dt><dd className="mono small">{t.branch}</dd></>}
         {t.costUsd > 0 && <><dt>Cost</dt><dd>{money(t.costUsd)}</dd></>}
       </dl>
