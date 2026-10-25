@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // tandem: run Tandem from the project you want built. Node 22.18+ runs this TypeScript file as is.
 //
+//   tandem init <folder>      make a new project, then host a team for it
 //   tandem start              in your project's folder: host a team for it, print the invite address
 //   tandem join <address>     copy the conductor's project and add this computer's workers to the team
 //   tandem stop [--all]       stop what this computer started (--all also stops the brain)
@@ -32,9 +33,12 @@ const SIM_LIMIT = Number(process.env.TANDEM_SIM_LIMIT ?? 0);
 
 const HELP = `tandem: your team's Claude Codes, working as one.
 
-  Quick: "tandem --start" in your project, then "tandem" any time to open the dashboard.
+  Quick: "tandem init <new-folder>" starts a new project; "tandem --start" starts an existing one.
+  Tandem needs a Git project. In an empty folder, "tandem --start" makes it one for you.
   Every command works as a word or a flag: tandem start = tandem --start, tandem stop = tandem --stop.
 
+  tandem init <folder>        Make a brand-new Git project in <folder>, give it its first commit,
+                              then start Tandem there. An existing folder must be empty.
   tandem start              Start a team for the git repo you are in. You are its conductor: you send
                             the goals, and your computer plans them and merges the work. Prints the invite.
     --workers N             workers on this computer (default 1, one Claude per person; 0 = none)
@@ -319,6 +323,34 @@ async function ensurePage(): Promise<boolean> {
   return true;
 }
 
+// ---------- tandem init ----------
+// The friendly first-project command. It is deliberately strict: never put a Git repo or files
+// into a folder the person already has, because they may have meant to use `tandem --start` there.
+async function initProject(argv: string[]) {
+  const folder = argv[0];
+  if (!folder || folder.startsWith('-')) fail('Choose a new folder: tandem init <new-folder>\nFor a Git project you already have, open its folder and run: tandem --start');
+  const project = resolve(process.cwd(), folder);
+  // A folder that is there but empty is as good as new. One with anything in it is not touched.
+  if (existsSync(project) && !isEmptyFolder(project)) fail(`${project} already exists and has files in it. Tandem init only creates a brand-new project.\nFor an existing Git project, open its folder and run: tandem --start`);
+
+  mkdirSync(project, { recursive: true });
+  gitProject(project);
+  say(`\n  ${green('✓')} Created a new Git project: ${project}`);
+  say(dim('  Starting Tandem there…'));
+  process.chdir(project);
+  await start(argv.slice(1));
+}
+
+const isEmptyFolder = (dir: string) => readdirSync(dir).length === 0;
+
+// Makes `dir` a Git project with a first (empty) commit, which Tandem needs to branch from.
+function gitProject(dir: string) {
+  const made = git(dir, 'init');
+  if (!made.ok) fail(`Could not create a Git project in ${dir}:\n${made.out}`);
+  const committed = git(dir, '-c', 'user.name=Tandem', '-c', 'user.email=tandem@localhost', 'commit', '--allow-empty', '-m', 'Start');
+  if (!committed.ok) fail(`Tandem made ${dir}, but could not make its first Git commit:\n${committed.out}`);
+}
+
 // ---------- tandem start ----------
 async function start(argv: string[]) {
   if (argv.some(arg => arg === '--demo' || arg.startsWith('--demo='))) {
@@ -344,8 +376,14 @@ async function start(argv: string[]) {
   if (mgrAcct && mgrAcct.agent !== 'claude') fail('The conductor plans with Claude Code: --conductor-account must be a Claude account.');
 
   // The project is the Git repo where the command runs.
-  const repo = repoAt(process.cwd());
-  if (!repo) fail(`${process.cwd()} is not a git repository.\nRun tandem start in the project you want built.`);
+  let repo = repoAt(process.cwd());
+  // An empty folder is a new project: give it Git and a first commit so the person does not have to.
+  if (!repo && isEmptyFolder(process.cwd())) {
+    gitProject(process.cwd());
+    say(`\n  ${green('✓')} ${process.cwd()} was empty, so Tandem made it a new Git project.`);
+    repo = repoAt(process.cwd());
+  }
+  if (!repo) fail(`${process.cwd()} is not a git repository.\nTandem works inside a Git project. Run tandem start in one, or in an empty folder to begin a new project.\nTo turn this folder into one: git init, then git add -A and git commit -m Start.`);
   if (resolve(repo) === ROOT) fail('This is the Tandem source folder, not the project it should work on. Run tandem start in your project instead.');
   if (!git(repo, 'rev-parse', '--verify', '--quiet', 'HEAD').ok) fail(`${repo} has no commits yet. Make a first commit, then run tandem start again.`);
   const team = slug(o.team ?? basename(repo));
@@ -745,10 +783,11 @@ const ownCommand = () => (WIN ? `& '${join(ROOT, 'tandem.cmd')}'` : `'${join(ROO
 
 const [first, ...rest] = process.argv.slice(2);
 // Every command also works as a flag: "tandem --start" is "tandem start".
-const WORDS = ['start', 'join', 'stop', 'status', 'open', 'dashboard', 'logs', 'account', 'accounts', 'install', 'uninstall', 'doctor', 'version', 'help'];
+const WORDS = ['init', 'start', 'join', 'stop', 'status', 'open', 'dashboard', 'logs', 'account', 'accounts', 'install', 'uninstall', 'doctor', 'version', 'help'];
 const cmd = first && first.startsWith('--') && WORDS.includes(first.slice(2)) ? first.slice(2) : first;
 try {
-  if (cmd === 'start') await start(rest);
+  if (cmd === 'init') await initProject(rest);
+  else if (cmd === 'start') await start(rest);
   else if (cmd === 'join') await joinTeam(rest);
   else if (cmd === 'stop') await stop(rest);
   else if (cmd === 'status') await status();

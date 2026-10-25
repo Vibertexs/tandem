@@ -50,12 +50,6 @@ export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: s
             <li>On that page you are the conductor automatically. Describe what you want built and pick an effort.</li>
           </ol>
           <ProjectStarter say={say} idPrefix="landing" />
-          <details className="start-help">
-            <summary className="small">If <code className="mono">tandem</code> is not recognised</summary>
-            <p className="small muted">Keep the terminal in your project and run Tandem by its path instead:</p>
-            <CodeLine code={'& "C:\\path\\to\\tandem\\tandem.cmd" --start'} say={say} />
-            <p className="small muted">Run <code className="mono">tandem install</code> once in the Tandem folder to put it on your PATH. On macOS or Linux (untested): <code className="mono">/path/to/tandem/tandem --start</code>.</p>
-          </details>
         </section>
         <section className="card choice" aria-labelledby="join-h">
           <h2 id="join-h">Open a teammate&apos;s team</h2>

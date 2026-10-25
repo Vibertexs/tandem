@@ -83,7 +83,7 @@ export function TeamSetup({ snap, team, now, say, go, isOp }: { snap: Snapshot; 
         </Step>
       </ol>
     </section>
-    <ProjectStarter tandemDir={ctx.tandem_dir} projectDir={ctx.project_dir} say={say} idPrefix="team" />
+    <ProjectStarter projectDir={ctx.project_dir} say={say} idPrefix="team" />
     </>
   );
 }

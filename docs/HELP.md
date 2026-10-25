@@ -61,7 +61,7 @@ Each saved login has its own Tandem-owned configuration folder; your usual Claud
 | The dashboard at `localhost:5173` does not load | Start the team in the project with `tandem --start`. |
 | “Tandem needs Node.js 22.18 or newer” | Install the current Node LTS, then open a new terminal. |
 | `tandem` is not recognized | Open a new terminal after `tandem install`, or run `& 'C:\path\to\tandem\tandem.cmd' --start`. |
-| The folder is not a Git project, or has no commit | Run Tandem inside a Git repository after making its first commit. |
+| The folder is not a Git project, or has no commit | Tandem makes an empty folder a Git project by itself. A folder with files needs `git init`, `git add -A` and `git commit -m Start` first. |
 | A teammate cannot reach the conductor | Confirm both computers share a network or Tailscale, and that the conductor did not use `--local`. |
 | The conductor is not sharing the project | On the conductor’s computer, run `tandem stop`, then `tandem --start` without `--local`. |
 | Setup fails after an update | Run `tandem --start --fresh`. This clears Tandem’s board, not the project. |

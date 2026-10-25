@@ -146,32 +146,18 @@ export function why(task: Task, snap: Snapshot): string {
 // Our own repo, where a teammate gets the tandem command.
 export const TANDEM_REPO = 'https://github.com/Vibertexs/tandem';
 
-const isWindowsPath = (path: string) => /^[a-z]:[\\/]/i.test(path) || path.includes('\\');
-const powershellQuote = (path: string) => `'${path.replace(/'/g, "''")}'`;
-const shellQuote = (path: string) => `'${path.replace(/'/g, "'\\''")}'`;
-
-// A complete command for the conductor's computer. Calling Tandem by its known path means the ordinary
-// first-use path never asks someone to edit PATH or install anything globally.
-export function startCommand(tandemDir: string, projectDir: string) {
-  if (!tandemDir || !projectDir || tandemDir.startsWith('<') || projectDir.startsWith('<')) return 'tandem start';
-  if (isWindowsPath(tandemDir) || isWindowsPath(projectDir)) {
-    const command = `${tandemDir.replace(/[\\/]+$/, '')}\\tandem.cmd`;
-    return `Set-Location -LiteralPath ${powershellQuote(projectDir)}\n& ${powershellQuote(command)} start`;
-  }
-  const command = `${tandemDir.replace(/\/+$/, '')}/tandem`;
-  return `cd -- ${shellQuote(projectDir)}\n${shellQuote(command)} start`;
+// The one-time setup makes `tandem` available in every terminal. Thereafter, commands should look
+// like product commands, not a script assembled from this computer's folder layout.
+export function startCommand(_tandemDir: string, _projectDir: string) {
+  return 'tandem --start';
 }
 
 // Use this when a host was started with --local, or its project share did not come up. Stopping
 // the brain is deliberate: it must be rebound to the network before a teammate can reach it.
 export function restartForSharingCommand(tandemDir: string, projectDir: string) {
-  if (!tandemDir || tandemDir.startsWith('<')) return 'tandem stop --all\ntandem start';
-  if (isWindowsPath(tandemDir) || isWindowsPath(projectDir)) {
-    const command = `${tandemDir.replace(/[\\/]+$/, '')}\\tandem.cmd`;
-    return `& ${powershellQuote(command)} stop --all\n${startCommand(tandemDir, projectDir)}`;
-  }
-  const command = `${tandemDir.replace(/\/+$/, '')}/tandem`;
-  return `${shellQuote(command)} stop --all\n${startCommand(tandemDir, projectDir)}`;
+  void tandemDir;
+  void projectDir;
+  return 'tandem stop --all\ntandem --start';
 }
 
 // What a teammate copies to add their computer's workers. First time only: get Tandem and put it on
