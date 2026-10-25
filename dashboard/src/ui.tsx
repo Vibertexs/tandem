@@ -24,26 +24,22 @@ export function useNow(): number {
   return now;
 }
 
-const HUES = [160, 210, 265, 25, 330, 190, 45, 120];
 export function Avatar({ name, size = 28 }: { name: string; size?: number }) {
-  const hue = HUES[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % HUES.length];
   const initials = name.split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase();
   return (
-    <span className="avatar" title={name} aria-hidden="true"
-      style={{ width: size, height: size, fontSize: size * 0.4, background: `hsl(${hue} 55% 88%)`, color: `hsl(${hue} 45% 28%)` }}>
+    <span className="avatar" title={name} aria-hidden="true" style={{ width: size, height: size, fontSize: size * 0.42 }}>
       {initials}
     </span>
   );
 }
 
-const STATUS_ICON: Record<string, string> = { idle: '○', busy: '▶', capped: '■' };
 const STATUS_TEXT: Record<string, string> = { idle: 'Free', busy: 'Working', capped: 'Out of quota' };
 export function WorkerStatus({ w, now }: { w: Worker; now: number }) {
   const offline = now - w.lastSeen.getTime() > 120_000;
-  if (offline) return <span className="chip st-offline"><span aria-hidden="true">◌</span> Offline</span>;
+  if (offline) return <span className="chip st-offline"><span className="status-dot" aria-hidden="true" />Offline</span>;
   const until = w.status === 'capped' && w.resetAt && w.resetAt.getTime() > now
     ? ` until ${w.resetAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '';
-  return <span className={`chip st-${w.status}`}><span aria-hidden="true">{STATUS_ICON[w.status] ?? '○'}</span> {STATUS_TEXT[w.status] ?? w.status}{until}</span>;
+  return <span className={`chip st-${w.status}`}><span className="status-dot" aria-hidden="true" />{STATUS_TEXT[w.status] ?? w.status}{until}</span>;
 }
 export const online = (w: Worker, now: number) => now - w.lastSeen.getTime() <= 120_000;
 
@@ -162,8 +158,9 @@ export function restartForSharingCommand(tandemDir: string, projectDir: string) 
   return `${shellQuote(command)} stop --all\n${startCommand(tandemDir, projectDir)}`;
 }
 
-// What a teammate copies to add their computer's workers. The command copies the project from
-// the host by itself, so there is no existing project folder to find or configure.
+// What a teammate copies to add their computer's workers: getting Tandem (once) and joining (every
+// time) are separate blocks, so the clone is not repeated. The join copies the project from the
+// host by itself, so there is no existing project folder to find or configure.
 export function JoinSteps({ link, gitUrl, say, restart }: { link: string; gitUrl: string; say: (m: string) => void; restart?: string }) {
   if (!gitUrl) {
     return (
@@ -175,13 +172,16 @@ export function JoinSteps({ link, gitUrl, say, restart }: { link: string; gitUrl
   }
   return (
     <div className="join-steps">
-      <p className="small muted">Paste this one block in Windows PowerShell. It gets Tandem once, makes its private copy of the host project, and starts this computer&apos;s workers.</p>
-      <CodeLine code={`git clone ${TANDEM_REPO}\nSet-Location tandem\n.\\tandem.cmd join "${link}"`} say={say} />
+      <p className="small"><strong>1. Get Tandem</strong> <span className="muted">(first time only, in Windows PowerShell). Already have it? Skip this.</span></p>
+      <CodeLine code={`git clone ${TANDEM_REPO}`} say={say} />
+      <p className="small"><strong>2. Join the team</strong> <span className="muted">(any time, from the folder you cloned into). It makes Tandem&apos;s private copy of the host project and starts this computer&apos;s workers.</span></p>
+      <CodeLine code={`cd tandem\n.\\tandem.cmd join "${link}"`} say={say} />
       <details className="join-platforms">
         <summary className="small">macOS or Linux</summary>
-        <CodeLine code={`git clone ${TANDEM_REPO}\ncd tandem\n./tandem join "${link}"`} say={say} />
+        <CodeLine code={`git clone ${TANDEM_REPO}`} say={say} />
+        <CodeLine code={`cd tandem\n./tandem join "${link}"`} say={say} />
       </details>
-      <p className="small muted">It needs Node.js 22.18+, Git, and Claude Code signed in. The workers use that computer&apos;s own Claude login and quota; they do not change an existing project folder.</p>
+      <p className="small muted">It needs Node.js 22.18+, Git, and Claude Code signed in. The workers use that computer&apos;s own Claude login and quota; they do not change an existing project folder. To update Tandem later, run <code>git pull</code> in its folder.</p>
     </div>
   );
 }
@@ -200,8 +200,8 @@ export function CodeLine({ code, say }: { code: string; say: (m: string) => void
 }
 
 export const EV_ICON: Record<string, string> = {
-  task_created: '＋', task_assigned: '→', task_claimed: '▶', task_done: '✓', task_failed: '✕', progress: '…',
-  lock_taken: '🔒', lock_released: '🔓', worker_capped: '■', worker_idle: '○', job_progress: '▤', merge_unblocked: '★',
+  task_created: '+', task_assigned: '→', task_claimed: '•', task_done: '✓', task_failed: '×', progress: '·',
+  lock_taken: '•', lock_released: '•', worker_capped: '•', worker_idle: '•', job_progress: '•', merge_unblocked: '✓',
 };
 
 export const isManager = (name: string) => /manager/i.test(name);

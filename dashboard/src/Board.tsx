@@ -33,7 +33,6 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
   if (unplanned) {
     return (
       <div className="next card alert" role="status">
-        <span className="next-icon" aria-hidden="true">⚠</span>
         <div><strong>The manager could not plan "{unplanned.text.slice(0, 80)}".</strong>
           <p className="small muted">{unplanned.note}</p></div>
         <button type="button" className="btn" disabled={busy || !api} onClick={async () => {
@@ -49,7 +48,6 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
   if (failed.length > 0) {
     return (
       <div className="next card alert" role="status">
-        <span className="next-icon" aria-hidden="true">⚠</span>
         <div><strong>{failed.length === 1 ? `"${failed[0].title}" needs you.` : `${failed.length} tasks need you.`}</strong>
           <p className="small muted">Two workers could not finish {failed.length === 1 ? 'it' : 'them'}: {failed[0].resultSummary ?? 'no reason given'}. Open the task to read why, then try again.</p></div>
         <button type="button" className="btn" onClick={() => openTask(failed[0].id)}>Open it</button>
@@ -60,7 +58,6 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
   if (hasManager && !managerOnline(snap, now) && snap.goals.some(g => g.status === 'new')) {
     return (
       <div className="next card subtle">
-        <span className="next-icon" aria-hidden="true">💤</span>
         <div><strong>The manager is offline, so new goals are waiting.</strong>
           <p className="small muted">On the host, run <code className="mono">tandem start</code> again in the project's folder. It picks up where it left off.</p></div>
       </div>
@@ -78,7 +75,6 @@ function NextStep({ snap, api, isOp, now, say, go, openTask }: Props & { openTas
   if (!snap.workers.some(w => online(w, now))) {
     return (
       <div className="next card subtle">
-        <span className="next-icon" aria-hidden="true">💻</span>
         <div><strong>No workers are online.</strong>
           <p className="small muted">Tasks wait until a worker picks them up. Start workers with <code className="mono">tandem start</code>, or invite another computer.</p></div>
         <button type="button" className="btn" onClick={() => go('team')}>Connect a computer</button>
@@ -123,8 +119,8 @@ function Prompt({ snap, api, isOp, say }: Props) {
 }
 
 export function GoalChip({ status }: { status: string }) {
-  const text = status === 'new' ? '⏳ Waiting for the manager' : status === 'planning' ? '✎ Being planned'
-    : status === 'done' ? '✓ Done' : status === 'failed' ? '✕ Could not plan' : status === 'cancelled' ? 'Cancelled' : '▶ Planned';
+  const text = status === 'new' ? 'Waiting for the manager' : status === 'planning' ? 'Being planned'
+    : status === 'done' ? 'Done' : status === 'failed' ? 'Could not plan' : status === 'cancelled' ? 'Cancelled' : 'Planned';
   return <span className={`chip goal-${status}`}>{text}</span>;
 }
 
@@ -161,7 +157,7 @@ function GoalLane({ lane, p, open, setOpen, flash }: { lane: Lane; p: Props; ope
   return (
     <section className={`goal-lane goal-${g?.status ?? 'other'} ${expanded ? '' : 'folded'}`} aria-label={g ? `Goal: ${g.text}` : 'Other tasks'}>
       <header className="lane-head">
-        <button type="button" className="lane-toggle" aria-expanded={expanded} aria-label={expanded ? 'Fold' : 'Unfold'} onClick={() => setExpanded(!expanded)}>{expanded ? '▾' : '▸'}</button>
+        <button type="button" className="lane-toggle" aria-expanded={expanded} aria-label={expanded ? 'Fold' : 'Unfold'} onClick={() => setExpanded(!expanded)}><span className={`chevron ${expanded ? 'open' : ''}`} aria-hidden="true" /></button>
         <div className="lane-title">
           <strong className="goal-text">{g ? g.text : 'Other tasks'}</strong>
           <span className="small muted">{meta}</span>
@@ -258,18 +254,21 @@ function Card({ t, snap, now, selected, flash, onOpen }: { t: Task; snap: Snapsh
       {stage === 'doing' && (
         <span className="working">
           <span className="work-bar" aria-hidden="true"><i /></span>
-          {info?.note && <span className="small muted note">“{info.note}”</span>}
+          {info?.note && <span className="small muted note">{info.note}</span>}
         </span>
       )}
+      <span className="meta-rows">
+        <span className="meta-row"><span className="meta-k">Files</span><span className="meta-v mono files" title={t.files.join(', ')}>{t.files.length === 1 ? t.files[0] : `${t.files.length} files`}</span></span>
+        {who && stage !== 'done' && <span className="meta-row"><span className="meta-k">Worker</span><span className="meta-v"><Avatar name={who.name} size={18} />{who.name}</span></span>}
+      </span>
       <span className="card-foot">
-        <span className="mono small muted files" title={t.files.join(', ')}>{t.files.length === 1 ? t.files[0] : `${t.files.length} files`}</span>
         {t.kind === 'reduce' && <span className="chip">merge</span>}
-        {lock && <span className="chip warn-chip" title={`Waiting for ${lock.path}`}>⏳ file busy</span>}
+        {lock && <span className="chip warn-chip" title={`Waiting for ${lock.path}`}>File busy</span>}
         {t.status === 'failed' && <span className="chip fail-chip">needs you</span>}
-        {t.status === 'open' && t.triedBy.length > 0 && <span className="chip warn-chip" title="A worker gave it back">↩ given back</span>}
+        {t.status === 'open' && t.triedBy.length > 0 && <span className="chip warn-chip" title="A worker gave it back">Given back</span>}
         {stage === 'doing' && info?.since && <span className="small muted">{took(info.since, now)}</span>}
         {stage === 'done' && <span className="small done-line">✓</span>}
-        {who ? <Avatar name={who.name} size={24} /> : t.assignee && stage === 'todo' ? <span className="chip">reserved</span> : null}
+        {who ? (stage === 'done' ? <Avatar name={who.name} size={22} /> : null) : t.assignee && stage === 'todo' ? <span className="chip">reserved</span> : null}
       </span>
     </button>
   );
@@ -302,14 +301,14 @@ function Drawer({ t, snap, now, onClose, api, isOp, say }: { t: Task; snap: Snap
     <aside className="drawer" role="dialog" aria-label={`Task: ${t.title}`}>
       <header>
         <span className={`stage-chip stage-${stage.key} ${t.status === 'failed' ? 'is-failed' : ''}`}>{t.status === 'failed' ? 'Needs you' : stage.title}</span>
-        <button ref={ref} type="button" className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+        <button ref={ref} type="button" className="icon-btn" onClick={onClose} aria-label="Close">×</button>
       </header>
       <h2>{t.title}</h2>
       <p className="muted mono small">{t.id}</p>
       <dl className="facts">
         {t.goalId && <><dt>Goal</dt><dd>{snap.goals.find(g => g.id === t.goalId)?.text ?? t.goalId}</dd></>}
         <dt>Assignee</dt><dd>{who ? <span className="who"><Avatar name={who.name} size={22} /> {who.name} <span className="small muted">{agentLabel(who)}</span></span> : t.assignee ? `Reserved for ${t.assignee}` : 'Nobody yet'}</dd>
-        <dt>Files</dt><dd className="mono small">{t.files.map(f => <div key={f}>{snap.locks.some(l => l.path === f) ? '🔒 ' : ''}{f}</div>)}</dd>
+        <dt>Files</dt><dd className="mono small">{t.files.map(f => <div key={f}>{f}{snap.locks.some(l => l.path === f) ? ' (locked)' : ''}</div>)}</dd>
         {deps.length > 0 && <><dt>After</dt><dd>{deps.map(d => <div key={d.id}>{d.status === 'done' ? '✓' : '○'} {d.title}</div>)}</dd></>}
         <dt>Model</dt><dd>{modelFor(t)} · {t.difficulty} task <span className="small muted">(the timeline shows what ran)</span></dd>
         {t.branch && <><dt>Branch</dt><dd className="mono small">{t.branch}</dd></>}
@@ -379,7 +378,7 @@ export function BoardPage(p: Props) {
         </div>
       ) : (
         <div className="lanes">
-          <div className="lane-cols" aria-hidden="true">{STAGES.map(s => <span key={s.key} title={s.hint}>{s.title}</span>)}</div>
+          <div className="lane-cols" aria-hidden="true">{STAGES.map(s => <span key={s.key} className={`stage-tag stage-${s.key}`} title={s.hint}><i className="tag-dot" />{s.title}</span>)}</div>
           {lanes.map(l => <GoalLane key={l.key} lane={l} p={p} open={open} setOpen={setOpen} flash={flash} />)}
         </div>
       )}

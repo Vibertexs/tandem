@@ -44,6 +44,7 @@ $suites = @(
   @('mcp: lock-check hook', 'mcp', 'npm.cmd run test:hook'),
   @('launcher: routing, limits, simulate', 'launcher', 'npm.cmd run test'),
   @('manager: merge, conflicts, test, finish, notify', 'manager', 'npm.cmd run test'),
+  @('dashboard: the dock', 'dashboard', 'npx.cmd tsx test/dock.test.ts'),
   @('page in Chrome', 'dashboard', 'npx.cmd tsx test/ui.test.ts'),
   @('tandem command: accounts, start, stop', '.', 'node cli/cli.test.ts'),
   @('tandem command: host project sharing and join', '.', 'npx.cmd --prefix brain tsx cli/share.test.ts')

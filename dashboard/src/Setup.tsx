@@ -7,7 +7,7 @@ import { CodeLine, JoinSteps, managerOnline, online, restartForSharingCommand, s
 function Step({ done, title, children }: { done: boolean; title: string; children?: ReactNode }) {
   return (
     <li className={`step ${done ? 'done' : ''}`}>
-      <span className="step-mark" aria-label={done ? 'done' : 'to do'}>{done ? '✓' : '○'}</span>
+      <span className="step-mark" aria-label={done ? 'done' : 'to do'}>{done ? '✓' : ''}</span>
       <div className="step-body">
         <strong>{title}</strong>
         {children}
@@ -46,7 +46,7 @@ export function SetupPage({ snap, team, now, say, go, isOp }: { snap: Snapshot; 
         <Step done={hostReady} title="1. Start the project host">
           <p className="small muted">Paste this whole block in PowerShell or Terminal on the computer that holds the project. It calls Tandem by its known path, so there is no PATH setup to do.</p>
           <CodeLine code={hostCommand} say={say} />
-          <p className="small muted">{manager ? '✓ Manager online.' : '○ Manager not online yet.'} {live.length ? `✓ ${live.length} coding worker${live.length === 1 ? '' : 's'} online.` : '○ No coding workers online yet.'}</p>
+          <p className="small muted">{manager ? 'Manager online.' : 'Manager not online yet.'} {live.length ? `${live.length} coding worker${live.length === 1 ? '' : 's'} online.` : 'No coding workers online yet.'}</p>
         </Step>
 
         <Step done={snap.goals.length > 0} title="2. Send a goal">

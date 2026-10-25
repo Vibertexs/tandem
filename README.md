@@ -86,20 +86,24 @@ The board's **Get started** page repeats these steps with your real folders alre
 > **Page not loading at `localhost:5173`?** Nothing is running. The board only exists after step 2. Run that command again.
 
 ### B. Teammate: add your computer
-You need the invite link from the host (the `Invite` line in their terminal, or **Invite** at the top right of their board). Paste this, with that link:
+You need the invite link from the host (the `Invite` line in their terminal, or **Invite** at the top right of their board).
+
+**First time only: get Tandem.**
+```powershell
+git clone https://github.com/Vibertexs/tandem
+```
+**Join the team (any time, from the folder you cloned into):**
 ```powershell
 # Windows PowerShell
-git clone https://github.com/Vibertexs/tandem
 cd tandem
 .\tandem.cmd join "PASTE-THE-INVITE-LINK-HERE"
 ```
 ```bash
 # macOS / Linux
-git clone https://github.com/Vibertexs/tandem
 cd tandem
 ./tandem join "PASTE-THE-INVITE-LINK-HERE"
 ```
-Keep the quotes around the link. Tandem copies the project from the host (no GitHub needed) into its own work folder and starts your Claude workers. They run under **your** Claude login and quota. Their branches are sent straight back to the host, whose manager merges them. Opening the invite link in a browser also shows the board.
+To update Tandem later, run `git pull` in that folder. Keep the quotes around the link. Tandem copies the project from the host (no GitHub needed) into its own work folder and starts your Claude workers. They run under **your** Claude login and quota. Their branches are sent straight back to the host, whose manager merges them. Opening the invite link in a browser also shows the board.
 
 ### Who controls the team
 - The computer where `tandem start` ran is the **host**.

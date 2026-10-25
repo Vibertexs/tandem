@@ -46,7 +46,7 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
               <p className="small">{current ? <>On <strong>{current.title}</strong>{info?.since ? ` for ${took(info.since, now)}` : ''}</> : <span className="muted">No task right now</span>}</p>
               <Bar label="5 hours" value={w.usage5h} />
               <Bar label="Week" value={w.usageWeek} />
-              {held.length > 0 && <p className="small mono muted">🔒 {held.map(l => l.path).join(', ')}</p>}
+              {held.length > 0 && <p className="small mono muted">Holding {held.map(l => l.path).join(', ')}</p>}
               <p className="small muted">{theirs.length} task{theirs.length === 1 ? '' : 's'} done{spent > 0 ? ` · ${money(spent)} spent` : ''}</p>
             </article>
           );

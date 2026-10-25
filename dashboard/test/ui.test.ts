@@ -78,6 +78,19 @@ try {
   check('control: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
   check('control: it shows one next step: the manager is not connected yet', await seen(A, 'The manager is not connected yet', 3000));
   check('control: the sidebar says this browser controls the team', await seen(A, 'You control this team', 2000));
+  {
+    // the dock: the icon under the pointer grows and pushes its neighbour away, and it shrinks back
+    const link = (i: number) => A.locator('.nav li a').nth(i);
+    const before = (await link(2).boundingBox())!;
+    const nextBefore = (await link(3).boundingBox())!;
+    await A.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+    const grew = await until(async () => { const b = await link(2).boundingBox(); return !!b && b.width > before.width + 8; }, 3000);
+    const nextAfter = (await link(3).boundingBox())!;
+    check('dock: the icon under the pointer grows, and pushes the next icon away', grew && nextAfter.y > nextBefore.y + 4, [before, nextBefore, nextAfter]);
+    await shot(A, '02b-dock-hover');
+    await A.mouse.move(700, 500);
+    check('dock: it shrinks back when the pointer leaves', await until(async () => (await link(2).boundingBox())!.width === before.width, 3000));
+  }
 
   // ---- 4. the manager requests control, and the host page approves it by itself ----
   const manager = await new Promise<DbConnection>((res, rej) => {
@@ -202,7 +215,11 @@ try {
     await manager.reducers.setContext({ sessionId: 'live', key: 'git_url', value: 'http://10.1.2.3:9418/bilal-ux' });
     const withShare = await until(async () => (await L.locator('.connect').innerText()).includes('git clone https://github.com/Vibertexs/tandem'), 4000);
     const lan2 = await L.locator('.connect').innerText();
-    check('team: with a host-shared project, a joiner gets one complete Windows command block', withShare && lan2.includes('Set-Location tandem') && lan2.includes(`.\\tandem.cmd join "${invite}"`) && lan2.includes('private copy of the host project'), lan2.slice(0, 400));
+    const blocks = await L.locator('.connect pre').allInnerTexts();
+    check('team: with a host-shared project, getting Tandem (git clone, first time only) and joining are two separate blocks',
+      withShare && blocks.some(b => b.trim() === 'git clone https://github.com/Vibertexs/tandem') &&
+      blocks.some(b => b.includes('cd tandem') && b.includes(`.\\tandem.cmd join "${invite}"`) && !b.includes('git clone')) &&
+      lan2.includes('first time only') && lan2.includes('private copy of the host project'), [blocks, lan2.slice(0, 300)]);
     await manager.reducers.setContext({ sessionId: 'live', key: 'git_url', value: '' });
     await L.context().close();
   }
@@ -256,7 +273,7 @@ try {
   await manager.reducers.createTask({ sessionId: 'live', kind: 'normal', assignee: 'w-kim', task: { id: 't-hard', title: 'Port it to COBOL', description: '', files: ['calc.cob'], difficulty: 'hard', model: '', effort: 'default', dependsOn: [] } });
   await x1.reducers.claimTask({ sessionId: 'live', workerId: 'w-kim' });
   await x1.reducers.giveBackTask({ sessionId: 'live', workerId: 'w-kim', taskId: 't-hard', reason: 'no COBOL compiler here' });
-  check('give back: the card stays in To do, marked "given back"', await until(async () => (await col(A, 'To do').locator('.task', { hasText: 'Port it to COBOL' }).innerText().catch(() => '')).includes('given back'), 5000));
+  check('give back: the card stays in To do, marked "given back"', await until(async () => (await col(A, 'To do').locator('.task', { hasText: 'Port it to COBOL' }).innerText().catch(() => '')).includes('Given back'), 5000));
   await x2.reducers.claimTask({ sessionId: 'live', workerId: 'w-lee' });
   await x2.reducers.giveBackTask({ sessionId: 'live', workerId: 'w-lee', taskId: 't-hard', reason: 'no COBOL compiler here either' });
   check('failed: after two workers, the next step says the task needs you, with the reason',
@@ -308,7 +325,7 @@ try {
   await P.goto(`${URL_}/?db=${DB}`);
   await until(() => prompt(P).isVisible(), 10_000);
   const bar = await P.locator('.sidebar').boundingBox();
-  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 840 && await P.locator('.nav a').count() === 6, bar);
+  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 820 && await P.locator('.nav a').count() === 6, bar);
   const small = await P.locator('.nav a, .btn').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent && (e as HTMLElement).offsetHeight < 44).length);
   check('phone: tap targets are at least 44px tall', small === 0, small);
   check('phone: no sideways scrolling', await P.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
