@@ -53,6 +53,13 @@ try {
   await A.goto(URL_);
   check('start: with nothing connected, the page explains that starting makes this computer the conductor, and offers an invite',
     await seen(A, 'Start a team for a project') && await seen(A, "Open a teammate's team", 1000) && await A.getByText('tandem --start', { exact: true }).first().isVisible() && await seen(A, 'That makes this computer the conductor', 1000));
+  const starter = A.locator('.project-starter').first();
+  await starter.getByLabel('Tandem folder').fill('C:\\Code\\tandem');
+  await starter.getByLabel('New project folder').fill('C:\\Code\\tandem-test');
+  check('start: the project guide turns the chosen folders into one PowerShell block that creates a Git project and starts Tandem',
+    (await starter.locator('.codeline pre').innerText()).includes("New-Item -ItemType Directory -Force -Path $project") &&
+    (await starter.locator('.codeline pre').innerText()).includes("Set-Location -LiteralPath $project") &&
+    (await starter.locator('.codeline pre').innerText()).includes("& 'C:\\Code\\tandem\\tandem.cmd' --start"));
   await shot(A, '01-start');
   await A.getByLabel('Invite link').fill('not an invite');
   await A.getByRole('button', { name: 'Open team' }).click();
@@ -233,6 +240,10 @@ try {
   check('get started: a local-only team explains that an invite needs a conductor started without --local',
     await steps.nth(1).innerText().then(t => t.includes('Right now only this computer can join') && t.includes('without --local')));
   await shot(A, '06a-setup');
+  const newProject = A.locator('.page > .project-starter');
+  check('team: the new-project guide uses the current project parent, not its exact project folder, and lets the conductor change it',
+    await newProject.getByLabel('New project folder').inputValue() === 'C:\\Code\\tandem-test' &&
+    await newProject.getByLabel('Tandem folder').inputValue() === 'C:\\Code\\tandem');
 
   // ---- 6. team, shared memory, activity ----
   await nav(A, 'Team');
