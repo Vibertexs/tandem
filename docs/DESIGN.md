@@ -46,7 +46,7 @@ System font stack (`Inter` first if installed, then Segoe UI Variable on Windows
 
 ## Components
 - **Dock (navigation).** A white rounded panel floating on the left, vertically centred. Icons only; the name appears as a dark label to the right on hover or keyboard focus. The active page has the accent tint and accent-coloured icon. A badge (accent dot with a count) shows pending requests.
-  - **Pages.** Board, Team (its Get started steps are at the top), Shared memory, Activity and Settings (a gear).
+  - **Pages (nine, in this order).** Overview (the team at a glance), Board, Results (finished goals and their merge button), Files (what is happening to each file), Team (its Get started steps are at the top), Shared memory, Usage (cost and quota), Activity and Settings (a gear). On a phone all nine fit in the bottom bar.
   - **Behaviour.** The dock keeps a fixed width (64px). Icons are 36px. When the mouse comes within about 80px of one it grows smoothly to at most 48px, which is as wide as the dock allows, and its neighbours grow less and push the rest away (like a dock). Clicking opens the page. The growth is computed in `Dock.tsx` (`dockSizes`) from the pointer position.
   - **Phone.** The dock becomes a floating bar at the bottom with fixed 46px targets and no growth. It is skipped for touch.
   - **Reduced motion.** With the operating system's reduced-motion setting on, transitions and the working bar's animation are off.

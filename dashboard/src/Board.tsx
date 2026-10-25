@@ -1,6 +1,7 @@
 // The main page: tell the team what to build, then watch the tasks move across the board.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Api, Goal, Snapshot, Task } from './brain';
+import { ApplyControl } from './Apply';
 import { Avatar, EV_ICON, agentLabel, STAGES, ago, copy, isManager, liveInfo, lockBlocking, managerOnline, modelFor, money, online, stageOf, took, why, type Stage } from './ui';
 
 type Props = { snap: Snapshot; api: Api | null; isOp: boolean; now: number; say: (m: string) => void; present: boolean; go: (page: string) => void };
@@ -188,22 +189,7 @@ function GoalLane({ lane, p, open, setOpen, flash }: { lane: Lane; p: Props; ope
               <button type="button" className="link" onClick={() => copy(`git checkout ${g.branch}`, say, `Copied: git checkout ${g.branch}`)}>copy git checkout</button>
             </span>
           )}
-          {g?.branch && g.status === 'done' && (() => {
-            // "Merge into my project": the manager merges the branch into the branch the project is on
-            const apply = snap.context[`apply_${g.id}`] ?? '';
-            if (apply.startsWith('done:')) return <span className="small goal-note ok-note">{apply.slice(5).trim()}</span>;
-            if (apply === 'requested' || apply === 'working') return <span className="small muted">Merging into your project…</span>;
-            return (
-              <>
-                {apply.startsWith('failed:') && <span className="small goal-note warn">{apply.slice(7).trim()}</span>}
-                {isOp && api && (
-                  <button type="button" className="btn small-btn" disabled={busy}
-                    title="Brings this work into the branch your project is on, so it shows in your folder. Refuses if you have uncommitted changes; never forces anything."
-                    onClick={() => act(() => api.setNote(`apply_${g.id}`, 'requested'), 'Asked the manager to merge it into your project.')}>Merge into my project</button>
-                )}
-              </>
-            );
-          })()}
+          {g?.branch && g.status === 'done' && <ApplyControl g={g} snap={snap} api={api} isOp={isOp} say={say} />}
           {g && isOp && api && g.status === 'failed' && <button type="button" className="btn small-btn" disabled={busy} onClick={() => act(() => api.retryGoal(g.id), 'Sent to the manager again.')}>Try again</button>}
         </div>
       )}

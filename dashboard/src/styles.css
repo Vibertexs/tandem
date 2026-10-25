@@ -335,6 +335,43 @@ ol.log.card { padding: 6px 20px; }
 .db-rows summary { cursor: pointer; color: var(--accent-strong); }
 .db-rows pre { margin-top: 6px; max-height: 220px; overflow: auto; white-space: pre; word-break: normal; font-size: 0.72rem; }
 
+/* ---- Shared memory: how the team shares one memory, and the agents ---- */
+.shared-brain { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+.under-hood { margin-top: 8px; }
+.under-hood > summary { cursor: pointer; color: var(--muted); font-weight: 500; padding: 6px 0; }
+.under-hood > summary:hover { color: var(--ink); }
+.under-hood[open] > summary { margin-bottom: 8px; }
+.agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 12px; }
+.agent-grid.compact { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.agent-card header { display: flex; align-items: center; gap: 10px; }
+.agent-card header > div { flex: 1; min-width: 0; }
+.agent-card.is-offline { opacity: 0.6; }
+.agent-facts { display: grid; grid-template-columns: 84px 1fr; gap: 6px 12px; margin: 12px 0 0; font-size: 0.85rem; }
+.agent-facts dt { color: var(--muted); }
+.agent-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.agent-facts .sans { font-family: var(--sans); }
+.compact .agent-facts { font-size: 0.8rem; }
+.manager-mark { background: var(--ink); color: var(--canvas); }
+
+/* ---- Overview, Results, Files, Usage ---- */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.stat-card { display: flex; flex-direction: column; gap: 2px; }
+.stat-value { font-size: 1.9rem; font-weight: 600; letter-spacing: -0.03em; line-height: 1.2; }
+.page > section > h2, .page > section > .row-actions { margin-bottom: 8px; }
+.result { display: flex; flex-direction: column; gap: 8px; }
+.result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.result-title { font-size: 1rem; }
+.result-facts { grid-template-columns: 72px 1fr; }
+.built-by { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.file-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.file-chip { background: var(--fill); padding: 2px 8px; border-radius: 6px; font-size: 0.78rem; }
+.file-list .row { gap: 14px; }
+.file-task { max-width: 36%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usage-money { font-variant-numeric: tabular-nums; }
+.usage-bar { width: min(180px, 24%); flex: none; }
+.usage-bar .bar { display: block; }
+.usage-bar .bar-fill { display: block; }
+
 .toast { position: fixed; left: 0; right: 0; margin: 0 auto; width: max-content; max-width: min(92vw, 520px); bottom: 28px; background: var(--ink); color: var(--canvas); padding: 11px 18px; border-radius: var(--radius-md); box-shadow: var(--shadow); z-index: 40; font-weight: 500; }
 
 /* ---- present view: the board only, big type ---- */
