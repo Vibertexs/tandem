@@ -48,15 +48,15 @@ await new Promise(r => setTimeout(r, 400));
 const task = [...conn.db.tasks.iter()].find(t => t.sessionId === S && t.id === 't-cx');
 const worker = [...conn.db.workers.iter()].find(w => w.sessionId === S && w.id === 'w-cody');
 check('the launcher exits cleanly', out.code === 0, out.out.slice(-400));
-check('the task is done on its branch, summed up by Codex\'s last message', task?.status === 'done' && task.branch === 'task/t-cx' && task.resultSummary === 'Wrote hello_codex.py', task && [task.status, task.branch, task.resultSummary]);
+check('the task is done on its branch, summed up by Codex\'s last message', task?.status === 'done' && task.branch === 'task/write-hello-codex-py-cx' && task.resultSummary === 'Wrote hello_codex.py', task && [task.status, task.branch, task.resultSummary]);
 let file = '';
-try { file = git('show', 'task/t-cx:hello_codex.py'); } catch { /* missing */ }
+try { file = git('show', 'task/write-hello-codex-py-cx:hello_codex.py'); } catch { /* missing */ }
 check('the branch has the file Codex wrote', file.includes('hello from codex'), file);
 check('the page sees a Codex worker on the "school" login', worker?.agent === 'codex' && worker.account === 'school', worker && [worker.agent, worker.account]);
 const seenFile = readdirSync(join(repo, '.worktrees', '.tandem')).find(f => f.endsWith('.seen.json'));
 const seen = seenFile ? JSON.parse(readFileSync(join(repo, '.worktrees', '.tandem', seenFile), 'utf8')) as { args: string[]; prompt: string; config: string } : null;
 check('codex exec runs in the task\'s worktree, with full auto and the prompt on stdin',
-  !!seen && seen.args[0] === 'exec' && seen.args.includes('--full-auto') && seen.args[seen.args.indexOf('--cd') + 1].endsWith(join('.worktrees', 'write-hello-codex-py-t-cx')) && seen.prompt.includes('task_id: t-cx'), seen?.args);
+  !!seen && seen.args[0] === 'exec' && seen.args.includes('--full-auto') && seen.args[seen.args.indexOf('--cd') + 1].endsWith(join('.worktrees', 'write-hello-codex-py-cx')) && seen.prompt.includes('task_id: t-cx'), seen?.args);
 check('its config has the tandem MCP server for this worker, and keeps the user\'s own setting',
   !!seen && seen.config.includes('[mcp_servers.tandem]') && seen.config.includes('TANDEM_WORKER_ID = "w-cody"') && seen.config.includes('model = "gpt-5-codex"'), seen?.config);
 

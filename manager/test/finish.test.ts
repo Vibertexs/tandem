@@ -46,7 +46,7 @@ function repoWith(testExpect: number) {
   const repo = repoWith(5);
   const { brain, calls } = fakeBrain();
   const out = await finishGoal(brain, repo, goal, [task('a', 'task/a', ['calc.py']), task('b', 'task/b', ['test_calc.py'])]);
-  check('tests pass: the goal is done on tandem/g1, and the note says the tests pass', out === 'done' && calls.finish?.branch === 'tandem/g1' && /Tests pass/.test(calls.finish.note), calls);
+  check('tests pass: the goal is done on tandem/build-calculator, and the note says the tests pass', out === 'done' && calls.finish?.branch === 'tandem/build-calculator' && /Tests pass/.test(calls.finish.note), calls);
 }
 {
   const repo = repoWith(6); // wrong expectation: the merged tests fail
@@ -68,8 +68,8 @@ function repoWith(testExpect: number) {
   execFileSync('git', ['remote', 'add', 'origin', bare], { cwd: repo, stdio: 'pipe' });
   const { brain, calls } = fakeBrain();
   const out = await finishGoal(brain, repo, goal, [task('a', 'task/a', ['calc.py']), task('b', 'task/b', ['test_calc.py'])], { push: true });
-  const onOrigin = execFileSync('git', ['--git-dir', bare, 'branch', '--list', 'tandem/g1'], { encoding: 'utf8' }).trim();
-  check('with push: the goal branch is on origin and the note says "Pushed to origin"', out === 'done' && onOrigin.includes('tandem/g1') && /Pushed to origin/.test(calls.finish?.note ?? ''), calls.finish);
+  const onOrigin = execFileSync('git', ['--git-dir', bare, 'branch', '--list', 'tandem/build-calculator'], { encoding: 'utf8' }).trim();
+  check('with push: the goal branch is on origin and the note says "Pushed to origin"', out === 'done' && onOrigin.includes('tandem/build-calculator') && /Pushed to origin/.test(calls.finish?.note ?? ''), calls.finish);
 }
 {
   // with review on: one review task before the goal is done, then its findings are in the note
@@ -106,7 +106,7 @@ function repoWith(testExpect: number) {
 
   // what the launcher does for that task: start the merge on top of the goal branch, let Claude edit, commit
   const tree = join(repo, '.worktrees', 'c');
-  git(repo, 'worktree', 'add', '-q', '-b', 'task/c', tree, 'tandem/g1');
+  git(repo, 'worktree', 'add', '-q', '-b', 'task/c', tree, 'tandem/build-calculator');
   const conflicted = startConflictMerge(tree, 'task/b');
   check('launcher: the merge is started and the conflicted file has markers', conflicted.join() === 'calc.py' && mergeInProgress(tree) && filesWithMarkers(tree, conflicted).join() === 'calc.py', conflicted);
   writeFileSync(join(tree, 'calc.py'), 'GREETING = "hello"\nNAME = "b"\n'); // "Claude" keeps both sides
@@ -116,7 +116,7 @@ function repoWith(testExpect: number) {
 
   const second = fakeBrain();
   const out2 = await finishGoal(second.brain, repo, goal, [...tasks, task('c', 'task/c', ['calc.py'], conflictTitle('task/b'))]);
-  const merged = git(repo, 'show', 'tandem/g1:calc.py');
+  const merged = git(repo, 'show', 'tandem/build-calculator:calc.py');
   check('conflict resolved: the goal is done, every branch merged, with both changes', out2 === 'done' && second.calls.tasks.length === 0 &&
     !/Could not merge/.test(second.calls.finish?.note ?? '') && merged === 'GREETING = "hello"\nNAME = "b"\n', { calls: second.calls, merged });
   const third = fakeBrain();

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ignoreWorktrees, mergeGoal, mergeNote, pushIfRemote, startFromBranches, worktreesDir } from '../merge.js';
+import { goalBranch, ignoreWorktrees, knownGoalBranch, mergeGoal, mergeNote, nameWords, pushIfRemote, startFromBranches, worktreesDir } from '../merge.js';
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail: unknown = '') => {
@@ -34,10 +34,10 @@ const r = mergeGoal(repo, 'g1', 'Build the calculator', ['task/a', 'task/b', 'ta
 check('clean branches are merged, in order', r.merged.join() === 'task/a,task/b,task/c', r);
 check('a conflicting branch is skipped and reported, not forced', r.failed.join() === 'task/d', r);
 check('a branch that does not exist is reported as missing', r.missing.join() === 'task/gone', r);
-check('the result is one branch named tandem/<goal>', r.target === 'tandem/g1' && git('rev-parse', '--verify', '--quiet', 'refs/heads/tandem/g1').length > 0);
-const files = git('ls-tree', '--name-only', 'tandem/g1').split('\n');
+check('the result is one branch named tandem/<goal>', r.target === 'tandem/build-calculator' && git('rev-parse', '--verify', '--quiet', 'refs/heads/tandem/build-calculator').length > 0);
+const files = git('ls-tree', '--name-only', 'tandem/build-calculator').split('\n');
 check('the goal branch has the work from every merged task', ['calc.py', 'test_calc.py', 'README.md'].every(f => files.includes(f)), files);
-check('the goal branch has task/c\'s README, untouched by the failed merge', git('show', 'tandem/g1:README.md') === 'from c');
+check('the goal branch has task/c\'s README, untouched by the failed merge', git('show', 'tandem/build-calculator:README.md') === 'from c');
 check('main is untouched', git('rev-parse', 'main') === mainBefore && !git('ls-tree', '--name-only', 'main').split('\n').includes('calc.py'));
 check('your uncommitted work in the repo is untouched', readFileSync(join(repo, 'notes.txt'), 'utf8') === 'my open work\n' && git('branch', '--show-current') === 'main');
 check('the temporary worktree is cleaned up', !existsSync(join(repo, '.worktrees', 'merge-g1')));
@@ -47,15 +47,15 @@ check('the note tells you what to do', /task\/d/.test(mergeNote(r)) && /by hand/
 mkdirSync(join(repo, 'docs'), { recursive: true });
 branch('task/e', 'docs/usage.md', 'how to\n');
 const again = mergeGoal(repo, 'g1', 'Build the calculator', ['task/e']);
-check('merging again adds to the existing goal branch', again.merged.join() === 'task/e' && git('ls-tree', '-r', '--name-only', 'tandem/g1').includes('docs/usage.md'));
+check('merging again adds to the existing goal branch', again.merged.join() === 'task/e' && git('ls-tree', '-r', '--name-only', 'tandem/build-calculator').includes('docs/usage.md'));
 
 // pushing: nothing happens without a remote; with one, the branch arrives there
-check('push: with no origin remote, nothing is pushed', pushIfRemote(repo, 'tandem/g1') === 'no-remote');
+check('push: with no origin remote, nothing is pushed', pushIfRemote(repo, 'tandem/build-calculator') === 'no-remote');
 const bare = mkdtempSync(join(tmpdir(), 'tandem-origin-'));
 execFileSync('git', ['init', '-q', '--bare', bare], { stdio: 'pipe' });
 git('remote', 'add', 'origin', bare);
-check('push: with an origin remote, the goal branch is pushed', pushIfRemote(repo, 'tandem/g1') === 'pushed' &&
-  execFileSync('git', ['--git-dir', bare, 'rev-parse', '--verify', '--quiet', 'refs/heads/tandem/g1'], { encoding: 'utf8' }).trim() === git('rev-parse', 'tandem/g1'));
+check('push: with an origin remote, the goal branch is pushed', pushIfRemote(repo, 'tandem/build-calculator') === 'pushed' &&
+  execFileSync('git', ['--git-dir', bare, 'rev-parse', '--verify', '--quiet', 'refs/heads/tandem/build-calculator'], { encoding: 'utf8' }).trim() === git('rev-parse', 'tandem/build-calculator'));
 check('push: a branch that does not exist fails without throwing', pushIfRemote(repo, 'nope/branch') === 'failed');
 
 // a task that depends on task/a and task/b starts with both of their work in its worktree
@@ -78,6 +78,29 @@ check('push: a branch that does not exist fails without throwing', pushIfRemote(
   const exclude = readFileSync(join(own, '.git', 'info', 'exclude'), 'utf8');
   check('your repo: .worktrees/ is ignored locally (git status stays clean), once, with nothing committed',
     g('status', '--porcelain') === '' && (exclude.match(/^\.worktrees\/$/gm) ?? []).length === 1 && !existsSync(join(own, '.gitignore')), [g('status', '--porcelain'), exclude]);
+}
+
+// readable names
+check('nameWords: a sentence becomes a few readable words, cut at a word, not mid-word',
+  nameWords('Add multiply(a, b) and divide(a, b) to calc.py (divide raises ValueError on zero)') === 'add-multiply-divide-calc-py' &&
+  nameWords('Update README for multiply, divide and the CLI') === 'update-readme-multiply-divide' &&
+  nameWords('Create a tiny Python calculator: calc.py with add(a, b) and sub(a, b)', 5, 36) === 'create-tiny-python-calculator-calc' &&
+  nameWords('???') === '' && nameWords('a b c') === '' && nameWords('x'.repeat(50) + ' ok', 5, 32) === '', nameWords('Add multiply(a, b) and divide(a, b) to calc.py'));
+{
+  const own = mkdtempSync(join(tmpdir(), 'tandem-names-'));
+  const g = (...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@x', ...a], { cwd: own, encoding: 'utf8', stdio: 'pipe' }).trim();
+  g('init', '-q', '-b', 'main'); writeFileSync(join(own, 'app.py'), 'x = 1\n'); g('add', '-A'); g('commit', '-q', '-m', 'start');
+  const one = goalBranch(own, 'g-aaa111', 'Add a login page with tests');
+  check('goalBranch: named after what was asked, not after the id', one === 'tandem/add-login-page-tests', one);
+  check('goalBranch: the same goal always gets the same branch', goalBranch(own, 'g-aaa111', 'Add a login page with tests') === one);
+  const two = goalBranch(own, 'g-bbb222', 'Add a login page with tests');
+  check('goalBranch: a second goal with the same words gets -2, never the first one\'s branch', two === `${one}-2`, two);
+  g('checkout', '-q', '-b', 'task/x-1'); writeFileSync(join(own, 'login.py'), 'ok = 1\n'); g('add', '-A'); g('commit', '-q', '-m', 'Write the login page'); g('checkout', '-q', 'main');
+  const r2 = mergeGoal(own, 'g-aaa111', 'Add a login page with tests', ['task/x-1']);
+  check('mergeGoal: merges on the readable branch, and the merge message uses the work\'s title (no ids, no branch names)',
+    r2.target === one && g('log', '-1', '--format=%s', one) === 'Merge: Write the login page', [r2.target, g('log', '-1', '--format=%s', one)]);
+  check('knownGoalBranch: finds it later (for a follow-up task), and knows nothing about a goal with no branch',
+    knownGoalBranch(own, 'g-aaa111') === one && knownGoalBranch(own, 'g-nope') === null);
 }
 
 // with TANDEM_WORKTREES (what `tandem start` sets), the task folders live outside the project

@@ -22,7 +22,7 @@ import { parseArgs } from 'node:util';
 import { BrainClient, type Task } from '../mcp/src/brain-client.js';
 import { loadRouting, route } from './routing.js';
 import { isRateLimit, resetTime } from './limits.js';
-import { filesWithMarkers, ignoreWorktrees, mergeInProgress, pushIfRemote, startConflictMerge, startFromBranches, worktreesDir } from '../manager/merge.js';
+import { filesWithMarkers, ignoreWorktrees, mergeInProgress, pushIfRemote, startConflictMerge, startFromBranches, worktreesDir, knownGoalBranch, nameWords } from '../manager/merge.js';
 import { REVIEW_TITLE, conflictBranch } from '../manager/finish.js';
 import { spawnClaude } from '../manager/claude.js';
 
@@ -191,18 +191,18 @@ function runCodex(cwd: string, prompt: string, readOnly: boolean) {
 
 async function realRun(t: Task) {
   const repo = resolve(opt.repo!);
-  // the folder says what the task is: write-calc-py-t-bu3yoo (the branch stays task/<id>)
-  const words = t.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
+  // The folder and the branch say what the task is: write-the-cli-ljzdhx, task/write-the-cli-ljzdhx.
+  // The short id at the end keeps the name unique across computers (branches are pushed to the host).
+  const name = `${nameWords(t.title) || 'task'}-${t.id.replace(/^t-/, '')}`;
   const trees = worktreesDir(repo);
-  const tree = join(trees, words ? `${words}-${t.id}` : t.id);
-  const branch = `task/${t.id}`;
+  const tree = join(trees, name);
+  const branch = `task/${name}`;
   let startedFrom: string[] = [];
   if (!existsSync(tree)) {
     ignoreWorktrees(repo);
     mkdirSync(trees, { recursive: true });
     // A task added to a goal after its work was merged (like a test fix) starts from the goal branch.
-    let base = 'HEAD';
-    if (t.goal_id) { try { git(repo, 'rev-parse', '--verify', '--quiet', `refs/heads/tandem/${t.goal_id}`); base = `tandem/${t.goal_id}`; } catch { /* no goal branch yet */ } }
+    const base = (t.goal_id && knownGoalBranch(repo, t.goal_id)) || 'HEAD';
     git(repo, 'worktree', 'add', '-q', '-b', branch, tree, base);
     // A task that waited for others starts with their work in it.
     const deps = t.depends_on.map(d => brain.getStatus().tasks.find(x => x.id === d)?.branch ?? '').filter(b => b.startsWith('task/'));
@@ -258,7 +258,7 @@ async function realRun(t: Task) {
       // (for a conflict task this commit also concludes the merge)
       git(tree, 'add', '-A');
       const dirty = git(tree, 'status', '--porcelain');
-      if (dirty) git(tree, '-c', 'user.name=tandem', '-c', 'user.email=tandem@localhost', 'commit', '-q', '-m', `${t.title} (${t.id})`);
+      if (dirty) git(tree, '-c', 'user.name=tandem', '-c', 'user.email=tandem@localhost', 'commit', '-q', '-m', t.title);
       // With --push the branch reaches the host's manager even from another computer.
       if (opt.push) {
         const pushed = pushIfRemote(tree, branch);

@@ -77,7 +77,7 @@ try {
   check('the manager marks the goal done', await goalLane.locator('.lane-head').getByText('✓ Done').waitFor({ timeout: 30_000 }).then(() => true, () => false));
   if (REAL) {
     const branch = (await goalLane.locator('.branch code').innerText().catch(() => '')).trim();
-    check('the goal shows the branch with all of its work', /^tandem\/g-/.test(branch), branch);
+    check('the goal shows the branch with all of its work', /^tandem\/[a-z0-9-]+$/.test(branch) && !/\/g-/.test(branch), branch);
     let files: string[] = [];
     try { files = execSync(`git -C ${REPO} ls-tree -r --name-only ${branch}`, { encoding: 'utf8' }).trim().split('\n'); } catch { /* no branch */ }
     check('that branch really has the calculator, its tests and the README', ['calc.py', 'test_calc.py', 'README.md'].every(f => files.includes(f)), files);

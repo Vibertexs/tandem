@@ -65,16 +65,16 @@ await new Promise(r => setTimeout(r, 500));
 
 const t = [...conn.db.tasks.iter()].find(x => x.sessionId === S && x.id === 't-fix');
 check('the launcher exits cleanly', result.code === 0, result.out.slice(-300));
-check('the conflict task is done, on branch task/t-fix', t?.status === 'done' && t.branch === 'task/t-fix', t && `${t.status} ${t.branch} ${t.resultSummary}`);
+check('the conflict task is done, on branch task/resolve-merge-conflict-task-fix', t?.status === 'done' && t.branch === 'task/resolve-merge-conflict-task-fix', t && `${t.status} ${t.branch} ${t.resultSummary}`);
 let file = '';
-try { file = git('show', 'task/t-fix:calc.py'); } catch { /* missing */ }
+try { file = git('show', 'task/resolve-merge-conflict-task-fix:calc.py'); } catch { /* missing */ }
 check('calc.py has both functions and no conflict markers', /def mul/.test(file) && /def div/.test(file) && !/^(<{7}|={7}|>{7})/m.test(file), file);
 let ancestor = false;
-try { git('merge-base', '--is-ancestor', 'task/b', 'task/t-fix'); ancestor = true; } catch { /* not merged */ }
+try { git('merge-base', '--is-ancestor', 'task/b', 'task/resolve-merge-conflict-task-fix'); ancestor = true; } catch { /* not merged */ }
 check('the fix branch really merged task/b (so the goal can merge cleanly now)', ancestor);
 let runs = '';
 try {
-  git('worktree', 'add', '-q', '--detach', `${REPO}/.worktrees/check`, 'task/t-fix'); // the launcher's worktree still has the branch
+  git('worktree', 'add', '-q', '--detach', `${REPO}/.worktrees/check`, 'task/resolve-merge-conflict-task-fix'); // the launcher's worktree still has the branch
   runs = execFileSync('python', ['-I', '-c', 'import sys; sys.path.insert(0, "."); import calc; print(calc.mul(2, 3), calc.div(6, 3))'], { cwd: `${REPO}/.worktrees/check`, encoding: 'utf8', stdio: 'pipe' }).trim();
 } catch (e) { runs = String(e); } finally { try { git('worktree', 'remove', '--force', `${REPO}/.worktrees/check`); } catch { /* gone */ } }
 check('the merged calc.py runs: mul(2, 3) and div(6, 3)', runs === '6 2.0', runs);

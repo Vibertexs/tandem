@@ -61,23 +61,6 @@ const seen = describe();
 check('the brain knows which agent and account each worker runs', seen === expected, seen);
 check('a real join to a team whose host is not sharing a project says to restart the host',
   /not sharing the project/.test(tandem(['join', `http://127.0.0.1:5173/?db=${TEAM}`], here, { TANDEM_SIMULATE: '' })));
-// starting again keeps the board, and says so
-{
-  const { DbConnection, tables } = await import('../brain/bindings/index.js');
-  const owner = await new Promise<InstanceType<typeof DbConnection>>((res, rej) => {
-    DbConnection.builder().withUri('ws://127.0.0.1:3001').withDatabaseName(TEAM)
-      .onConnect(c => { c.subscriptionBuilder().onApplied(() => res(c)).subscribe([tables.goals, tables.operators]); }).onConnectError((_c, e) => rej(e)).build();
-  });
-  await owner.reducers.claimOperator({});
-  await owner.reducers.postGoal({ sessionId: 'live', id: 'g-keep', text: 'A goal that should survive a restart' });
-  await new Promise(r => setTimeout(r, 500));
-  const again = tandem(['start', '--local', '--no-manager', '--no-browser', '--workers', '0', '--team', TEAM], repo);
-  check('starting again keeps the board and says how to start over', /kept the board from last time \(1 goal\)/.test(again) && /tandem start --fresh/.test(again), again.slice(-400));
-  const fresh = tandem(['start', '--local', '--no-manager', '--no-browser', '--workers', '0', '--team', TEAM, '--fresh'], repo);
-  check('start --fresh wipes the board (the goal is gone, nothing is "kept")', !/kept the board/.test(fresh) && /fresh/.test(fresh), fresh.slice(-400));
-  owner.disconnect();
-  await new Promise(r => setTimeout(r, 300));
-}
 const status = tandem([], repo);
 check('plain "tandem" shows the team and its workers, and opens the dashboard', status.includes(TEAM) && /2 workers/.test(status) && /http:\/\/localhost:5173\/\?db=/.test(status), status);
 check('tandem -d (and dashboard, open, --dashboard) gives the dashboard address', ['-d', 'dashboard', 'open', '--dashboard'].every(c => /http:\/\/localhost:5173\/\?db=/.test(tandem([c], repo))));

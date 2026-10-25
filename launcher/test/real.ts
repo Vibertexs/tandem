@@ -50,9 +50,9 @@ await new Promise(r => setTimeout(r, 500));
 
 const t = [...conn.db.tasks.iter()].find(x => x.sessionId === S && x.id === 't-hello');
 check('the launcher exits cleanly', result.code === 0, result.out.slice(-300));
-check('the task is done, on branch task/t-hello', t?.status === 'done' && t.branch === 'task/t-hello', t && `${t.status} ${t.branch}`);
+check('the task is done, on branch task/write-hello-py-hello', t?.status === 'done' && t.branch === 'task/write-hello-py-hello', t && `${t.status} ${t.branch}`);
 let file = '';
-try { file = git('show', 'task/t-hello:hello.py'); } catch { /* missing */ }
+try { file = git('show', 'task/write-hello-py-hello:hello.py'); } catch { /* missing */ }
 check('the branch has a commit with hello.py', /hello from tandem/.test(file), file);
 check('main is untouched (the work stayed on the task branch)', !git('ls-tree', '--name-only', 'HEAD').split('\n').includes('hello.py'));
 check('the real cost of the run is recorded on the task', (t?.costUsd ?? 0) > 0, t?.costUsd);
