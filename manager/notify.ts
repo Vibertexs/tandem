@@ -7,7 +7,7 @@ export function goalDoneMessage(goal: Goal, tasks: Task[], branch: string, note:
   const workers = [...new Set(tasks.map(t => t.assignee).filter(Boolean))].length;
   return [
     `✓ Goal done: ${goal.text}`,
-    `${tasks.length} task${tasks.length === 1 ? '' : 's'} by ${workers} worker${workers === 1 ? '' : 's'}${cost > 0 ? `, $${cost.toFixed(2)} of Claude usage` : ''}.`,
+    `${tasks.length} task${tasks.length === 1 ? '' : 's'} by ${workers} worker${workers === 1 ? '' : 's'}${cost > 0 ? `, ~$${cost.toFixed(2)} of Claude usage (estimated at API prices)` : ''}.`,
     branch ? `All of its work is on ${branch}.` : '',
     note,
   ].filter(Boolean).join('\n');

@@ -154,9 +154,9 @@ const reserved = st.data.tasks.find((t: { id: string }) => t.id === as.data?.tas
 check('assign_task: creates an open task reserved for the assignee', reserved?.status === 'open' && reserved.assignee === 'w-bob' && reserved.model === '', reserved);
 
 // ---- goals ----
-await seed.reducers.postGoal({ sessionId: S, id: 'g-old', text: 'First goal' });
+await seed.reducers.postGoal({ sessionId: S, id: 'g-old', text: 'First goal', effort: 'medium' });
 await sleep(50);
-await seed.reducers.postGoal({ sessionId: S, id: 'g-new', text: 'Second goal' });
+await seed.reducers.postGoal({ sessionId: S, id: 'g-new', text: 'Second goal', effort: 'medium' });
 await sleep(400);
 const gg = await C.call('get_goals');
 check('get_goals: returns the waiting goals, oldest first', gg.data?.goals?.map((g: { id: string }) => g.id).join() === 'g-old,g-new' && gg.data.goals[0].text === 'First goal', gg.text);

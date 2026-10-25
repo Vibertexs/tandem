@@ -1,6 +1,6 @@
 // THE PRODUCT, END TO END, the way a person uses it:
-//   in the project: tandem start  ->  open the page (it takes control by itself)
-//   ->  type a goal  ->  the manager plans it (1 real haiku run)  ->  simulated workers do it
+//   in the project: tandem --start  ->  open the page (it takes control by itself: you are the conductor)
+//   ->  type a goal at Low effort  ->  the conductor plans it (1 real haiku run)  ->  simulated workers do it
 //   ->  the board shows every task done  ->  tandem stop
 // Needs: Chrome, claude on PATH. Uses a fresh team (bilal-start) and a throwaway repo.
 // FLOW_REAL=1: real workers instead of simulated ones (each task is a haiku run, about 4 runs in
@@ -55,16 +55,18 @@ check('tandem start, run in the project, finishes and says it is running for tha
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
 try {
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 960 } })).newPage();
-  // the page `tandem start` opens (host=1): control and the manager's approval happen by themselves
+  // the page `tandem --start` opens (host=1): control and the conductor Claude's approval happen by themselves
   await page.goto(`${URL_}&host=1`);
-  check('the host page takes control by itself: the prompt is on, no question asked', await page.getByLabel('Describe what you want built').waitFor({ timeout: 15_000 }).then(() => true, () => false) && await page.getByText('Watch only').count() === 0);
-  check('the manager is approved without a click and online', await seen(page, 'Manager online', 40_000));
+  check('the conductor page takes control by itself: the prompt is on, no question asked', await page.getByLabel('Describe what you want built').waitFor({ timeout: 15_000 }).then(() => true, () => false) && await page.getByText('Watch only').count() === 0);
+  check("the conductor's Claude is approved without a click and online", await seen(page, 'Conductor online', 40_000));
   check('the workers are online (no "No workers" step)', await page.getByText('No workers are online.').waitFor({ state: 'hidden', timeout: 15_000 }).then(() => true, () => false));
   await page.getByLabel('Describe what you want built').fill('Create a tiny Python calculator: calc.py with add(a, b) and sub(a, b), test_calc.py with unittest tests, and a README.md.');
+  // Low effort: haiku plans it, so the one real run stays cheap
+  await page.getByRole('radio', { name: 'Low' }).click();
   await page.getByRole('button', { name: /^Send/ }).click();
   const goalLane = page.locator('.goal-lane').first();
-  check('the goal is sent and gets its lane, waiting for the manager', await seen(page, /Waiting for the manager|Being planned/, 5000));
-  check('the manager plans it within 3 minutes', await goalLane.locator('.lane-head').getByText(/Planned|Done/).waitFor({ timeout: 180_000 }).then(() => true, () => false));
+  check('the goal is sent at Low effort and gets its lane, waiting for the conductor', await seen(page, /Waiting for the conductor|Being planned/, 5000) && await seen(page, 'Low effort', 2000));
+  check('the conductor plans it within 3 minutes', await goalLane.locator('.lane-head').getByText(/Planned|Done/).waitFor({ timeout: 180_000 }).then(() => true, () => false));
   const total = await page.locator('.summary-top strong').innerText().catch(() => '');
   check('the plan has at least 2 tasks', Number(total.match(/of (\d+)/)?.[1] ?? 0) >= 2, total);
   if (SHOTS) await page.screenshot({ path: join(SHOTS, 'flow-planned.png') });
@@ -74,7 +76,7 @@ try {
     return !!m && m[1] === m[2];
   }, undefined, { timeout: REAL ? 600_000 : 180_000 }).then(() => true, () => false);
   check(`the ${REAL ? 'real' : 'simulated'} workers finish every task`, allDone, await page.locator('.summary-top strong').innerText().catch(() => ''));
-  check('the manager marks the goal done', await goalLane.locator('.lane-head').getByText('Done', { exact: true }).waitFor({ timeout: 30_000 }).then(() => true, () => false));
+  check('the conductor marks the goal done', await goalLane.locator('.lane-head').getByText('Done', { exact: true }).waitFor({ timeout: 30_000 }).then(() => true, () => false));
   if (REAL) {
     const branch = (await goalLane.locator('.branch code').innerText().catch(() => '')).trim();
     check('the goal shows the branch with all of its work', /^tandem\/[a-z0-9-]+$/.test(branch) && !/\/g-/.test(branch), branch);
@@ -89,14 +91,14 @@ try {
     finally { try { execSync(`git -C ${REPO} worktree remove --force ${REPO}\\.worktrees\\verify`, { stdio: 'pipe' }); } catch { /* gone */ } }
     check("the workers' tests pass on the goal branch", ok, out.slice(-300));
     const card = await goalLane.innerText().catch(() => '');
-    check("the goal's lane says the tests passed and what it cost", /Tests pass/.test(card) && /\$\d+\.\d+ of Claude usage/.test(card), card);
+    check("the goal's lane says the tests passed and what it used", /Tests pass/.test(card) && /~\$\d+\.\d+/.test(card), card);
     if (REVIEW) check("with --review, a worker reviewed the branch and its findings are on the goal's lane", /Review the goal's work/.test(card) && /Review: \S/.test(card), card);
   }
   check('the board shows the goal at 100%', await goalLane.innerText().then(t => /(\d+)\/\1/.test(t)).catch(() => false));
   if (SHOTS) await page.screenshot({ path: join(SHOTS, 'flow-done.png'), fullPage: true });
   await page.locator('.nav a', { hasText: 'Shared memory' }).click();
   const interfaces = await page.getByLabel('Interfaces').inputValue().catch(() => '');
-  console.log(`  (the manager wrote to Interfaces: ${interfaces ? JSON.stringify(interfaces.slice(0, 100)) : 'nothing'})`);
+  console.log(`  (the conductor wrote to Interfaces: ${interfaces ? JSON.stringify(interfaces.slice(0, 100)) : 'nothing'})`);
   await page.locator('.nav a', { hasText: 'Team' }).click();
   check('the Team page shows the two workers', await page.locator('.worker').nth(1).waitFor({ timeout: 5000 }).then(async () => await page.locator('.worker').count() === 2, () => false));
 } finally {
@@ -105,8 +107,8 @@ try {
   console.log(stopped.trim());
   await new Promise(r => setTimeout(r, 1500));
   const left = execSync('powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \\"Name=\'node.exe\'\\" | Where-Object { $_.CommandLine -match \'watch.ts|launcher.ts\' -and $_.CommandLine.Contains(\'' + REPO.replace(/\\/g, '\\\\') + '\') } | Measure-Object).Count"', { encoding: 'utf8' }).trim();
-  check('tandem stop stops the manager and both workers, and none are left running',
-    /stopped manager/.test(stopped) && (stopped.match(/stopped worker/g) ?? []).length === 2 && left === '0', { stopped, left });
+  check('tandem stop stops the conductor and both workers, and none are left running',
+    /stopped conductor/.test(stopped) && (stopped.match(/stopped worker/g) ?? []).length === 2 && left === '0', { stopped, left });
 }
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

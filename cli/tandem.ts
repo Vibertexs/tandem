@@ -2,7 +2,7 @@
 // tandem: run Tandem from the project you want built. Node 22.18+ runs this TypeScript file as is.
 //
 //   tandem start              in your project's folder: host a team for it, print the invite address
-//   tandem join <address>     copy the host's project and add this computer's workers to the team
+//   tandem join <address>     copy the conductor's project and add this computer's workers to the team
 //   tandem stop [--all]       stop what this computer started (--all also stops the brain)
 //   tandem status | open | logs
 //
@@ -10,6 +10,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdirSync, openSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { connect } from 'node:net';
 import { hostname, networkInterfaces } from 'node:os';
 import { basename, delimiter, dirname, join, resolve } from 'node:path';
@@ -34,7 +35,8 @@ const HELP = `tandem: your team's Claude Codes, working as one.
   Quick: "tandem --start" in your project, then "tandem" any time to open the dashboard.
   Every command works as a word or a flag: tandem start = tandem --start, tandem stop = tandem --stop.
 
-  tandem start              Start a team for the git repo you are in. Prints the invite address.
+  tandem start              Start a team for the git repo you are in. You are its conductor: you send
+                            the goals, and your computer plans them and merges the work. Prints the invite.
     --workers N             workers on this computer (default 1, one Claude per person; 0 = none)
     --local                 only this computer can join (default: your network can)
     --team NAME             the team's name (default: this folder's name)
@@ -42,15 +44,17 @@ const HELP = `tandem: your team's Claude Codes, working as one.
                             Your project and its branches are not touched. Joined teammates run join again.
     --push                  push task and goal branches to origin (a PR per goal with the GitHub CLI)
     --review                a worker reviews each goal before it is done
-    --model NAME            force one model for every task (default: auto = by task difficulty:
-                            easy haiku, normal sonnet, hard opus)
+    --model NAME            force one model for every task. Default: each goal's effort (picked on the
+                            page: low, medium, high) and each task's difficulty choose it
+    --conductor-model NAME  force the model the conductor plans with (default: by the goal's effort,
+                            low haiku, medium sonnet, high opus)
     --notify URL            post "goal done" to a Slack or Discord webhook
     --accounts all|a,b      one worker per saved account (see tandem account), instead of --workers
-    --manager-account A     the Claude account the manager plans with
+    --conductor-account A   the Claude account the conductor plans with
     --no-browser            do not open the page
 
-  tandem join <address>     Copy the host's project and add this computer's workers.
-                            <address> is the invite the host's page shows, like http://192.168.1.20:5173/?db=shop
+  tandem join <address>     Join as a teammate: copy the conductor's project and add this computer's workers.
+                            <address> is the invite the conductor's page shows, like http://192.168.1.20:5173/?db=shop
     --workers N, --accounts as above; --repo <path> uses your own clone instead
 
   tandem account add <label> [--agent codex]   A login for workers (opens that CLI to sign in).
@@ -68,7 +72,7 @@ const HELP = `tandem: your team's Claude Codes, working as one.
   tandem                    On its own: opens the dashboard. It shows what is running, or how to get started.
   tandem -d                 Open the dashboard (also: tandem dashboard, tandem open, tandem --dashboard).
   tandem status             What is running, with each team's links.
-  tandem logs [part]        The latest log lines: all, or one part (manager, alex, brain, page).
+  tandem logs [part]        The latest log lines: all, or one part (conductor, a worker's name, brain, page).
   tandem --version          Which version this is.
   tandem --help             This list (also: tandem help, tandem -h).
 `;
@@ -276,7 +280,7 @@ async function accountCmd(argv: string[]) {
   } else fail('tandem account add <label> [--agent codex] | tandem account list | tandem account remove <label>');
 }
 
-const modelNote = (model: string) => model === 'auto' ? 'model by task difficulty' : `${model} for every task`;
+const modelNote = (model: string) => model === 'auto' ? 'models by each goal\'s effort' : `${model} for every task`;
 type WorkerOpts = { simulate: boolean; push: boolean; model: string; budget: string; simLimit?: number; accounts?: Account[] };
 // Starts the workers that are not running yet: `count` on the default login, or one per account.
 // Workers are named after the computer they run on ("bilal-pc", "bilal-pc-2"), or after the computer
@@ -324,15 +328,20 @@ async function start(argv: string[]) {
     workers: { type: 'string', default: '1' },
     local: { type: 'boolean', default: false }, team: { type: 'string' }, fresh: { type: 'boolean', default: false },
     push: { type: 'boolean', default: false }, review: { type: 'boolean', default: false },
-    model: { type: 'string', default: 'auto' }, 'manager-model': { type: 'string', default: 'haiku' },
+    model: { type: 'string', default: 'auto' }, 'conductor-model': { type: 'string', default: 'auto' },
     budget: { type: 'string', default: '0.50' }, notify: { type: 'string' },
-    'no-browser': { type: 'boolean', default: false }, 'no-manager': { type: 'boolean', default: false },
-    accounts: { type: 'string' }, 'manager-account': { type: 'string' },
+    'no-browser': { type: 'boolean', default: false }, 'no-conductor': { type: 'boolean', default: false },
+    accounts: { type: 'string' }, 'conductor-account': { type: 'string' },
+    // the names from before "manager" became "conductor" still work
+    'manager-model': { type: 'string' }, 'no-manager': { type: 'boolean', default: false }, 'manager-account': { type: 'string' },
   } });
   const accts = pickAccounts(o.accounts);
   const workers = accts.length || Number(o.workers);
-  const mgrAcct = o['manager-account'] ? pickAccounts(o['manager-account'])[0] : undefined;
-  if (mgrAcct && mgrAcct.agent !== 'claude') fail('The manager plans with Claude Code: --manager-account must be a Claude account.');
+  const conductorModel = o['manager-model'] ?? o['conductor-model']!;
+  const noConductor = o['no-conductor'] || o['no-manager'];
+  const condAccountLabel = o['conductor-account'] ?? o['manager-account'];
+  const mgrAcct = condAccountLabel ? pickAccounts(condAccountLabel)[0] : undefined;
+  if (mgrAcct && mgrAcct.agent !== 'claude') fail('The conductor plans with Claude Code: --conductor-account must be a Claude account.');
 
   // The project is the Git repo where the command runs.
   const repo = repoAt(process.cwd());
@@ -341,9 +350,9 @@ async function start(argv: string[]) {
   if (!git(repo, 'rev-parse', '--verify', '--quiet', 'HEAD').ok) fail(`${repo} has no commits yet. Make a first commit, then run tandem start again.`);
   const team = slug(o.team ?? basename(repo));
 
-  // which agent CLIs the real (not simulated) workers and the manager need
+  // which agent CLIs the real (not simulated) workers and the conductor need
   const realAgents = SIMULATE ? [] : accts.length ? accts.map(a => a.agent) : workers > 0 ? ['claude'] : [];
-  const needClaude = realAgents.includes('claude') || !o['no-manager'];
+  const needClaude = realAgents.includes('claude') || !noConductor;
   for (const t of ['git', 'spacetime', ...(needClaude ? ['claude'] : []), ...(realAgents.includes('codex') ? ['codex'] : [])]) {
     if (!which(t)) fail((t === 'spacetime' ? 'The SpacetimeDB CLI is not installed. See https://spacetimedb.com/install'
       : t === 'claude' ? 'Claude Code (claude) is not installed or not on PATH. Install it from https://claude.com/claude-code and sign in.'
@@ -391,19 +400,25 @@ async function start(argv: string[]) {
     else say(dim(`  ! could not share the project (see ${join(LOGS, `${team}-git-share.err`)}). Teammates can watch but not add workers.`));
   }
 
-  if (!o['no-manager']) {
-    if (running('manager', team)) done('manager', 'running');
+  // The conductor's key: only the conductor's own page link carries it, and with it that page can
+  // always take control back. Kept per team, so old links keep working.
+  const hostKey = teams()[team]?.hostKey ?? randomBytes(16).toString('hex');
+  if (!noConductor) {
+    // (a conductor started by an older Tandem is still called "manager")
+    if (running('conductor', team) || running('manager', team)) done('conductor', 'running');
     else {
-      const args = ['--import', tsx('manager'), join(ROOT, 'manager', 'watch.ts'), '--repo', repo, '--model', o['manager-model']!, '--budget', o.budget!];
+      const args = ['--import', tsx('manager'), join(ROOT, 'manager', 'watch.ts'), '--repo', repo, '--model', conductorModel, '--budget', o.budget!];
       if (shareUrl) args.push('--git-url', shareUrl);
       if (o.push) args.push('--push');
       if (o.review) args.push('--review');
       if (o.notify) args.push('--notify', o.notify);
-      background('manager', team, process.execPath, args, ROOT, {
+      // (its saved login keeps its old file name, so a conductor approved before stays approved)
+      background('conductor', team, process.execPath, args, ROOT, {
         STDB_URI: uri, STDB_DB: team, TANDEM_SESSION: 'live', TANDEM_TOKEN_FILE: join(ROOT, 'mcp', '.tandem', `manager-token-${team}`),
+        TANDEM_HOST_KEY: hostKey,
         ...(mgrAcct ? loginEnv(mgrAcct) : {}),
       });
-      done('manager', `started: it plans every goal you type${mgrAcct ? ` (${mgrAcct.label})` : ''}`);
+      done('conductor', `started: it plans every goal you send${conductorModel === 'auto' ? ', with the models its effort picks' : ` (${conductorModel})`}${mgrAcct ? ` (${mgrAcct.label})` : ''}`);
     }
   }
   if (workers > 0) {
@@ -411,10 +426,10 @@ async function start(argv: string[]) {
     done('workers', `${names.join(', ')}${SIMULATE ? ' (test mode: fake coding)' : accts.length ? '' : ` (Claude, ${modelNote(o.model!)})`}`);
   }
 
-  // host=1 makes this browser the controller by itself; the invite link never carries it
-  const page = `http://localhost:${PAGE_PORT}/?db=${team}${shared ? `&lan=${ip}` : ''}&host=1`;
+  // host=1 and the key make this the conductor's page; the invite link never carries them
+  const page = `http://localhost:${PAGE_PORT}/?db=${team}${shared ? `&lan=${ip}` : ''}&host=1&key=${hostKey}`;
   const invite = shared ? `http://${ip}:${PAGE_PORT}/?db=${team}` : null;
-  remember(team, { page, repo, invite, gitPort: sharePort });
+  remember(team, { page, repo, invite, gitPort: sharePort, hostKey });
   say();
   say(`  Tandem is running for ${repo}`);
   say();
@@ -431,7 +446,7 @@ async function start(argv: string[]) {
   } else say(`  ${bold('Invite')}   ${dim('only this computer can join (--local)')}`);
   say(`  ${bold('Stop')}     tandem stop`);
   say();
-  say(dim('  You control this team from that page. Open it any time with: tandem'));
+  say(dim('  You are the conductor: you run the team from that page. Open it any time with: tandem'));
   if (!which('tandem')) say(dim(`  Tip: run ${ownCommand()} install once, then "tandem" works in any new terminal.`));
   if (invite && WIN) say(dim('  If Windows asks whether node and spacetime may use the network, allow private networks.'));
   if (!o['no-browser']) openBrowser(page);
@@ -447,7 +462,7 @@ function parseAddress(address: string, team?: string): { host: string; team: str
     const t = team ?? u.searchParams.get('db') ?? /(?:^|\/)db=([^&/#]+)/.exec(u.pathname)?.[1] ?? u.pathname.replace(/^\/+|\/+$/g, '');
     if (u.hostname && t) return { host: u.hostname, team: slug(t) };
   } catch { /* not a URL */ }
-  return fail(`Could not read the address "${address}". Use the invite the host's page shows, like http://192.168.1.20:5173/?db=shop`);
+  return fail(`Could not read the address "${address}". Use the invite the conductor's page shows, like http://192.168.1.20:5173/?db=shop`);
 }
 
 // Does the host's brain have a team with this name? false only when it says there is none;
@@ -485,7 +500,7 @@ function workClone(url: string, team: string): string {
   if (!existsSync(join(dir, '.git'))) {
     mkdirSync(dirname(dir), { recursive: true });
     const r = git(ROOT, 'clone', '-q', url, dir);
-    if (!r.ok) fail(`Could not get the project from the host (${url}):\n${r.out}\nCheck the host is still running Tandem, and that you can reach it.`);
+    if (!r.ok) fail(`Could not get the project from the conductor's computer (${url}):\n${r.out}\nCheck the conductor is still running Tandem, and that you can reach it.`);
   } else {
     git(dir, 'remote', 'set-url', 'origin', url); // the host's address may have changed
     git(dir, 'fetch', '-q', 'origin');
@@ -502,13 +517,13 @@ async function joinTeam(argv: string[]) {
     repo: { type: 'string' }, // use your own clone of the project instead of the one Tandem makes
   } });
   const accts = pickAccounts(o.accounts);
-  if (!positionals[0]) fail('Which team? tandem join <invite>, using the link the host\'s page shows (Invite, top right).');
+  if (!positionals[0]) fail('Which team? tandem join <invite>, using the link the conductor\'s page shows (Invite, top right).');
   const { host, team } = parseAddress(positionals[0], o.team);
   say();
   say(`  ${bold('Tandem')} ${dim(`· joining team "${team}" at ${host}`)}`);
   say();
   if (!(await reachable(host, BRAIN_PORT, 2500))) {
-    fail(`Cannot reach ${host}:${BRAIN_PORT}. Check the invite on the host's page, that both computers are on the same network, and that the host did not use --local.`);
+    fail(`Cannot reach ${host}:${BRAIN_PORT}. Check the invite on the conductor's page, that both computers are on the same network, and that the conductor did not use --local.`);
   }
   done('host', 'reachable');
   if ((await teamExists(host, team)) === false) {
@@ -524,13 +539,13 @@ async function joinTeam(argv: string[]) {
     const from = await teamContext(host, team, 'git_url');
     if (o.repo) {
       repo = repoAt(resolve(o.repo)) ?? fail(`${o.repo} is not a git repository.`);
-      if (!git(repo, 'remote', 'get-url', 'origin').ok) fail(`${repo} has no origin remote. The workers push their branches there for the host to merge.`);
+      if (!git(repo, 'remote', 'get-url', 'origin').ok) fail(`${repo} has no origin remote. The workers push their branches there for the conductor to merge.`);
       done('project', repo);
     } else if (from) {
       repo = workClone(from, team);
-      done('project', `copied from the host to ${repo}`);
+      done('project', `copied from the conductor to ${repo}`);
     } else {
-      fail('The host is not sharing the project yet. On the host, run: tandem stop, then tandem start\n(the host has to be on a network others can reach, not --local).');
+      fail('The conductor is not sharing the project yet. On the conductor\'s computer, run: tandem stop, then tandem start\n(it has to be on a network others can reach, not --local).');
     }
   }
   repo ??= process.cwd();
@@ -545,17 +560,18 @@ async function joinTeam(argv: string[]) {
   const page = `http://${host}:${PAGE_PORT}/?db=${team}`;
   remember(team, { page, repo, host });
   say();
-  say(`  Joined team "${team}"`);
+  say(`  Joined team "${team}" as a teammate`);
   say();
   say(`  ${bold('Board')}    ${cyan(page)}`);
   say(`  ${bold('Stop')}     tandem stop`);
   say();
-  say(dim('  You can watch right away. To send goals, click "Request control" on the page.'));
+  say(dim('  Your computer\'s workers now take tasks from the conductor. The conductor sends the goals; you can watch on the page.'));
   if (!o['no-browser']) openBrowser(page);
 }
 
 // ---------- the teams this computer started or joined (for status and open) ----------
-type TeamInfo = { page: string; repo: string; invite?: string | null; host?: string; gitPort?: number };
+// hostKey: the conductor's key (only in the conductor's own page link), so that page can always take control back
+type TeamInfo = { page: string; repo: string; invite?: string | null; host?: string; gitPort?: number; hostKey?: string };
 const TEAMS = join(STATE, 'teams.json');
 function teams(): Record<string, TeamInfo> { try { return JSON.parse(readFileSync(TEAMS, 'utf8')); } catch { return {}; } }
 function remember(team: string, info: TeamInfo) { mkdirSync(STATE, { recursive: true }); writeFileSync(TEAMS, JSON.stringify({ ...teams(), [team]: info }, null, 2)); }
@@ -608,7 +624,7 @@ async function status() {
     const workers = mine.filter(p => p.name.startsWith('worker ')).map(p => p.name.slice(7));
     say();
     say(`  ${bold(t)}${known[t]?.repo ? dim(`  ${known[t].repo}`) : ''}`);
-    say(`    ${mine.some(p => p.name === 'manager') ? 'manager, ' : ''}${workers.length} worker${workers.length === 1 ? '' : 's'}${workers.length ? dim(` (${workers.join(', ')})`) : ''}`);
+    say(`    ${mine.some(p => p.name === 'conductor' || p.name === 'manager') ? 'conductor, ' : ''}${workers.length} worker${workers.length === 1 ? '' : 's'}${workers.length ? dim(` (${workers.join(', ')})`) : ''}`);
     if (known[t]?.page) say(`    ${bold('Open')}    ${cyan(known[t].page)}`);
     if (known[t]?.invite) say(`    ${bold('Invite')}  ${cyan(known[t].invite!)}`);
   }
@@ -633,7 +649,7 @@ async function openPage(argv: string[]) {
 
 function logs(argv: string[]) {
   const team = currentTeam(argv);
-  const part = argv.find(a => !a.startsWith('--')) ?? ''; // manager, alex, brain, page...
+  const part = argv.find(a => !a.startsWith('--')) ?? ''; // conductor, bilal-pc, brain, page...
   const files = existsSync(LOGS) ? readdirSync(LOGS).filter(f => f.endsWith('.log')) : [];
   const picked = files.filter(f => (team ? f.startsWith(`${team}-`) || /^(brain|page)\./.test(f) : true) && f.toLowerCase().includes(part.toLowerCase()));
   if (!picked.length) fail(`No logs${part ? ` for "${part}"` : ''} yet. They are in ${LOGS}`);
@@ -712,7 +728,7 @@ function doctorCmd() {
   row(git_ ? ok : bad, 'Git', git_ ? git_.version : 'not found', git_ ? '' : 'Install it: https://git-scm.com/downloads');
   row(npm_ ? ok : bad, 'npm', npm_ ? npm_.version : 'not found', npm_ ? '' : 'It comes with Node.js: https://nodejs.org');
   row(claude_ ? ok : bad, 'Claude Code', claude_ ? claude_.version : 'not found', claude_ ? 'Make sure you are signed in: run "claude" once and follow the login.' : 'Install it: https://claude.com/claude-code, then run "claude" once and sign in.');
-  row(spacetime_ ? ok : opt, 'SpacetimeDB', spacetime_ ? spacetime_.version : 'not found (only the host needs it)', spacetime_ ? '' : 'To host a team: https://spacetimedb.com/install');
+  row(spacetime_ ? ok : opt, 'SpacetimeDB', spacetime_ ? spacetime_.version : 'not found (only the conductor needs it)', spacetime_ ? '' : 'To be a conductor: https://spacetimedb.com/install');
   row(tailscale ? ok : opt, 'Tailscale', tailscale ? `connected, ${tailscale}` : tsInstalled ? 'installed, not connected' : 'not found (only needed across different networks)', tailscale ? '' : 'Public wifi or different networks: https://tailscale.com/download');
   row(python_ ? ok : opt, 'Python', python_ ? python_.version : 'not found (only for Python projects)');
   const onPath = !!which('tandem');
@@ -720,7 +736,7 @@ function doctorCmd() {
 
   const canJoin = !!(git_ && npm_ && claude_);
   const canHost = canJoin && !!spacetime_;
-  say(`\n  ${canJoin ? green('✓') : bad} Ready to join a team   ${canHost ? green('✓') : bad} Ready to host a team\n`);
+  say(`\n  ${canJoin ? green('✓') : bad} Ready to join a team   ${canHost ? green('✓') : bad} Ready to be the conductor\n`);
   if (!canJoin) process.exitCode = 1;
 }
 

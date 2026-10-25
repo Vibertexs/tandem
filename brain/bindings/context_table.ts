@@ -15,4 +15,6 @@ export default __t.row({
   sessionId: __t.string().name("session_id"),
   key: __t.string(),
   value: __t.string(),
+  updatedBy: __t.string().name("updated_by"),
+  updatedAt: __t.f64().name("updated_at"),
 });

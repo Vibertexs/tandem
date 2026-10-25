@@ -1,6 +1,6 @@
-// "Merge into my project", for a finished goal: the button, and what the manager answered. Used on
+// "Merge into my project", for a finished goal: the button, and what the conductor answered. Used on
 // the Board's lanes and on the Results page. The page asks by setting the shared note
-// apply_<goal id> to "requested"; the manager merges the goal's branch into the branch the project
+// apply_<goal id> to "requested"; the conductor merges the goal's branch into the branch the project
 // is on and answers "done: ..." or "failed: ..." in the same note.
 import { useState } from 'react';
 import type { Api, Goal, Snapshot } from './brain';
@@ -13,7 +13,7 @@ export function ApplyControl({ g, snap, api, isOp, say }: { g: Goal; snap: Snaps
   const ask = async () => {
     if (!api || busy) return;
     setBusy(true);
-    try { await api.setNote(`apply_${g.id}`, 'requested'); say('Asked the manager to merge it into your project.'); }
+    try { await api.setNote(`apply_${g.id}`, 'requested'); say('Asked the conductor to merge it into your project.'); }
     catch (e) { say('Could not do that: ' + (e instanceof Error ? e.message : String(e))); }
     finally { setBusy(false); }
   };

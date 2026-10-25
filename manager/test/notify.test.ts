@@ -8,7 +8,7 @@ const check = (name: string, ok: boolean, detail: unknown = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  notify: ${name}${ok ? '' : '  ' + JSON.stringify(detail)}`);
   if (!ok) failures++;
 };
-const goal: Goal = { id: 'g1', text: 'Build the calculator', status: 'planned', created_at: '', branch: '', cost_usd: 0.01 };
+const goal: Goal = { id: 'g1', text: 'Build the calculator', status: 'planned', created_at: '', branch: '', cost_usd: 0.01, effort: 'medium' };
 const task = (id: string, assignee: string, cost: number): Task => ({
   id, job_id: null, kind: 'normal', title: id, description: '', files: [], difficulty: 'easy', model: '', effort: 'default',
   status: 'done', assignee, branch: `task/${id}`, depends_on: [], result: null, result_summary: null, goal_id: 'g1', cost_usd: cost,
@@ -16,7 +16,7 @@ const task = (id: string, assignee: string, cost: number): Task => ({
 
 const text = goalDoneMessage(goal, [task('a', 'w-alex', 0.02), task('b', 'w-sam', 0.03)], 'tandem/g1', 'Tests pass (python -m unittest).');
 check('the message says what, who, what it cost, where and how it went',
-  text === '✓ Goal done: Build the calculator\n2 tasks by 2 workers, $0.06 of Claude usage.\nAll of its work is on tandem/g1.\nTests pass (python -m unittest).', text);
+  text === '✓ Goal done: Build the calculator\n2 tasks by 2 workers, ~$0.06 of Claude usage (estimated at API prices).\nAll of its work is on tandem/g1.\nTests pass (python -m unittest).', text);
 check('Discord gets {content}, Slack gets {text}',
   'content' in payloadFor('https://discord.com/api/webhooks/1/x', 'hi') && 'text' in payloadFor('https://hooks.slack.com/services/T/B/x', 'hi'));
 

@@ -56,7 +56,7 @@ const beforeCtx = await call('set_context', { key: 'k', value: 'v' });
 check('before authorizing: set_context is refused too', beforeCtx.isError, beforeCtx.text);
 const beforeGoals = await call('get_goals');
 check('before authorizing: reading goals works (reads are open)', !beforeGoals.isError, beforeGoals.text);
-await human.reducers.postGoal({ sessionId: 'live', id: 'g1', text: 'Plan me' });
+await human.reducers.postGoal({ sessionId: 'live', id: 'g1', text: 'Plan me', effort: 'medium' });
 const beforeMark = await call('mark_goal', { goal_id: 'g1', status: 'planning' });
 check('before authorizing: mark_goal is refused', beforeMark.isError && /operator/.test(beforeMark.text), beforeMark.text);
 const reg = await call('register_worker', { name: 'Mgr', plan: 'pro' });

@@ -3,7 +3,7 @@
 // folder. FinishedStrip is the short version on the Board: one line per goal, with the same button.
 import type { Api, Goal, Snapshot } from './brain';
 import { ApplyControl } from './Apply';
-import { Avatar, copy, money, took } from './ui';
+import { Avatar, Spend, copy, took } from './ui';
 
 type P = { snap: Snapshot; api: Api | null; isOp: boolean; say: (m: string) => void };
 
@@ -49,6 +49,7 @@ export function FinishedGoals({ snap, api, isOp, say }: P) {
       {goals.map(g => {
         const tasks = snap.tasks.filter(t => t.goalId === g.id);
         const cost = g.costUsd + tasks.reduce((s, t) => s + t.costUsd, 0);
+        const tokens = g.tokens + tasks.reduce((s, t) => s + t.tokens, 0);
         const files = [...new Set(tasks.flatMap(t => t.files))];
         const at = doneAt(snap, g);
         const byWorker = new Map<string, number>();
@@ -60,7 +61,8 @@ export function FinishedGoals({ snap, api, isOp, say }: P) {
               <span className="chip goal-done">Done</span>
             </header>
             <p className="small muted">
-              {[at ? `built in ${took(g.createdAt, at.getTime())}` : '', `${tasks.length} task${tasks.length === 1 ? '' : 's'}`, cost > 0 ? `${money(cost)} of Claude usage` : ''].filter(Boolean).join(' · ')}
+              {[at ? `built in ${took(g.createdAt, at.getTime())}` : '', `${tasks.length} task${tasks.length === 1 ? '' : 's'}`, `${g.effort} effort`].filter(Boolean).join(' · ')}
+              {(cost > 0 || tokens > 0) && <> · <Spend usd={cost} tokens={tokens} /> used</>}
             </p>
             {g.note && <p className="small"><span className="goal-note ok-note">{g.note}</span></p>}
             <dl className="agent-facts result-facts">

@@ -55,7 +55,7 @@ try {
   run([join(here, '..', 'launcher', 'launcher.ts'), '--name', 'Guest', '--repo', b, '--push', '--poll', '2'], 'guest-token');
   check('the teammate\'s worker joins', await until(() => [...owner.db.workers.iter()].some(w => w.id === 'w-guest'), 20_000));
 
-  await owner.reducers.postGoal({ sessionId: 'live', id: 'g-shop', text: 'Create a tiny Python calculator: calc.py with add(a, b) and sub(a, b), test_calc.py with unittest tests, and a README.md section on usage.' });
+  await owner.reducers.postGoal({ sessionId: 'live', id: 'g-shop', text: 'Create a tiny Python calculator: calc.py with add(a, b) and sub(a, b), test_calc.py with unittest tests, and a README.md section on usage.', effort: 'medium' });
   const goal = () => [...owner.db.goals.iter()].find(g => g.id === 'g-shop');
   const done = await until(() => ['done', 'failed'].includes(goal()?.status ?? ''), 900_000);
   const tasks = [...owner.db.tasks.iter()].filter(t => t.goalId === 'g-shop');

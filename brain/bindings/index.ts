@@ -38,6 +38,7 @@ import AddGoalCostReducer from "./add_goal_cost_reducer";
 import AddOperatorReducer from "./add_operator_reducer";
 import ApproveOperatorReducer from "./approve_operator_reducer";
 import CancelGoalReducer from "./cancel_goal_reducer";
+import ClaimAsHostReducer from "./claim_as_host_reducer";
 import ClaimOperatorReducer from "./claim_operator_reducer";
 import ClaimTaskReducer from "./claim_task_reducer";
 import ClearBoardReducer from "./clear_board_reducer";
@@ -50,6 +51,7 @@ import FailGoalReducer from "./fail_goal_reducer";
 import FinishGoalReducer from "./finish_goal_reducer";
 import GiveBackTaskReducer from "./give_back_task_reducer";
 import HeartbeatReducer from "./heartbeat_reducer";
+import NoteReadReducer from "./note_read_reducer";
 import PingReducer from "./ping_reducer";
 import PostGoalReducer from "./post_goal_reducer";
 import ReapStaleReducer from "./reap_stale_reducer";
@@ -64,6 +66,7 @@ import RetryTaskReducer from "./retry_task_reducer";
 import SeedTasksReducer from "./seed_tasks_reducer";
 import SetContextReducer from "./set_context_reducer";
 import SetGoalStatusReducer from "./set_goal_status_reducer";
+import SetHostKeyReducer from "./set_host_key_reducer";
 import TakeLocksReducer from "./take_locks_reducer";
 import UpdateCapacityReducer from "./update_capacity_reducer";
 
@@ -212,6 +215,7 @@ const reducersSchema = __reducers(
   __reducerSchema("add_operator", AddOperatorReducer),
   __reducerSchema("approve_operator", ApproveOperatorReducer),
   __reducerSchema("cancel_goal", CancelGoalReducer),
+  __reducerSchema("claim_as_host", ClaimAsHostReducer),
   __reducerSchema("claim_operator", ClaimOperatorReducer),
   __reducerSchema("claim_task", ClaimTaskReducer),
   __reducerSchema("clear_board", ClearBoardReducer),
@@ -224,6 +228,7 @@ const reducersSchema = __reducers(
   __reducerSchema("finish_goal", FinishGoalReducer),
   __reducerSchema("give_back_task", GiveBackTaskReducer),
   __reducerSchema("heartbeat", HeartbeatReducer),
+  __reducerSchema("note_read", NoteReadReducer),
   __reducerSchema("ping", PingReducer),
   __reducerSchema("post_goal", PostGoalReducer),
   __reducerSchema("reap_stale", ReapStaleReducer),
@@ -238,6 +243,7 @@ const reducersSchema = __reducers(
   __reducerSchema("seed_tasks", SeedTasksReducer),
   __reducerSchema("set_context", SetContextReducer),
   __reducerSchema("set_goal_status", SetGoalStatusReducer),
+  __reducerSchema("set_host_key", SetHostKeyReducer),
   __reducerSchema("take_locks", TakeLocksReducer),
   __reducerSchema("update_capacity", UpdateCapacityReducer),
 );

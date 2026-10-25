@@ -25,7 +25,7 @@ const owner = await new Promise<DbConnection>((res, rej) => {
     .onConnectError((_c, e) => rej(e)).build();
 });
 await owner.reducers.claimOperator({});
-await owner.reducers.postGoal({ sessionId: 'live', id: 'g1', text: 'Build the calculator' });
+await owner.reducers.postGoal({ sessionId: 'live', id: 'g1', text: 'Build the calculator', effort: 'medium' });
 
 // the team's repo, with a GitHub remote (never contacted: nothing is pushed in this test)
 const repo = mkdtempSync(join(tmpdir(), 'tandem-watch-repo-'));
@@ -60,7 +60,7 @@ try {
   check('Try again: it plans the goal again', await until(() => (out.match(/planning 1 goal/g) ?? []).length === 3, 15_000), out.slice(-300));
 
   // "Merge into my project": the page sets apply_<goal> = requested; the manager merges and answers
-  await owner.reducers.postGoal({ sessionId: 'live', id: 'g2', text: 'Add a CLI' });
+  await owner.reducers.postGoal({ sessionId: 'live', id: 'g2', text: 'Add a CLI', effort: 'medium' });
   await owner.reducers.finishGoal({ sessionId: 'live', id: 'g2', branch: 'tandem/x', note: 'Tests pass.' });
   const answer = () => [...owner.db.context.iter()].find(c => c.sessionId === 'live' && c.key === 'apply_g2')?.value ?? '';
   check('before the request, the project folder does not have the goal\'s work', !existsSync(join(repo, 'cli.py')));

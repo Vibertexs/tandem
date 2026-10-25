@@ -5,13 +5,11 @@ import { Landing, Unreachable } from './Landing';
 import { BoardPage } from './Board';
 import { ActivityPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
 import { Dock } from './Dock';
-import { OverviewPage } from './Overview';
 import { UsagePage } from './Usage';
 import { CodeLine, JoinSteps, isManager, managerOnline, online, restartForSharingCommand, useNow } from './ui';
 import type { Snapshot } from './brain';
 
 const PAGES = [
-  { key: 'overview', label: 'Overview' },
   { key: 'board', label: 'Board' },
   { key: 'team', label: 'Team' },
   { key: 'memory', label: 'Shared memory' },
@@ -23,8 +21,8 @@ type PageKey = typeof PAGES[number]['key'];
 
 const pageFromHash = (): PageKey => {
   const raw = location.hash.replace(/^#\/?/, '');
-  // getting started is part of the Team page; finished goals are part of Activity
-  const k = raw === 'setup' ? 'team' : raw === 'results' ? 'activity' : raw;
+  // getting started is part of the Team page; finished goals are part of Activity; the overview was the Board
+  const k = raw === 'setup' ? 'team' : raw === 'results' ? 'activity' : raw === 'overview' ? 'board' : raw;
   return (PAGES.find(p => p.key === k)?.key ?? 'board') as PageKey;
 };
 
@@ -72,18 +70,27 @@ export function App() {
     }
   }, [snap.goals, say]);
 
-  // Whoever ran `tandem start` controls the team: the page it opens (host=1) takes control by
-  // itself the first time, and approves the manager when it asks. No button, no choice.
+  // Whoever ran `tandem --start` is the conductor: the page it opens (host=1) takes control by itself
+  // the first time, and approves the conductor's Claude when it asks. No button, no choice.
+  // If this browser lost control later (its storage was cleared, or it is another browser), the
+  // conductor's key in that page's link takes it back.
   const claiming = useRef(false);
+  const reclaiming = useRef(false);
   useEffect(() => {
     if (!config.host || config.mock || !api || !me || status !== 'connected') return;
-    if (snap.operators.length > 0 || claiming.current) return;
-    claiming.current = true;
-    api.claimTeam().then(
-      () => say('You control this team. Describe what you want built.'),
-      e => { claiming.current = false; say('Could not take control: ' + (e as Error).message); },
-    );
-  }, [api, me, status, snap.operators.length, say]);
+    if (snap.operators.some(o => o.identity === me)) return;
+    if (snap.operators.length === 0) {
+      if (claiming.current) return;
+      claiming.current = true;
+      api.claimTeam().then(
+        () => say('You are the conductor. Describe what you want built.'),
+        e => { claiming.current = false; say('Could not take control: ' + (e as Error).message); },
+      );
+    } else if (config.hostKey && !reclaiming.current) {
+      reclaiming.current = true;
+      api.claimAsHost(config.hostKey).then(() => say('You are the conductor again.'), () => { /* an older team without a key */ });
+    }
+  }, [api, me, status, snap.operators, say]);
   useEffect(() => {
     if (!config.host || !api || !me || !snap.operators.some(o => o.identity === me)) return;
     const mgr = snap.requests.find(r => isManager(r.name));
@@ -125,23 +132,22 @@ export function App() {
               <span className="team-name">{config.mock ? 'Sample data' : team!.db}</span>
               <span className="small muted">{status === 'connected' ? `${workersOnline} worker${workersOnline === 1 ? '' : 's'} online` : 'Reconnecting…'}</span>
               {status === 'connected' && !config.mock && (
-                <span className="small muted">{managerOnline(snap, now) ? 'Manager online' : snap.operators.some(o => isManager(o.name)) ? 'Manager offline' : 'No manager yet'}</span>
+                <span className="small muted">{managerOnline(snap, now) ? 'Conductor online' : snap.operators.some(o => isManager(o.name)) ? 'Conductor offline' : 'No conductor yet'}</span>
               )}
             </div>
           )}
-          {!config.present && (config.mock ? <span className="chip">Read only</span> : isOp ? <span className="chip st-busy">You control this team</span> : <span className="chip">Watching</span>)}
+          {!config.present && (config.mock ? <span className="chip">Read only</span> : isOp ? <span className="chip st-busy">You are the conductor</span> : <span className="chip">Teammate · watching</span>)}
           {!config.mock && !config.present && team && <Invite team={team} snap={snap} say={say} />}
           {!config.mock && !isOp && !unowned && !config.present && status === 'connected' && (
             asked
-              ? <span className="chip goal-new">Waiting for a controller to approve you</span>
-              : <AskToManage onAsk={name => api!.askToManage(name).then(() => say('Control request sent. A controller sees it on the Board.'), e => say('Could not ask: ' + (e as Error).message))} />
+              ? <span className="chip goal-new">Waiting for the conductor to approve you</span>
+              : <AskToManage onAsk={name => api!.askToManage(name).then(() => say('Request sent. The conductor sees it on the Board.'), e => say('Could not ask: ' + (e as Error).message))} />
           )}
         </header>
-        {config.mock && <div className="banner">Sample data, not connected to a team. <a href="?">Host or join a team</a></div>}
+        {config.mock && <div className="banner">Sample data, not connected to a team. <a href="?">Start or join a team</a></div>}
         {status === 'connecting' && api && <div className="banner">Connection lost. Reconnecting…</div>}
-        {unowned && !config.host && !config.present && <div className="banner">Waiting for the host to take control. This board shows what happens once they do.</div>}
+        {unowned && !config.host && !config.present && <div className="banner">Waiting for the conductor to take control. This board shows what happens once they do.</div>}
         <main>
-          {page === 'overview' && <OverviewPage {...common} go={go} />}
           {page === 'board' && <BoardPage {...common} isOp={isOp} present={config.present} go={go} />}
           {page === 'usage' && <UsagePage {...common} />}
           {page === 'team' && <TeamPage {...common} team={team ?? { uri: '', db: 'sample' }} go={go} />}
@@ -172,7 +178,7 @@ function Invite({ team, snap, say }: { team: Team; snap: Snapshot; say: (m: stri
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('mousedown', onDown); };
   }, [open]);
   if (!share) {
-    return <span className="chip invite-local" title="To invite others: tandem stop --all, then tandem start, in the project's folder">This computer only</span>;
+    return <span className="chip invite-local" title="To invite others: tandem stop --all, then tandem --start, in the project's folder">This computer only</span>;
   }
   return (
     <div className="invite" ref={box}>
@@ -197,7 +203,7 @@ function AskToManage({ onAsk }: { onAsk: (name: string) => Promise<unknown> }) {
     <form className="inline-form" onSubmit={e => { e.preventDefault(); if (name.trim()) void onAsk(name.trim()).then(() => setOpen(false)); }}>
       <label className="sr-only" htmlFor="ask-name">Your name</label>
       <input id="ask-name" autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="Your name" aria-label="Your name" />
-      <span className="small muted">A current controller must approve this browser.</span>
+      <span className="small muted">The conductor must approve this browser.</span>
       <button type="submit" className="btn primary" disabled={!name.trim()}>Request</button>
       <button type="button" className="btn" onClick={() => setOpen(false)}>Cancel</button>
     </form>

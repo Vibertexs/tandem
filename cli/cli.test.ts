@@ -61,8 +61,8 @@ check('a mistyped invite (no "?", a stray ".") is read as the same team',
 }
 {
   const d = tandem(['doctor'], repo);
-  check('tandem doctor checks Node, Git, npm, Claude Code, SpacetimeDB, Tailscale and Python, and says if this computer can join and host',
-    ['Node.js', 'Git', 'npm', 'Claude Code', 'SpacetimeDB', 'Tailscale', 'Python', 'Ready to join a team', 'Ready to host a team'].every(s => d.includes(s)), d);
+  check('tandem doctor checks Node, Git, npm, Claude Code, SpacetimeDB, Tailscale and Python, and says if this computer can join and be the conductor',
+    ['Node.js', 'Git', 'npm', 'Claude Code', 'SpacetimeDB', 'Tailscale', 'Python', 'Ready to join a team', 'Ready to be the conductor'].every(s => d.includes(s)), d);
   check('tandem --doctor is the same', tandem(['--doctor'], repo) === d);
   check('tandem doctor changes nothing: it says what to do for what is missing, and nothing is added to the PATH', !/Added/.test(d));
 }

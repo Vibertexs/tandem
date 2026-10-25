@@ -31,4 +31,5 @@ export default __t.row({
   goalId: __t.string().name("goal_id"),
   costUsd: __t.f64().name("cost_usd"),
   triedBy: __t.string().name("tried_by"),
+  tokens: __t.f64(),
 });

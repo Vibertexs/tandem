@@ -117,7 +117,7 @@ try {
       .onConnectError((_c, error) => reject(error)).build();
   });
   await boardOwner.reducers.claimOperator({});
-  await boardOwner.reducers.postGoal({ sessionId: 'live', id: 'g-keep', text: 'A goal that should survive a restart' });
+  await boardOwner.reducers.postGoal({ sessionId: 'live', id: 'g-keep', text: 'A goal that should survive a restart', effort: 'medium' });
   await sleep(500);
   const again = tandem(base, repo, hostState);
   check('starting again keeps the board and says how to start over', /kept the board from last time \(1 goal\)/.test(again.out) && /tandem start --fresh/.test(again.out), again.out.slice(-400));

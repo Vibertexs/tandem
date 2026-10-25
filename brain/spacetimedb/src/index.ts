@@ -49,6 +49,7 @@ const tasks = table(
     goal_id: t.string().default(''), // the goal this task was planned for, '' if none
     cost_usd: t.f64().default(0), // what its Claude runs cost, as reported by claude -p
     tried_by: t.string().default(''), // comma-separated workers that gave it back; they do not get it again
+    tokens: t.f64().default(0), // tokens its Claude runs used (input, output and cache), as reported by claude -p
   }
 );
 
@@ -84,6 +85,8 @@ const context = table(
     session_id: t.string().index('btree'),
     key: t.string(),
     value: t.string(),
+    updated_by: t.string().default(''), // who wrote it last: "Conductor" (the host's page) or "Conductor Claude"
+    updated_at: t.f64().default(0), // when, in milliseconds since 1970 (0 = not known)
   }
 );
 
@@ -101,10 +104,22 @@ const goals = table(
     branch: t.string().default(''), // when done: the branch with all of its work merged
     note: t.string().default(''), // when done: how it went ("Tests pass", what could not be merged)
     cost_usd: t.f64().default(0), // what planning it cost (its tasks' costs are on the tasks)
+    effort: t.string().default('medium'), // low | medium | high: which models plan it and do its tasks
+    tokens: t.f64().default(0), // tokens planning it used (its tasks' tokens are on the tasks)
   }
 );
 
-// Who is connected right now (the manager pings it). The page uses it to say "Manager online".
+// The conductor's key, so the conductor's own page can always take control back (for example after
+// a browser's storage was cleared). Private: no client can read it.
+const hostKeys = table(
+  { name: 'host_keys', public: false },
+  {
+    session_id: t.string().primaryKey(),
+    key: t.string(),
+  }
+);
+
+// Who is connected right now (the conductor pings it, kind 'manager'). The page uses it to say "Conductor online".
 const presence = table(
   { name: 'presence', public: true },
   {
@@ -137,7 +152,7 @@ const operatorRequests = table(
   }
 );
 
-const spacetimedb = schema({ workers, tasks, locks, events, context, goals, operators, operatorRequests, presence });
+const spacetimedb = schema({ workers, tasks, locks, events, context, goals, operators, operatorRequests, presence, hostKeys });
 export default spacetimedb;
 
 type Ctx = ReducerCtx<InferSchema<typeof spacetimedb>>;
@@ -288,7 +303,7 @@ function insertTask(
   // While the manager is planning exactly one goal, every task it creates belongs to that goal.
   const planning = [...ctx.db.goals.session_id.filter(session)].filter(g => g.status === 'planning');
   const goal_id = planning.length === 1 ? planning[0].id : '';
-  ctx.db.tasks.insert({ goal_id, cost_usd: 0, tried_by: '',
+  ctx.db.tasks.insert({ goal_id, cost_usd: 0, tried_by: '', tokens: 0,
     pk: pk(session, a.id), session_id: session, id: a.id, job_id: jobId, kind, title: a.title,
     description: a.description, files: a.files, difficulty: a.difficulty, model: a.model, effort: a.effort,
     status, assignee, branch: undefined, depends_on: a.depends_on, result: undefined, result_summary: undefined,
@@ -564,14 +579,35 @@ export const updateCapacity = spacetimedb.reducer(
   }
 );
 
+const millis = (ctx: Ctx) => Number(ctx.timestamp.microsSinceUnixEpoch / 1000n);
+
 export const setContext = spacetimedb.reducer(
   { session_id: t.string(), key: t.string(), value: t.string() },
   (ctx, { session_id, key, value }) => {
     checkSession(session_id);
     requireOperator(ctx, session_id);
+    // who wrote it: the operator's name ("Conductor" for the host's page, "Conductor Claude")
+    const updated_by = ctx.db.operators.identity.find(ctx.sender)?.name ?? '';
     const row = ctx.db.context.pk.find(pk(session_id, key));
-    if (row) ctx.db.context.pk.update({ ...row, value });
-    else ctx.db.context.insert({ pk: pk(session_id, key), session_id, key, value });
+    if (row) ctx.db.context.pk.update({ ...row, value, updated_by, updated_at: millis(ctx) });
+    else ctx.db.context.insert({ pk: pk(session_id, key), session_id, key, value, updated_by, updated_at: millis(ctx) });
+  }
+);
+
+const NOTE_TITLES: Record<string, string> = { project_summary: 'Project summary', interfaces: 'Interfaces', decisions: 'Decisions' };
+
+// A worker was given the shared notes before a task (the launcher puts them in its prompt). Logged
+// so the page can show which agent read which notes, and when.
+export const noteRead = spacetimedb.reducer(
+  { session_id: t.string(), worker_id: t.string(), task_id: t.string(), keys: t.array(t.string()) },
+  (ctx, { session_id, worker_id, task_id, keys }) => {
+    const worker = requireWorkerOwner(ctx, session_id, worker_id);
+    if (!worker) throw new SenderError('unknown worker');
+    const task = ctx.db.tasks.pk.find(pk(session_id, task_id));
+    if (!task) throw new SenderError('unknown task');
+    if (keys.length === 0) return;
+    const titles = keys.slice(0, 10).map(k => NOTE_TITLES[k] ?? k.slice(0, 40));
+    addEvent(ctx, session_id, worker_id, 'context_read', `${worker.name} read the shared notes (${titles.join(', ')}) before "${task.title}"`);
   }
 );
 
@@ -596,7 +632,7 @@ export const resetSession = spacetimedb.reducer(
       });
     }
     for (const [key, value] of Object.entries(seed.context)) {
-      ctx.db.context.insert({ pk: pk(session_id, key), session_id, key, value });
+      ctx.db.context.insert({ pk: pk(session_id, key), session_id, key, value, updated_by: '', updated_at: 0 });
     }
     addEvent(ctx, session_id, undefined, 'task_created', 'Session reset');
   }
@@ -623,11 +659,38 @@ export const seedTasks = spacetimedb.reducer(
 );
 
 // The first caller becomes the operator. After that, only operators can add or remove operators.
+// The first caller is the conductor's page (tandem start opens it).
 export const claimOperator = spacetimedb.reducer(ctx => {
   if ([...ctx.db.operators.iter()].length > 0) throw new SenderError('an operator already exists');
-  ctx.db.operators.insert({ identity: ctx.sender, added_at: ctx.timestamp, name: 'Owner' });
+  ctx.db.operators.insert({ identity: ctx.sender, added_at: ctx.timestamp, name: 'Conductor' });
   ctx.db.operatorRequests.identity.delete(ctx.sender);
 });
+
+// The conductor Claude stores the conductor's key (tandem start makes it, and only the conductor's
+// own page link carries it).
+export const setHostKey = spacetimedb.reducer(
+  { session_id: t.string(), key: t.string() },
+  (ctx, { session_id, key }) => {
+    checkSession(session_id);
+    requireOperator(ctx, session_id);
+    if (!/^[a-f0-9]{32,128}$/.test(key)) throw new SenderError('bad key');
+    if (ctx.db.hostKeys.session_id.find(session_id)) ctx.db.hostKeys.session_id.update({ session_id, key });
+    else ctx.db.hostKeys.insert({ session_id, key });
+  }
+);
+
+// The conductor's page takes control, even when other browsers already have it (its own browser
+// lost its saved login, or it opened the page in another browser). Needs the conductor's key.
+export const claimAsHost = spacetimedb.reducer(
+  { session_id: t.string(), key: t.string() },
+  (ctx, { session_id, key }) => {
+    checkSession(session_id);
+    const saved = ctx.db.hostKeys.session_id.find(session_id);
+    if (!saved || saved.key !== key) throw new SenderError('that is not this team\'s conductor key');
+    if (!ctx.db.operators.identity.find(ctx.sender)) ctx.db.operators.insert({ identity: ctx.sender, added_at: ctx.timestamp, name: 'Conductor' });
+    ctx.db.operatorRequests.identity.delete(ctx.sender);
+  }
+);
 
 export const addOperator = spacetimedb.reducer(
   { identity: t.identity() },
@@ -646,17 +709,20 @@ export const removeOperator = spacetimedb.reducer(
   }
 );
 
-// The operator types a goal. It waits as `new` until the manager Claude picks it up.
+// The operator types a goal. It waits as `new` until the conductor Claude picks it up.
+// effort: low | medium | high (anything else is medium). It picks the models that plan the goal and
+// do its tasks.
 export const postGoal = spacetimedb.reducer(
-  { session_id: t.string(), id: t.string(), text: t.string() },
-  (ctx, { session_id, id, text }) => {
+  { session_id: t.string(), id: t.string(), text: t.string(), effort: t.string() },
+  (ctx, { session_id, id, text, effort }) => {
     checkSession(session_id);
     requireOperator(ctx, session_id);
     const clean = text.trim();
     if (clean.length === 0 || clean.length > 2000) throw new SenderError('a goal is 1 to 2000 characters');
     if (ctx.db.goals.pk.find(pk(session_id, id))) throw new SenderError(`goal ${id} already exists`);
-    ctx.db.goals.insert({ pk: pk(session_id, id), session_id, id, text: clean, status: 'new', created_at: ctx.timestamp, branch: '', note: '', cost_usd: 0 });
-    addEvent(ctx, session_id, undefined, 'task_created', `Goal sent to the manager: ${clean.slice(0, 80)}`);
+    const level = ['low', 'medium', 'high'].includes(effort) ? effort : 'medium';
+    ctx.db.goals.insert({ pk: pk(session_id, id), session_id, id, text: clean, status: 'new', created_at: ctx.timestamp, branch: '', note: '', cost_usd: 0, effort: level, tokens: 0 });
+    addEvent(ctx, session_id, undefined, 'task_created', `Goal sent to the conductor (${level} effort): ${clean.slice(0, 80)}`);
   }
 );
 
@@ -788,26 +854,28 @@ export const ping = spacetimedb.reducer(
 );
 
 const cleanCost = (usd: number) => (Number.isFinite(usd) && usd > 0 ? Math.min(usd, 1000) : 0);
+const cleanTokens = (n: number) => (Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 1e9) : 0);
 
-// What a task's Claude run cost. Only the worker that has (or had) the task may add to it.
+// What a task's Claude run cost and how many tokens it used. Only the worker that has (or had) the
+// task may add to it.
 export const recordCost = spacetimedb.reducer(
-  { session_id: t.string(), worker_id: t.string(), task_id: t.string(), usd: t.f64() },
-  (ctx, { session_id, worker_id, task_id, usd }) => {
+  { session_id: t.string(), worker_id: t.string(), task_id: t.string(), usd: t.f64(), tokens: t.f64() },
+  (ctx, { session_id, worker_id, task_id, usd, tokens }) => {
     requireWorkerOwner(ctx, session_id, worker_id);
     const task = ctx.db.tasks.pk.find(pk(session_id, task_id));
     if (!task) throw new SenderError('unknown task');
     if (task.assignee !== worker_id) throw new SenderError('task is not assigned to this worker');
-    ctx.db.tasks.pk.update({ ...task, cost_usd: task.cost_usd + cleanCost(usd) });
+    ctx.db.tasks.pk.update({ ...task, cost_usd: task.cost_usd + cleanCost(usd), tokens: task.tokens + cleanTokens(tokens) });
   }
 );
 
-// What planning a goal cost (the manager reports it).
+// What planning a goal cost, and its tokens (the conductor reports them).
 export const addGoalCost = spacetimedb.reducer(
-  { session_id: t.string(), id: t.string(), usd: t.f64() },
-  (ctx, { session_id, id, usd }) => {
+  { session_id: t.string(), id: t.string(), usd: t.f64(), tokens: t.f64() },
+  (ctx, { session_id, id, usd, tokens }) => {
     requireOperator(ctx, session_id);
     const goal = ctx.db.goals.pk.find(pk(session_id, id));
     if (!goal) throw new SenderError('unknown goal');
-    ctx.db.goals.pk.update({ ...goal, cost_usd: goal.cost_usd + cleanCost(usd) });
+    ctx.db.goals.pk.update({ ...goal, cost_usd: goal.cost_usd + cleanCost(usd), tokens: goal.tokens + cleanTokens(tokens) });
   }
 );

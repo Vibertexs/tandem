@@ -20,4 +20,6 @@ export default __t.row({
   branch: __t.string(),
   note: __t.string(),
   costUsd: __t.f64().name("cost_usd"),
+  effort: __t.string(),
+  tokens: __t.f64(),
 });

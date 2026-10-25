@@ -6,7 +6,7 @@ import { GetStarted } from './Setup';
 import { LiveDatabase } from './Database';
 import { AgentCards } from './Agents';
 import { FinishedGoals } from './Finished';
-import { Avatar, Bar, CodeLine, EV_ICON, JoinSteps, WorkerStatus, agentLabel, ago, copy, isManager, money, online, restartForSharingCommand, took, liveInfo } from './ui';
+import { Avatar, Bar, CodeLine, EV_ICON, JoinSteps, Spend, UnitSwitch, WorkerStatus, agentLabel, ago, copy, isManager, onConductor, online, restartForSharingCommand, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
 
@@ -28,8 +28,8 @@ const list = (text: string) => text.split(/[,\n]/).map(x => x.trim()).filter(Boo
 export function TeamPage({ snap, now, say, team, isOp, go }: Common & { team: Team; go: (page: string) => void }) {
   const share = shareable(team);
   const uri = share?.uri ?? team.uri;
-  // The manager says which repo the team works on (its origin). Real workers elsewhere need a clone.
-  const gitUrl = snap.context.git_url ?? ''; // set once the host serves the project (tandem start)
+  // The conductor says which repo the team works on (its origin). Real workers elsewhere need a clone.
+  const gitUrl = snap.context.git_url ?? ''; // set once the conductor serves the project (tandem --start)
   const restart = restartForSharingCommand(snap.context.tandem_dir ?? '', snap.context.project_dir ?? '');
   const mcp = `claude mcp add tandem -e STDB_URI=${uri} -e STDB_DB=${team.db} -e TANDEM_SESSION=live -- node --import tsx <tandem-folder>/mcp/src/server.ts`;
   const sorted = [...snap.workers].sort((a, b) => Number(online(b, now)) - Number(online(a, now)) || a.name.localeCompare(b.name));
@@ -45,15 +45,18 @@ export function TeamPage({ snap, now, say, team, isOp, go }: Common & { team: Te
           const info = current ? liveInfo(current, snap.events) : null;
           const held = snap.locks.filter(l => l.workerId === w.id);
           const theirs = snap.tasks.filter(t => t.assignee === w.id && t.status === 'done');
-          const spent = snap.tasks.filter(t => t.assignee === w.id).reduce((sum, t) => sum + t.costUsd, 0);
+          const mine = snap.tasks.filter(t => t.assignee === w.id);
+          const spent = mine.reduce((sum, t) => sum + t.costUsd, 0);
+          const tokens = mine.reduce((sum, t) => sum + t.tokens, 0);
           return (
             <article key={w.id} className={`card worker ${online(w, now) ? '' : 'is-offline'}`} aria-label={w.name}>
-              <header><Avatar name={w.name} size={36} /><div><strong>{w.name}</strong><div className="small muted"><span className={`chip agent-${w.agent}`}>{agentLabel(w)}</span> seen {ago(w.lastSeen, now)}</div></div><WorkerStatus w={w} now={now} /></header>
+              <header><Avatar name={w.name} size={36} /><div><strong>{w.name}</strong><div className="small muted"><span className={`chip agent-${w.agent}`}>{agentLabel(w)}</span> <span className="chip">{onConductor(w, snap) ? "Conductor's computer" : 'Teammate'}</span> seen {ago(w.lastSeen, now)}</div></div><WorkerStatus w={w} now={now} /></header>
               <p className="small">{current ? <>On <strong>{current.title}</strong>{info?.since ? ` for ${took(info.since, now)}` : ''}</> : <span className="muted">No task right now</span>}</p>
-              <Bar label="5 hours" value={w.usage5h} />
-              <Bar label="Week" value={w.usageWeek} />
+              {/* Claude Code only reports the quota on some plans: no empty bars when it does not */}
+              {w.usage5h !== null && <Bar label="5 hours" value={w.usage5h} />}
+              {w.usageWeek !== null && <Bar label="Week" value={w.usageWeek} />}
               {held.length > 0 && <p className="small mono muted">Holding {held.map(l => l.path).join(', ')}</p>}
-              <p className="small muted">{theirs.length} task{theirs.length === 1 ? '' : 's'} done{spent > 0 ? ` · ${money(spent)} spent` : ''}</p>
+              <p className="small muted">{theirs.length} task{theirs.length === 1 ? '' : 's'} done{spent > 0 || tokens > 0 ? <> · <Spend usd={spent} tokens={tokens} /> used</> : ''}</p>
             </article>
           );
         })}
@@ -68,10 +71,10 @@ export function TeamPage({ snap, now, say, team, isOp, go }: Common & { team: Te
         ) : (
           <>
             <p className="small warn">Right now only this computer can join.</p>
-            <p className="muted small">On the project host, restart without <code className="mono">--local</code> to invite others:</p>
+            <p className="muted small">On the conductor&apos;s computer, restart without <code className="mono">--local</code> to invite others:</p>
             <CodeLine code={restart} say={say} />
             <p className="muted small">Or add more workers on this computer:</p>
-            <CodeLine code="tandem start --workers 4" say={say} />
+            <CodeLine code="tandem --start --workers 4" say={say} />
           </>
         )}
         <details>
@@ -90,20 +93,34 @@ export function TeamPage({ snap, now, say, team, isOp, go }: Common & { team: Te
 // ---------- Shared memory ----------
 const NOTES: { key: string; title: string; hint: string }[] = [
   { key: 'project_summary', title: 'Project summary', hint: 'What this project is, in two or three sentences.' },
-  { key: 'interfaces', title: 'Interfaces', hint: 'Names and shapes that parallel tasks must agree on. The manager writes here too.' },
+  { key: 'interfaces', title: 'Interfaces', hint: 'Names and shapes that parallel tasks must agree on. The conductor writes here too.' },
   { key: 'decisions', title: 'Decisions', hint: 'Rules everyone follows, like "TypeScript everywhere".' },
 ];
-function Note({ k, title, hint, snap, api, isOp, say }: Common & { k: string; title: string; hint: string }) {
+// Which workers' Claudes read a note (the launcher logs it each time one does), newest first.
+function readersOf(snap: Snapshot, title: string) {
+  const reads = snap.events.filter(e => e.type === 'context_read' && (/\(([^)]*)\)/.exec(e.message)?.[1] ?? '').split(', ').includes(title));
+  const names = [...new Set(reads.map(e => e.message.split(' read the shared notes')[0]))];
+  return { names, at: reads[0]?.time ?? null };
+}
+function Note({ k, title, hint, snap, api, isOp, say, now }: Common & { k: string; title: string; hint: string }) {
   const saved = snap.context[k] ?? '';
   const [draft, setDraft] = useState<string | null>(null);
   const { busy, act } = useAct(say);
   const value = draft ?? saved;
+  const meta = snap.contextMeta[k];
+  const readers = readersOf(snap, title);
   return (
     <form className="card memory-note" onSubmit={e => { e.preventDefault(); void act(() => api!.setNote(k, value), `${title} saved.`).then(ok => { if (ok) setDraft(null); }); }}>
       <h2>{title}</h2>
       <p className="small muted">{hint}</p>
       <label className="sr-only" htmlFor={`note-${k}`}>{title}</label>
       <textarea id={`note-${k}`} value={value} onChange={e => setDraft(e.target.value)} disabled={!isOp} rows={4} placeholder={isOp ? 'Empty' : 'Nothing yet'} />
+      {saved.trim() && (
+        <p className="small muted note-meta">
+          {meta?.by ? <>Written by <strong>{meta.by}</strong>{meta.at ? ` · ${ago(meta.at, now)}` : ''}</> : 'Written before Tandem kept track of who wrote it'}
+          {' · '}{readers.names.length ? <>Read by {readers.names.join(', ')}{readers.at ? ` · last ${ago(readers.at, now)}` : ''}</> : 'No worker has read it yet'}
+        </p>
+      )}
       {isOp && <div className="row-actions">
         <button type="submit" className="btn primary" disabled={busy || value === saved}>Save</button>
         {draft !== null && draft !== saved && <button type="button" className="btn" onClick={() => setDraft(null)}>Undo</button>}
@@ -114,7 +131,7 @@ function Note({ k, title, hint, snap, api, isOp, say }: Common & { k: string; ti
 export function MemoryPage(c: Common & { team: Team }) {
   return (
     <div className="page">
-      <p className="muted lead">Every Claude on the team reads these notes before it starts a task. Keep them short. They are stored in the database&apos;s <code className="mono">context</code> table.</p>
+      <p className="muted lead">Every worker&apos;s Claude reads these notes before it starts a task, and each note says who wrote it and who read it. Keep them short. They are stored in the database&apos;s <code className="mono">context</code> table.</p>
       <div className="notes">{NOTES.map(n => <Note key={n.key} {...c} k={n.key} title={n.title} hint={n.hint} />)}</div>
 
       <section className="shared-brain" aria-labelledby="brain-h">
@@ -203,8 +220,8 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
       )}
 
       <section className="card" aria-labelledby="ops-h">
-        <h2 id="ops-h">People who control this team</h2>
-        <p className="small muted">Controllers can send goals, edit shared memory and change the team. This is a browser permission, not a Tandem account or anyone&apos;s Claude login. Everyone else can watch.</p>
+        <h2 id="ops-h">Who can send goals</h2>
+        <p className="small muted">The conductor (the computer that ran <code className="mono">tandem --start</code>) controls the team, and can approve others to send goals and edit shared memory too. This is a browser permission, not a Tandem account or anyone&apos;s Claude login. Teammates can always watch. The conductor&apos;s own page can always take control back.</p>
         <ul className="plain rows">
           {snap.operators.map(o => (
             <li key={o.identity} className="row">
@@ -219,7 +236,7 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
       {isOp && (
         <section className="card" aria-labelledby="hand-h">
           <h2 id="hand-h">Add work by hand</h2>
-          <p className="small muted">Normally the manager does this from your goals.</p>
+          <p className="small muted">Normally the conductor does this from your goals.</p>
           <div className="control-grid">
             <form className="form" onSubmit={e => { e.preventDefault(); void act(() => api!.createTask({ title: title.trim(), description: desc.trim(), files: list(files), difficulty: diff }, who || undefined), 'Task created.').then(ok => { if (ok) { setTitle(''); setFiles(''); setDesc(''); } }); }}>
               <h3>One task</h3>
@@ -253,13 +270,20 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
           <dt>Address</dt><dd className="mono">{team.uri}</dd>
           {share && share.uri !== team.uri && <><dt>Others use</dt><dd className="mono">{share.uri}</dd></>}
         </dl>
-        {!share && <><p className="small muted">Only this computer can open this team. On the project host, restart Tandem without <code className="mono">--local</code> to share the link:</p><CodeLine code={restart} say={say} /></>}
+        {!share && <><p className="small muted">Only this computer can open this team. On the conductor&apos;s computer, restart Tandem without <code className="mono">--local</code> to share the link:</p><CodeLine code={restart} say={say} /></>}
         <div className="row-actions">
           <button type="button" className="btn" onClick={async () => { try { const QRCode = (await import('qrcode')).default; setQr(await QRCode.toDataURL(pageUrl, { margin: 1, width: 220 })); } catch { setQr(''); } }}>Show QR code</button>
           <button type="button" className="btn" onClick={() => copy(pageUrl, say, 'Link copied')}>Copy link</button>
           <button type="button" className="btn" onClick={onLeave}>Switch team</button>
         </div>
         {qr !== null && (qr ? <img className="qr" src={qr} alt="QR code for this team's page" width={220} height={220} /> : <p className="small">Could not make a QR code.</p>)}
+        <p className="small muted">For a projector or a second screen: <a href={`${pageUrl}${pageUrl.includes('?') ? '&' : '?'}view=present`} target="_blank" rel="noreferrer">the big-type board</a>, no controls.</p>
+      </section>
+
+      <section className="card" aria-labelledby="unit-h">
+        <h2 id="unit-h">Show usage as</h2>
+        <p className="small muted">Dollars are estimated at Claude API prices (~). On a Pro or Max plan nothing is billed per run, so tokens may say more. This browser remembers the choice.</p>
+        <UnitSwitch />
       </section>
 
       {isOp && (
