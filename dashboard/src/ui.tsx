@@ -93,7 +93,7 @@ export const lockBlocking = (t: Task, snap: Snapshot) =>
 // workers read, so the page and the workers always agree.
 type Pick = { model: string; effort: string };
 type Level = { conductor: Pick; difficulty: Record<string, Pick>; kind: Record<string, Pick> };
-const LEVELS = (routing as { by_goal_effort: Record<string, Level> }).by_goal_effort;
+export const LEVELS = (routing as { by_goal_effort: Record<string, Level> }).by_goal_effort;
 export const goalEffortOf = (task: Task, snap: Snapshot) => snap.goals.find(g => g.id === task.goalId)?.effort ?? 'medium';
 export function routeFor(task: Task, goalEffort = 'medium'): Pick {
   const l = LEVELS[goalEffort] ?? LEVELS.medium;
@@ -238,6 +238,30 @@ export const money = (usd: number) => `$${usd > 0 && usd < 0.01 ? usd.toFixed(3)
 // "850 tokens", "12.4k tokens", "1.2M tokens"
 export const tokenText = (n: number) =>
   `${n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : Math.round(n)} tokens`;
+
+// Light, Dark, or whatever the operating system uses (Settings). index.html applies it before the
+// page draws; this keeps it in step after a change.
+export type Theme = 'system' | 'light' | 'dark';
+const THEME_KEY = 'tandem-theme';
+const readTheme = (): Theme => { try { const t = localStorage.getItem(THEME_KEY); return t === 'light' || t === 'dark' ? t : 'system'; } catch { return 'system'; } };
+let theme = readTheme();
+const themeListeners = new Set<() => void>();
+export function setTheme(t: Theme) {
+  theme = t;
+  try { if (t === 'system') localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, t); } catch { /* this visit only */ }
+  if (t === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  themeListeners.forEach(f => f());
+}
+export function ThemeSwitch() {
+  const t = useSyncExternalStore(f => { themeListeners.add(f); return () => themeListeners.delete(f); }, () => theme);
+  return (
+    <div className="unit-switch" role="group" aria-label="Theme">
+      {(['system', 'light', 'dark'] as const).map(k => (
+        <button key={k} type="button" className={`chip ${t === k ? 'on' : ''}`} aria-pressed={t === k} onClick={() => setTheme(k)}>{k === 'system' ? 'System' : k === 'light' ? 'Light' : 'Dark'}</button>
+      ))}
+    </div>
+  );
+}
 
 // Usage shows as dollars or as tokens; the choice is this browser's (Usage page and Settings).
 // Dollars are what the runs would cost at API prices: an estimate, so they carry a "~".

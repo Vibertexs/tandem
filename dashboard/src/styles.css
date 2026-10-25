@@ -37,8 +37,9 @@
   --mono: ui-monospace, 'Cascadia Mono', SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light;
 }
+/* Dark: by the operating system, unless Settings picked Light or Dark (data-theme on <html>). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --canvas: #121110; --dot: #24221e; --surface: #1a1917; --surface-2: #1f1d1a; --fill: #26241f; --ink: #efede8; --muted: #9d9a92;
     --line: #2d2b26; --line-strong: #3c3933; --accent: #e8734d; --accent-strong: #f08a66; --accent-soft: #3a211a;
     --primary: #efede8; --primary-ink: #121110; --ok: #4cc38a; --ok-soft: #14291f; --info: #7ba2f2; --info-soft: #172338;
@@ -46,6 +47,14 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4); --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -14px rgba(0, 0, 0, 0.6);
     color-scheme: dark;
   }
+}
+:root[data-theme='dark'] {
+  --canvas: #121110; --dot: #24221e; --surface: #1a1917; --surface-2: #1f1d1a; --fill: #26241f; --ink: #efede8; --muted: #9d9a92;
+  --line: #2d2b26; --line-strong: #3c3933; --accent: #e8734d; --accent-strong: #f08a66; --accent-soft: #3a211a;
+  --primary: #efede8; --primary-ink: #121110; --ok: #4cc38a; --ok-soft: #14291f; --info: #7ba2f2; --info-soft: #172338;
+  --warn: #e3b341; --warn-soft: #2a2412; --danger: #ff8f84; --danger-soft: #341b18; --low: #4cc38a; --mid: #e3b341; --high: #ff8f84;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4); --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -14px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -163,7 +172,17 @@ textarea { resize: vertical; }
 .present .main { padding-left: 28px; }
 .topbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 24px 0 12px; }
 .topbar h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.025em; }
-.team-pill { display: flex; align-items: center; gap: 10px; padding: 6px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow-sm); }
+/* Everything on the right of the top bar has one shape: a white pill, the team pill's. */
+.top-item { display: inline-flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow-sm); color: var(--ink); font: inherit; font-size: 0.88rem; font-weight: 500; white-space: nowrap; }
+button.top-item { cursor: pointer; }
+button.top-item:hover { background: var(--fill); }
+.top-item .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--line-strong); flex: none; }
+.top-item .dot.on { background: var(--ok); }
+.top-item .dot.you { background: var(--info); }
+.top-item .dot.wait { background: var(--warn); }
+.top-item.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+.top-item.primary:hover { background: var(--primary); opacity: 0.88; }
+.team-pill { font-weight: 400; }
 .team-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
 .dot.on { background: var(--ok); }
@@ -236,8 +255,13 @@ textarea { resize: vertical; }
 .step-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
 .step-body p { margin: 0; }
 .join-steps { display: flex; flex-direction: column; gap: 6px; }
-.setup-roles { max-width: 760px; display: flex; flex-direction: column; gap: 10px; }
-.setup-roles h2 { font-size: 1rem; }
+/* Get started, inside one card on the Team page: the steps are rows, not cards of their own */
+.setup { display: flex; flex-direction: column; gap: 10px; }
+.setup .steps-list { gap: 0; max-width: none; }
+.setup .step { border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; background: none; padding: 16px 0 4px; }
+.setup .step-body > details > summary, .setup .connect summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.prefs { grid-template-columns: 120px 1fr; align-items: center; }
+.prefs dd { flex-direction: row; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 /* ---- the invite, top right of every page ---- */
 .invite { position: relative; }
@@ -334,8 +358,6 @@ ol.log.card { padding: 6px 20px; }
 /* ---- Shared memory: the live database ---- */
 .live-db { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
 .live-db .lead { margin-bottom: 0; }
-.db-points { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); max-width: 70ch; }
-.db-points strong { color: var(--ink); }
 .db-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .db-card { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; transition: border-color 0.3s, box-shadow 0.3s, background 0.6s; }
 .db-card.lit { border-color: var(--accent); background: var(--accent-soft); }
@@ -346,8 +368,25 @@ ol.log.card { padding: 6px 20px; }
 .db-rows summary { cursor: pointer; color: var(--accent-strong); }
 .db-rows pre { margin-top: 6px; max-height: 220px; overflow: auto; white-space: pre; word-break: normal; font-size: 0.72rem; }
 
-/* ---- Shared memory: how the team shares one memory, and the agents ---- */
-.shared-brain { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+/* ---- Help ---- */
+.help .card { display: flex; flex-direction: column; gap: 10px; }
+.help-cmds { display: flex; flex-direction: column; gap: 12px; }
+.help-cmds li { display: grid; grid-template-columns: minmax(0, 360px) 1fr; gap: 4px 16px; align-items: center; }
+@media (max-width: 860px) { .help-cmds li { grid-template-columns: 1fr; } }
+.help-options { grid-template-columns: minmax(120px, 200px) 1fr; }
+.help-option { display: contents; }
+.table-wrap { overflow-x: auto; }
+.help-table { border-collapse: collapse; font-size: 0.85rem; min-width: 480px; width: 100%; }
+.help-table th, .help-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.help-table thead th { color: var(--muted); font-weight: 500; }
+.help-table tbody th { font-weight: 500; }
+kbd { font-family: var(--mono); font-size: 0.78rem; padding: 1px 6px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 6px; background: var(--surface); }
+
+/* ---- Shared memory: locks and other shared values, then the agents ---- */
+.dev-rows .row { gap: 12px; }
+.dev-rows code { font-size: 0.8rem; }
+.dev-key { flex: none; min-width: 150px; }
+.dev-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .under-hood { margin-top: 8px; }
 .under-hood > summary { cursor: pointer; color: var(--muted); font-weight: 500; padding: 6px 0; }
 .under-hood > summary:hover { color: var(--ink); }
@@ -421,6 +460,7 @@ ol.log.card { padding: 6px 20px; }
   .lane-body .column.is-empty { display: none; } /* stacked: only the stages that have tasks */
   .toast { bottom: 90px; }
   .team-pill { order: 5; width: 100%; }
+  .top-item { min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
