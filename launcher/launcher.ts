@@ -24,6 +24,7 @@ import { loadRouting, route } from './routing.js';
 import { isRateLimit, resetTime } from './limits.js';
 import { filesWithMarkers, ignoreWorktrees, mergeInProgress, pushIfRemote, startConflictMerge, startFromBranches, worktreesDir } from '../manager/merge.js';
 import { REVIEW_TITLE, conflictBranch } from '../manager/finish.js';
+import { spawnClaude } from '../manager/claude.js';
 
 const { values: opt } = parseArgs({
   options: {
@@ -128,7 +129,7 @@ function runClaude(cwd: string, prompt: string, model: string, effort: string, e
     '--max-budget-usd', BUDGET, '--output-format', 'json'];
   if (effort && effort !== 'default') args.push('--effort', effort);
   return new Promise<{ code: number; out: string; result: string; cost: number; isError: boolean }>(done => {
-    const child = spawn('claude', args, { cwd, windowsHide: true, env: { ...process.env, TANDEM_WORKER_ID: workerId, TANDEM_SESSION: SESSION, STDB_URI: URI, STDB_DB: DB, ...extraEnv } });
+    const child = spawnClaude(args, { cwd, windowsHide: true, env: { ...process.env, TANDEM_WORKER_ID: workerId, TANDEM_SESSION: SESSION, STDB_URI: URI, STDB_DB: DB, ...extraEnv } });
     let stdout = ''; let stderr = '';
     child.stdout.on('data', d => { stdout += d; });
     child.stderr.on('data', d => { stderr += d; });
