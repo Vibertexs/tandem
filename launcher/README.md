@@ -16,7 +16,7 @@ Env: `STDB_URI`, `STDB_DB`, `TANDEM_SESSION` (default `live`), `LAUNCHER_BUDGET_
 
 ## What one task looks like
 1. `claim_task` (the brain locks its files).
-2. `git worktree add .worktrees/<task words>-<task id>` on a new branch `task/<task id>`. A task that waited for others (`depends_on`) starts with their branches merged in, so its Claude can read the code it builds on. A task added to a finished goal (a test fix) starts from the goal branch.
+2. `git worktree add <worktrees>/<task words>-<task id>` on a new branch `task/<task id>`. A task that waited for others (`depends_on`) starts with their branches merged in, so its Claude can read the code it builds on. A task added to a finished goal (a test fix) starts from the goal branch.
 3. `claude -p` in that worktree with the team rules (`mcp/skill/SKILL.md`) and the task. The run gets:
    - the tandem MCP, so it can report progress and lock extra files
    - the lock-check hook, via `--settings`, so it cannot edit files other tasks hold
@@ -28,7 +28,7 @@ Env: `STDB_URI`, `STDB_DB`, `TANDEM_SESSION` (default `live`), `LAUNCHER_BUDGET_
 7. A "Review the goal's work" task (manager `--review`) runs with read-only tools (Read, Glob, Grep), and its whole reply is kept as the result.
 8. A "Resolve the merge conflict with task/X" task is special: the launcher starts that merge in the worktree, Claude only edits out the conflict markers, and the launcher commits the merge (retrying if markers are left).
 
-`.worktrees/` is kept out of your repo's `git status` through `.git/info/exclude`, so nothing is committed to your repo.
+`<worktrees>` is Tandem's own folder when started by `tandem start` (`TANDEM_WORKTREES`), so nothing is added to your project. Run by hand, it is `.worktrees/` in the repo, kept out of `git status` through `.git/info/exclude`; nothing is committed to your repo.
 
 ## Checklist
 - [x] Launcher loop: register, claim a task, run it in a git worktree, report progress and completion, repeat (`launcher.ts`; the Python placeholder is not used)

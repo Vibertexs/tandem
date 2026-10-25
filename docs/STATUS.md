@@ -32,7 +32,8 @@ For real work, go to your own project's folder and run `tandem start`. `tandem s
 | Area | What |
 |---|---|
 | Control | Whoever runs `tandem start` controls the team: the page it opens (`host=1`) takes control and approves the manager by itself. The claim-or-watch screen is gone. Teammates opening the invite only watch. |
-| Names | Workers are named after the computer (`bilal-pc`, `bilal-pc-2`, or `bilal-pc-work1` with accounts), not Alex or Sam. Task folders are `.worktrees/<task words>-<id>`; worker config files are in `.worktrees/.tandem/`. The Board no longer suggests goals. |
+| Names | Workers are named after the computer (`bilal-pc`, `bilal-pc-2`, or `bilal-pc-work1` with accounts), not Alex or Sam. The Board no longer suggests goals. |
+| Task folders | Each task runs in its own git worktree (so parallel Claudes never touch the same files). `tandem start` puts them in Tandem's own folder, `.tandem/worktrees/<project>-<id>/<task words>-<id>`, not in your project, so your project gets no `.worktrees` folder and no `.git/info/exclude` entry. Run by hand without `tandem start`, they are in `.worktrees/` in the repo. |
 | Models | Default is by task difficulty: easy haiku, normal sonnet, hard opus (`--model <name>` forces one). The task drawer shows the model. It used to be haiku for everything. |
 | Windows | Background workers and the manager no longer open console windows on Windows. |
 | Starting | `tandem start` in your project, not in the Tandem folder. Run its launcher by path on first use—no PATH setup needed. Open to your network by default (`--local` keeps it on this computer). One line per piece, then Open, Invite, Stop. Safe to run twice: what runs is kept. `tandem join <invite>`, `tandem stop`, `tandem status`, `tandem open`, `tandem logs`. One cross-platform TypeScript file (`cli/tandem.ts`, Node 22.18+); `start.ps1`, `start.sh`, `stop.ps1` and `stop.sh` are gone. |
@@ -75,6 +76,10 @@ Also passing:
 - Not tried: `gh pr create` (no GitHub CLI here), a real Slack or Discord webhook, a real usage limit, and a real failing-tests fix round (each is tested without Claude).
 - Identities are saved tokens on each computer, not accounts. Anyone who can reach the brain can watch and add a worker. The host project server also has no separate login, so share only over a trusted private network such as Tailscale.
 - Nothing is hosted on Maincloud (it needs `spacetime login` in a browser).
+
+## Later (ideas, not built)
+- **Spec-first team mode.** A team of four has a spec and splits the idea into four parts. Each person prompts their own Claude Code on their part, as they do today. Tandem then adds: each person says which stage they are on, shared memory tells every Claude who is on what ("Sam is on login, so you take the API"), and at the end `tandem push` submits a person's branch for testing and the manager rebases and merges them. This builds on what exists (shared memory, locks, presence); it needs a one-command way to connect a person's own Claude to the brain, stages in the shared context, and `tandem push`. Do it after the current flow passes on two real computers.
+- **Normal names in the result.** Task folders may carry descriptive names while they are being worked on, but what lands in the project should look hand-made: readable branch names (not `g-0fv9rd`) and plain commit messages without task ids.
 
 ## Branches
 `bilal/git-share` is on top of `bilal/join-quotes`, which carries every earlier branch. Nothing from this final stack is on `main`. The PR text is in `docs/PR.md`. Open it at https://github.com/Vibertexs/tandem/pull/new/bilal/git-share

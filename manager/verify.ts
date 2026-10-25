@@ -3,6 +3,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { worktreesDir } from './merge.js';
 
 export type TestRun = { ran: boolean; ok: boolean; command: string; output: string };
 
@@ -28,7 +29,7 @@ export function testCommand(dir: string): { file: string; args: string[]; label:
 }
 
 export function testBranch(repo: string, branch: string, timeoutMs = 300_000): TestRun {
-  const tree = join(repo, '.worktrees', `verify-${branch.replace(/[^a-z0-9-]/gi, '-')}`);
+  const tree = join(worktreesDir(repo), `verify-${branch.replace(/[^a-z0-9-]/gi, '-')}`);
   try {
     git(repo, 'worktree', 'prune');
     if (existsSync(tree)) git(repo, 'worktree', 'remove', '--force', tree);

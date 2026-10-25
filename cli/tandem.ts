@@ -167,7 +167,8 @@ function background(name: string, team: string, cmd: string, args: string[], cwd
   mkdirSync(LOGS, { recursive: true });
   const base = join(LOGS, `${team ? `${team}-` : ''}${name.replace(/\s+/g, '-')}`);
   const child = spawn(cmd, args, {
-    cwd, env: { ...process.env, ...env }, detached: true, windowsHide: true,
+    // task folders go in Tandem's own state, not in your project
+    cwd, env: { ...process.env, TANDEM_WORKTREES: join(STATE, 'worktrees'), ...env }, detached: true, windowsHide: true,
     stdio: ['ignore', openSync(`${base}.log`, 'a'), openSync(`${base}.err`, 'a')],
   });
   child.unref();

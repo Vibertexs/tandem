@@ -3,7 +3,8 @@
 // is skipped (the merge is aborted) and reported; nothing is ever forced.
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { basename, dirname, join, resolve } from 'node:path';
 
 // failed: branches that conflicted; conflicts: the files each one conflicted in.
 export type MergeResult = { target: string; merged: string[]; failed: string[]; missing: string[]; conflicts: Record<string, string[]> };
@@ -14,7 +15,7 @@ const git = (cwd: string, ...args: string[]) =>
 export function mergeGoal(repo: string, goalId: string, goalText: string, branches: string[]): MergeResult {
   const hasBranch = (b: string) => { try { git(repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`); return true; } catch { return false; } };
   const target = `tandem/${goalId}`;
-  const tree = join(repo, '.worktrees', `merge-${goalId}`);
+  const tree = join(worktreesDir(repo), `merge-${goalId}`);
   const result: MergeResult = { target, merged: [], failed: [], missing: [], conflicts: {} };
   try {
     ignoreWorktrees(repo);
@@ -42,9 +43,22 @@ export function mergeGoal(repo: string, goalId: string, goalText: string, branch
   return result;
 }
 
+// Where a project's task folders live. `tandem start` sets TANDEM_WORKTREES to a folder inside
+// Tandem's own state, so nothing is added to your project. Without it (the tests, a launcher run by
+// hand) it is .worktrees/ in the repo.
+export function worktreesDir(repo: string): string {
+  const base = process.env.TANDEM_WORKTREES;
+  if (!base) return join(repo, '.worktrees');
+  const full = resolve(repo);
+  const name = basename(full).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'project';
+  return join(base, `${name}-${createHash('sha1').update(full.toLowerCase()).digest('hex').slice(0, 6)}`);
+}
+
 // Keeps .worktrees/ out of `git status` in the user's repo: a local-only ignore rule in
-// .git/info/exclude (never committed, so the repo itself is not changed).
+// .git/info/exclude (never committed, so the repo itself is not changed). Not needed when the
+// task folders live outside the repo.
 export function ignoreWorktrees(repo: string) {
+  if (process.env.TANDEM_WORKTREES) return;
   try {
     const exclude = resolve(repo, git(repo, 'rev-parse', '--git-common-dir'), 'info', 'exclude');
     const now = existsSync(exclude) ? readFileSync(exclude, 'utf8') : '';
