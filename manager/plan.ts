@@ -7,6 +7,7 @@
 // The manager's identity (printed first) must be allowed to manage the team; watch.ts asks for
 // that by itself. Uses your Claude quota. Nothing is added to your Claude Code settings.
 import { spawn } from 'node:child_process';
+import { spawnClaude } from './claude.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -49,9 +50,10 @@ const prompt = readFileSync(join(here, 'PROMPT.md'), 'utf8') + '\n\nBegin now: c
 // TANDEM_CLAUDE: a node script standing in for claude (tests only)
 const [cmd, ...pre] = process.env.TANDEM_CLAUDE ? [process.execPath, process.env.TANDEM_CLAUDE] : ['claude'];
 const code = await new Promise<number>(done => {
-  const child = spawn(cmd, [...pre, '-p', '--model', opt.model!, '--mcp-config', config, '--strict-mcp-config',
-    '--allowedTools', 'mcp__tandem', 'Read', 'Glob', 'Grep', '--max-budget-usd', opt.budget!, '--output-format', 'json'],
-    { cwd: resolve(opt.workdir!), windowsHide: true });
+  const args = ['-p', '--model', opt.model!, '--mcp-config', config, '--strict-mcp-config',
+    '--allowedTools', 'mcp__tandem', 'Read', 'Glob', 'Grep', '--max-budget-usd', opt.budget!, '--output-format', 'json'];
+  const where = { cwd: resolve(opt.workdir!), windowsHide: true };
+  const child = process.env.TANDEM_CLAUDE ? spawn(cmd, [...pre, ...args], where) : spawnClaude(args, where);
   let stdout = ''; let stderr = '';
   child.stdout.on('data', d => { stdout += d; });
   child.stderr.on('data', d => { stderr += d; process.stderr.write(d); });
