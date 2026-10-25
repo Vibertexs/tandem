@@ -138,7 +138,7 @@ export function App() {
         <main>
           {page === 'board' && <BoardPage {...common} isOp={isOp} present={config.present} go={go} />}
           {page === 'team' && <TeamPage {...common} team={team ?? { uri: '', db: 'sample' }} go={go} />}
-          {page === 'memory' && <MemoryPage {...common} />}
+          {page === 'memory' && <MemoryPage {...common} team={team ?? { uri: '', db: 'sample' }} />}
           {page === 'activity' && <ActivityPage {...common} />}
           {page === 'settings' && <SettingsPage {...common} team={team ?? { uri: '', db: 'sample' }} onLeave={leave} />}
         </main>

@@ -59,6 +59,13 @@ check('a mistyped invite (no "?", a stray ".") is read as the same team',
   check('tandem uninstall removes only the Tandem folder', /Removed/.test(tandem(['uninstall'], repo, env)) && readFileSync(pf, 'utf8') === 'C:\\a;C:\\b');
   check('uninstalling when it is not there says there is nothing to remove', /nothing to remove/.test(tandem(['uninstall'], repo, env)));
 }
+{
+  const d = tandem(['doctor'], repo);
+  check('tandem doctor checks Node, Git, npm, Claude Code, SpacetimeDB, Tailscale and Python, and says if this computer can join and host',
+    ['Node.js', 'Git', 'npm', 'Claude Code', 'SpacetimeDB', 'Tailscale', 'Python', 'Ready to join a team', 'Ready to host a team'].every(s => d.includes(s)), d);
+  check('tandem --doctor is the same', tandem(['--doctor'], repo) === d);
+  check('tandem doctor changes nothing: it says what to do for what is missing, and nothing is added to the PATH', !/Added/.test(d));
+}
 check('--simulate is not an option any more', /Unknown option '--simulate'/.test(tandem(['start', '--simulate'], repo)));
 check('an unknown account is refused with how to add it', /No account "nope"/.test(tandem(['start', '--accounts', 'nope', '--local', '--no-manager', '--no-browser', '--team', TEAM], repo)));
 

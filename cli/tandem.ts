@@ -62,6 +62,8 @@ const HELP = `tandem: your team's Claude Codes, working as one.
 
   tandem install            Put tandem on your PATH, so it works in any new terminal (once).
   tandem uninstall          Take it off again.
+  tandem doctor             Check this computer has what Tandem needs (Node, Git, Claude Code,
+                            SpacetimeDB, Tailscale) and say what to install. Changes nothing.
 
   tandem                    On its own: opens the dashboard. It shows what is running, or how to get started.
   tandem -d                 Open the dashboard (also: tandem dashboard, tandem open, tandem --dashboard).
@@ -103,7 +105,10 @@ function which(cmd: string): string | null {
 function run(cmd: string, args: string[], cwd = ROOT) {
   const shell = WIN && /\.(cmd|bat)$/i.test(cmd);
   const quoted = shell ? args.map(a => (/[\s"&|<>^]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a)) : args;
-  const r = spawnSync(shell ? `"${cmd}"` : cmd, quoted, { cwd, encoding: 'utf8', shell, windowsHide: true });
+  // through a shell, the whole command is one string (Node warns about passing arguments with a shell)
+  const r = shell
+    ? spawnSync([`"${cmd}"`, ...quoted].join(' '), { cwd, encoding: 'utf8', shell: true, windowsHide: true })
+    : spawnSync(cmd, quoted, { cwd, encoding: 'utf8', windowsHide: true });
   return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() };
 }
 const git = (cwd: string, ...args: string[]) => run('git', args, cwd);
@@ -340,9 +345,10 @@ async function start(argv: string[]) {
   const realAgents = SIMULATE ? [] : accts.length ? accts.map(a => a.agent) : workers > 0 ? ['claude'] : [];
   const needClaude = realAgents.includes('claude') || !o['no-manager'];
   for (const t of ['git', 'spacetime', ...(needClaude ? ['claude'] : []), ...(realAgents.includes('codex') ? ['codex'] : [])]) {
-    if (!which(t)) fail(t === 'spacetime' ? 'The SpacetimeDB CLI is not installed. See https://spacetimedb.com/install'
+    if (!which(t)) fail((t === 'spacetime' ? 'The SpacetimeDB CLI is not installed. See https://spacetimedb.com/install'
       : t === 'claude' ? 'Claude Code (claude) is not installed or not on PATH. Install it from https://claude.com/claude-code and sign in.'
-      : t === 'codex' ? 'The Codex CLI (codex) is not installed. See https://github.com/openai/codex' : `${t} is not installed.`);
+      : t === 'codex' ? 'The Codex CLI (codex) is not installed. See https://github.com/openai/codex' : `${t} is not installed.`)
+      + '\nRun "tandem doctor" to see everything this computer needs.');
   }
   say();
   say(`  ${bold('Tandem')} ${dim(`· team "${team}" · ${repo}`)}`);
@@ -684,12 +690,46 @@ function uninstallCmd() {
   try { if (resolve(dirname(link), readlinkSync(link)) === join(ROOT, 'tandem')) { rmSync(link); say(`\n  ${green('✓')} Removed ${link}.`); return; } } catch { /* not a link */ }
   say(`\n  ${link} is not a link to this Tandem, so it was left alone.`);
 }
+// ---------- tandem doctor: is this computer ready? ----------
+// Checks what Tandem needs and says what to install for anything missing. Nothing is changed.
+function doctorCmd() {
+  // "git version 2.51.1", "v11.6.1": the version number from a program's --version, else its first line
+  const first = (r: { ok: boolean; out: string }) => (r.ok ? (/\d+\.\d+(?:\.\d+)?/.exec(r.out)?.[0] ?? r.out.split('\n')[0].trim()) : '');
+  const has = (cmd: string, args: string[] = ['--version']) => { const p = which(cmd); return p ? { path: p, version: first(run(p, args)) } : null; };
+  const git_ = has('git');
+  const npm_ = has('npm');
+  const claude_ = has('claude');
+  const spacetime_ = has('spacetime');
+  const python_ = has('python') ?? has('python3');
+  const tailscale = tailscaleAddress();
+  const tsInstalled = !!tailscale || !!which('tailscale') || (!!process.env.ProgramFiles && existsSync(join(process.env.ProgramFiles, 'Tailscale', 'tailscale.exe')));
+
+  say(`\n  ${bold('Tandem · is this computer ready?')}\n`);
+  const row = (mark: string, what: string, detail: string, fix = '') =>
+    say(`  ${mark} ${what.padEnd(13)} ${detail}${fix ? `\n    ${' '.repeat(13)} ${dim(fix)}` : ''}`);
+  const ok = green('✓'), bad = '✗', opt = dim('–');
+  row(ok, 'Node.js', `${process.versions.node}`);
+  row(git_ ? ok : bad, 'Git', git_ ? git_.version : 'not found', git_ ? '' : 'Install it: https://git-scm.com/downloads');
+  row(npm_ ? ok : bad, 'npm', npm_ ? npm_.version : 'not found', npm_ ? '' : 'It comes with Node.js: https://nodejs.org');
+  row(claude_ ? ok : bad, 'Claude Code', claude_ ? claude_.version : 'not found', claude_ ? 'Make sure you are signed in: run "claude" once and follow the login.' : 'Install it: https://claude.com/claude-code, then run "claude" once and sign in.');
+  row(spacetime_ ? ok : opt, 'SpacetimeDB', spacetime_ ? spacetime_.version : 'not found (only the host needs it)', spacetime_ ? '' : 'To host a team: https://spacetimedb.com/install');
+  row(tailscale ? ok : opt, 'Tailscale', tailscale ? `connected, ${tailscale}` : tsInstalled ? 'installed, not connected' : 'not found (only needed across different networks)', tailscale ? '' : 'Public wifi or different networks: https://tailscale.com/download');
+  row(python_ ? ok : opt, 'Python', python_ ? python_.version : 'not found (only for Python projects)');
+  const onPath = !!which('tandem');
+  row(onPath ? ok : opt, '"tandem" cmd', onPath ? 'works in any terminal' : 'not on your PATH yet', onPath ? '' : `Run once: ${ownCommand()} install, then open a new terminal.`);
+
+  const canJoin = !!(git_ && npm_ && claude_);
+  const canHost = canJoin && !!spacetime_;
+  say(`\n  ${canJoin ? green('✓') : bad} Ready to join a team   ${canHost ? green('✓') : bad} Ready to host a team\n`);
+  if (!canJoin) process.exitCode = 1;
+}
+
 // how to run this Tandem by its own path, for the tip printed when "tandem" is not on the PATH
 const ownCommand = () => (WIN ? `& '${join(ROOT, 'tandem.cmd')}'` : `'${join(ROOT, 'tandem')}'`);
 
 const [first, ...rest] = process.argv.slice(2);
 // Every command also works as a flag: "tandem --start" is "tandem start".
-const WORDS = ['start', 'join', 'stop', 'status', 'open', 'dashboard', 'logs', 'account', 'accounts', 'install', 'uninstall', 'version', 'help'];
+const WORDS = ['start', 'join', 'stop', 'status', 'open', 'dashboard', 'logs', 'account', 'accounts', 'install', 'uninstall', 'doctor', 'version', 'help'];
 const cmd = first && first.startsWith('--') && WORDS.includes(first.slice(2)) ? first.slice(2) : first;
 try {
   if (cmd === 'start') await start(rest);
@@ -702,6 +742,7 @@ try {
   else if (cmd === 'account' || cmd === 'accounts') await accountCmd(rest);
   else if (cmd === 'install') installCmd();
   else if (cmd === 'uninstall') uninstallCmd();
+  else if (cmd === 'doctor') doctorCmd();
   else if (cmd === 'help' || cmd === '-h') say(HELP);
   else if (!cmd) {
     // just `tandem`: open the page. A running team's board (with what is running); otherwise the

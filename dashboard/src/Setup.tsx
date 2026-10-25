@@ -45,18 +45,12 @@ export function GetStarted({ snap, team, now, say, go, isOp }: { snap: Snapshot;
 
       <ol className="plain steps-list">
         <Step done={hostReady} title="1. Start the project host">
-          <p className="small muted">Paste this whole block in PowerShell or Terminal on the computer that holds the project. It calls Tandem by its known path, so there is no PATH setup to do.</p>
+          <p className="small muted">Paste this whole block in PowerShell or Terminal on the computer that holds the project. It calls Tandem by its full path, so it works before you set up your PATH.</p>
           <CodeLine code={hostCommand} say={say} />
           <p className="small muted">{manager ? 'Manager online.' : 'Manager not online yet.'} {live.length ? `${live.length} coding worker${live.length === 1 ? '' : 's'} online.` : 'No coding workers online yet.'}</p>
         </Step>
 
-        <Step done={snap.goals.length > 0} title="2. Send a goal">
-          {isOp
-            ? <p className="small muted">Go to the <a href="#/board" onClick={() => go('board')}>Board</a>, describe what you want built, and send it. The manager turns it into tasks for the workers.</p>
-            : <p className="small muted">A controller must approve this browser before it can send goals. Use <strong>Request control</strong> in the top bar, then go to the Board.</p>}
-        </Step>
-
-        <Step done={joined.length > 0} title="3. Add a teammate&apos;s computer">
+        <Step done={joined.length > 0} title="2. Add a teammate&apos;s computer">
           {!share ? (
             <>
               <p className="small warn">This team is only available on this computer. Start the project host without <code className="mono">--local</code> to create an invite.</p>
@@ -69,6 +63,12 @@ export function GetStarted({ snap, team, now, say, go, isOp }: { snap: Snapshot;
             </>
           )}
           {joined.length > 0 && <p className="small muted">Joined worker computers: {joined.map(w => w.name).join(', ')}.</p>}
+        </Step>
+
+        <Step done={snap.goals.length > 0} title="3. Send a goal">
+          {isOp
+            ? <p className="small muted">Go to the <a href="#/board" onClick={() => go('board')}>Board</a>, describe what you want built, and send it. The manager turns it into tasks, and every connected computer&apos;s workers pick them up.</p>
+            : <p className="small muted">A controller must approve this browser before it can send goals. Use <strong>Request control</strong> in the top bar, then go to the Board.</p>}
         </Step>
       </ol>
     </section>

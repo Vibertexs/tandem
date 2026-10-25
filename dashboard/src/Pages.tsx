@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { Api, Snapshot } from './brain';
 import { shareable, type Team } from './config';
 import { GetStarted } from './Setup';
+import { LiveDatabase } from './Database';
 import { Avatar, Bar, CodeLine, EV_ICON, JoinSteps, WorkerStatus, agentLabel, ago, copy, isManager, money, online, restartForSharingCommand, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
@@ -108,11 +109,12 @@ function Note({ k, title, hint, snap, api, isOp, say }: Common & { k: string; ti
     </form>
   );
 }
-export function MemoryPage(c: Common) {
+export function MemoryPage(c: Common & { team: Team }) {
   return (
     <div className="page">
-      <p className="muted lead">Every Claude on the team reads this before it starts a task. Keep it short.</p>
+      <p className="muted lead">Every Claude on the team reads these notes before it starts a task. Keep them short. They are stored in the database&apos;s <code className="mono">context</code> table.</p>
       <div className="notes">{NOTES.map(n => <Note key={n.key} {...c} k={n.key} title={n.title} hint={n.hint} />)}</div>
+      <LiveDatabase snap={c.snap} team={c.team} />
     </div>
   );
 }
