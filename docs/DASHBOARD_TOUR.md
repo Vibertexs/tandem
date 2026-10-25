@@ -60,10 +60,4 @@ The dashboard’s **Help** page is for quick copy-and-run commands. The longer [
 
 **Settings** remembers a System, Light, or Dark theme for the browser. It also carries the usage display preference and tools for adding work by hand.
 
-## Phone view
-
-<img src="img/phone.png" alt="Tandem Board on a phone with the navigation dock at the bottom" width="420">
-
-On a phone, the navigation dock becomes a bottom bar with touch-sized targets. Teammates can follow work from the invite link without touching the conductor’s project.
-
 These screenshots use the dashboard’s automated sample team. Simulated workers are labelled as such; the interface and coordination flow are the same as a live team.

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { type Team } from './config';
 import { CodeLine } from './ui';
+import { ProjectStarter } from './ProjectStarter';
 
 // The invite the conductor's page and `tandem --start` show: http://192.168.1.20:5173/?db=shop.
 // Also accepts host/team or host:3001/team. Returns null if it cannot tell the team.
@@ -48,6 +49,7 @@ export function Landing({ onOpen, say }: { onOpen: (t: Team) => void; say: (m: s
             </li>
             <li>On that page you are the conductor automatically. Describe what you want built and pick an effort.</li>
           </ol>
+          <ProjectStarter say={say} idPrefix="landing" />
           <details className="start-help">
             <summary className="small">If <code className="mono">tandem</code> is not recognised</summary>
             <p className="small muted">Keep the terminal in your project and run Tandem by its path instead:</p>
