@@ -22,7 +22,7 @@ import { parseArgs } from 'node:util';
 import { BrainClient, type Task } from '../mcp/src/brain-client.js';
 import { loadRouting, route } from './routing.js';
 import { isRateLimit, resetTime } from './limits.js';
-import { filesWithMarkers, ignoreWorktrees, mergeInProgress, pushIfRemote, startConflictMerge, startFromBranches } from '../manager/merge.js';
+import { filesWithMarkers, ignoreWorktrees, mergeInProgress, pushIfRemote, startConflictMerge, startFromBranches, worktreesDir } from '../manager/merge.js';
 import { REVIEW_TITLE, conflictBranch } from '../manager/finish.js';
 
 const { values: opt } = parseArgs({
@@ -101,7 +101,8 @@ async function simulate(t: Task) {
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe', windowsHide: true }).trim();
 
-// A worker's own config files live in .worktrees/.tandem/, so .worktrees/ holds only task folders.
+// A worker's own config files live in a .tandem/ folder beside the task folders, so the task folders
+// folder holds only tasks.
 function scratchFile(cwd: string, name: string) {
   const dir = join(cwd, '..', '.tandem');
   mkdirSync(dir, { recursive: true });
@@ -189,14 +190,15 @@ function runCodex(cwd: string, prompt: string, readOnly: boolean) {
 
 async function realRun(t: Task) {
   const repo = resolve(opt.repo!);
-  // the folder says what the task is: .worktrees/write-calc-py-t-bu3yoo (the branch stays task/<id>)
+  // the folder says what the task is: write-calc-py-t-bu3yoo (the branch stays task/<id>)
   const words = t.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
-  const tree = join(repo, '.worktrees', words ? `${words}-${t.id}` : t.id);
+  const trees = worktreesDir(repo);
+  const tree = join(trees, words ? `${words}-${t.id}` : t.id);
   const branch = `task/${t.id}`;
   let startedFrom: string[] = [];
   if (!existsSync(tree)) {
     ignoreWorktrees(repo);
-    mkdirSync(join(repo, '.worktrees'), { recursive: true });
+    mkdirSync(trees, { recursive: true });
     // A task added to a goal after its work was merged (like a test fix) starts from the goal branch.
     let base = 'HEAD';
     if (t.goal_id) { try { git(repo, 'rev-parse', '--verify', '--quiet', `refs/heads/tandem/${t.goal_id}`); base = `tandem/${t.goal_id}`; } catch { /* no goal branch yet */ } }

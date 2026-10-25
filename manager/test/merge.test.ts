@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ignoreWorktrees, mergeGoal, mergeNote, pushIfRemote, startFromBranches } from '../merge.js';
+import { ignoreWorktrees, mergeGoal, mergeNote, pushIfRemote, startFromBranches, worktreesDir } from '../merge.js';
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail: unknown = '') => {
@@ -78,6 +78,25 @@ check('push: a branch that does not exist fails without throwing', pushIfRemote(
   const exclude = readFileSync(join(own, '.git', 'info', 'exclude'), 'utf8');
   check('your repo: .worktrees/ is ignored locally (git status stays clean), once, with nothing committed',
     g('status', '--porcelain') === '' && (exclude.match(/^\.worktrees\/$/gm) ?? []).length === 1 && !existsSync(join(own, '.gitignore')), [g('status', '--porcelain'), exclude]);
+}
+
+// with TANDEM_WORKTREES (what `tandem start` sets), the task folders live outside the project
+{
+  const own = mkdtempSync(join(tmpdir(), 'tandem-outside-'));
+  const store = mkdtempSync(join(tmpdir(), 'tandem-trees-'));
+  const g = (...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@x', ...a], { cwd: own, encoding: 'utf8', stdio: 'pipe' }).trim();
+  g('init', '-q', '-b', 'main'); writeFileSync(join(own, 'app.py'), 'x = 1\n'); g('add', '-A'); g('commit', '-q', '-m', 'start');
+  g('checkout', '-q', '-b', 'task/z'); writeFileSync(join(own, 'z.py'), 'z = 1\n'); g('add', '-A'); g('commit', '-q', '-m', 'z'); g('checkout', '-q', 'main');
+  check('worktreesDir: without TANDEM_WORKTREES it is .worktrees/ in the repo', worktreesDir(own) === join(own, '.worktrees'));
+  process.env.TANDEM_WORKTREES = store;
+  const dir = worktreesDir(own);
+  check('worktreesDir: with it, the folder is inside that store, named after the project, and not in the repo',
+    dir.startsWith(store) && dir !== store && !dir.startsWith(own) && dir === worktreesDir(own), dir);
+  const m = mergeGoal(own, 'gx', 'Outside', ['task/z']);
+  check('a goal is merged with nothing created in the project: no .worktrees, git status clean, no exclude rule',
+    m.merged.join() === 'task/z' && !existsSync(join(own, '.worktrees')) && g('status', '--porcelain') === '' &&
+    !/worktrees/.test(existsSync(join(own, '.git', 'info', 'exclude')) ? readFileSync(join(own, '.git', 'info', 'exclude'), 'utf8') : ''), [m, g('status', '--porcelain')]);
+  delete process.env.TANDEM_WORKTREES;
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
