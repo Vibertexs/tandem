@@ -284,8 +284,8 @@ try {
     const alex = A.getByRole('article', { name: 'Agent Alex' });
     check('memory: each agent has a card: what it is working on, the files it holds, and the notes it read',
       await alex.isVisible() && /Working on/.test(await alex.innerText()) && /Holding/.test(await alex.innerText()) && /No notes read yet/.test(await alex.innerText()), await alex.innerText().catch(() => ''));
-    check("memory: a worker on the conductor's computer says so; the others are teammates",
-      await until(async () => (await alex.innerText()).includes("Conductor's computer"), 3000) && (await A.getByRole('article', { name: 'Agent Sam' }).innerText()).includes('Teammate'));
+    check('memory: a worker on the conductor\'s computer says "Conductor"; the others are teammates',
+      await until(async () => (await alex.innerText()).includes('Simulated · Conductor'), 3000) && (await A.getByRole('article', { name: 'Agent Sam' }).innerText()).includes('Teammate'));
     check('memory: the conductor has a card too', await A.getByRole('article', { name: 'Conductor' }).isVisible());
     await A.locator('.under-hood > summary').click(); // the raw tables are folded away
   }

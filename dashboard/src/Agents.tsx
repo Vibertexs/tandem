@@ -40,7 +40,7 @@ export function AgentCards({ snap, now, compact = false }: { snap: Snapshot; now
           <article key={w.id} className={`card agent-card ${online(w, now) ? '' : 'is-offline'}`} aria-label={`Agent ${w.name}`}>
             <header>
               <Avatar name={w.name} size={32} />
-              <div><strong>{w.name}</strong><div className="small muted">{agentLabel(w)} · {onConductor(w, snap) ? "Conductor's computer" : 'Teammate'}</div></div>
+              <div><strong>{w.name}</strong><div className="small muted">{agentLabel(w)} · {onConductor(w, snap) ? 'Conductor' : 'Teammate'}</div></div>
               <WorkerStatus w={w} now={now} />
             </header>
             <dl className="agent-facts">
