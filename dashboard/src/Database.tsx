@@ -47,11 +47,6 @@ export function LiveDatabase({ snap, team }: { snap: Snapshot; team: Team }) {
           ? <>This is <strong>SpacetimeDB</strong>: the database <code className="mono">{team.db}</code> at <code className="mono">{team.uri}</code>. Everything on the Board, the Team page and the notes above is rows in these tables. Changes are pushed to every connected computer the moment they happen; nothing polls.</>
           : <>Sample data, not a live database. With a real team, this shows its SpacetimeDB tables and updates the moment anything changes.</>}
       </p>
-      <ul className="plain db-points">
-        <li><strong>Tables</strong> hold all the shared state, below.</li>
-        <li><strong>Reducers</strong> make every change: claiming a task, taking a file lock, finishing a goal. Each runs inside the database in one atomic step, so two workers can never claim the same task.</li>
-        <li><strong>Subscriptions</strong> push those changes live to this page and to every worker.</li>
-      </ul>
       <div className="db-grid">
         {TABLES.map((t, i) => (
           <article key={t.name} className={`card db-card ${lit.has(t.name) ? 'lit' : ''}`} aria-label={`Table ${t.name}`}>

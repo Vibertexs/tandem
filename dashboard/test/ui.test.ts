@@ -73,8 +73,8 @@ try {
   await A.goto(`${URL_}/?db=${DB}&host=1`);
   check('control: no claim-or-watch question; the host page takes control by itself and the prompt is on', await until(() => prompt(A).isEnabled()) && await A.getByText('Watch only').count() === 0);
   await shot(A, '02-owner');
-  check('control: the dock has Board, Team, Shared memory, Activity, Settings (goals live on the Board; getting started is on Team)',
-    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Board|Team|Shared memory|Activity|Settings');
+  check('control: the dock has Overview, Board, Results, Files, Team, Shared memory, Usage, Activity, Settings (goals live on the Board; getting started is on Team)',
+    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Overview|Board|Results|Files|Team|Shared memory|Usage|Activity|Settings');
   check('control: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
   check('control: it shows one next step: the manager is not connected yet', await seen(A, 'The manager is not connected yet', 3000));
   check('control: the sidebar says this browser controls the team', await seen(A, 'You control this team', 2000));
@@ -247,6 +247,15 @@ try {
   check('memory: saving a note says so', await seen(A, 'Project summary saved.', 4000));
   await shot(A, '08-memory');
   {
+    // how the team shares one memory: the agents, and what each is doing, holding and sees
+    check('memory: it explains that the code is in git and SpacetimeDB holds what the agents agree on', await seen(A, 'The code is not stored here.', 2000) && await seen(A, 'SpacetimeDB holds what the agents must agree on', 1000));
+    const alex = A.getByRole('article', { name: 'Agent Alex' });
+    check('memory: each agent has a card: what it is working on, the files it holds, and the notes it sees',
+      await alex.isVisible() && /Working on/.test(await alex.innerText()) && /Holding/.test(await alex.innerText()) && /Project summary/.test(await alex.innerText()), await alex.innerText().catch(() => ''));
+    check('memory: the manager has a card too', await A.getByRole('article', { name: 'Manager' }).isVisible());
+    await A.locator('.under-hood > summary').click(); // the raw tables are under "Under the hood"
+  }
+  {
     // the live database: every SpacetimeDB table, with its row count, updating as the database changes
     const rowsIn = async (table: string) => Number(await A.getByRole('article', { name: `Table ${table}` }).locator('.db-count strong').innerText());
     check('memory: the page lists the nine SpacetimeDB tables, and says it is the database', await A.locator('.db-card').count() === 9 && await seen(A, 'Live database', 1000) && await seen(A, 'SpacetimeDB', 1000) && await rowsIn('tasks') > 0 && await rowsIn('workers') === 2, await A.locator('.live-db').innerText().catch(() => ''));
@@ -256,6 +265,26 @@ try {
     await A.getByRole('article', { name: 'Table context' }).locator('summary').click();
     check('memory: "Show rows" shows the actual rows', await until(async () => (await A.getByRole('article', { name: 'Table context' }).locator('pre').innerText()).includes('db_probe'), 2000));
   }
+
+  // ---- the other pages: Overview, Results, Files, Usage ----
+  await nav(A, 'Overview');
+  check('overview: four numbers, the agents, the goals and the latest news',
+    await until(async () => await A.locator('.stat-card').count() === 4, 3000) && await until(() => A.getByRole('article', { name: 'Agent Sam' }).isVisible(), 3000) && await seen(A, 'Build a tiny calculator with tests', 2000) && await seen(A, 'Latest', 1000), await A.locator('.page').innerText().catch(() => ''));
+  await shot(A, '08a-overview');
+  await nav(A, 'Results');
+  const result = A.getByRole('article', { name: /^Result: Build a tiny calculator/ });
+  check('results: a finished goal shows its branch, what it cost, who built it, its files and what the merge said',
+    await until(() => result.isVisible(), 3000) && (await result.innerText()).includes(`tandem/${goalId}`) && (await result.innerText()).includes('$0.01') && /Built by/.test(await result.innerText()) && /Files/.test(await result.innerText()) && (await result.innerText()).includes('Merged tandem/x into main'), await result.innerText().catch(() => 'no result card'));
+  await shot(A, '08b-results');
+  await nav(A, 'Files');
+  check('files: every file any task works on, with its stage and who has it', await until(async () => await A.locator('.file-list .row').count() > 3, 3000) && await seen(A, 'All files', 1000) && /calc\.py/.test(await A.locator('.file-list').innerText()), await A.locator('.file-list').innerText().catch(() => ''));
+  await A.getByRole('button', { name: 'Done', exact: true }).click();
+  check('files: the Done filter keeps only files of finished tasks', await until(async () => (await A.locator('.file-list .stage-tag').allInnerTexts()).every(t => /Done/.test(t)) && await A.locator('.file-list .row').count() > 0, 3000));
+  await shot(A, '08c-files');
+  await nav(A, 'Usage');
+  check('usage: the total, each computer and each goal, with what it spent',
+    await seen(A, 'Spent in total', 2000) && await A.getByRole('article', { name: 'Usage Alex' }).isVisible() && (await A.locator('.page').innerText()).includes('$0.01'), await A.locator('.page').innerText().catch(() => ''));
+  await shot(A, '08d-usage');
   await nav(A, 'Activity');
   check('activity: the log has plain-English lines', await until(async () => await A.locator('.log li').count() > 5) && await seen(A, /claimed:/, 2000), await A.locator('.log li').count());
   await A.getByRole('button', { name: /^Finished/ }).click();
@@ -352,7 +381,7 @@ try {
   await P.goto(`${URL_}/?db=${DB}`);
   await until(() => prompt(P).isVisible(), 10_000);
   const bar = await P.locator('.sidebar').boundingBox();
-  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 820 && await P.locator('.nav a').count() === 5, bar);
+  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 820 && await P.locator('.nav a').count() === 9, bar);
   const small = await P.locator('.nav a, .btn').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent && (e as HTMLElement).offsetHeight < 44).length);
   check('phone: tap targets are at least 44px tall', small === 0, small);
   check('phone: no sideways scrolling', await P.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));

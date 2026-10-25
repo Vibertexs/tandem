@@ -5,13 +5,21 @@ import { Landing, Unreachable } from './Landing';
 import { BoardPage } from './Board';
 import { ActivityPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
 import { Dock } from './Dock';
+import { OverviewPage } from './Overview';
+import { ResultsPage } from './Results';
+import { FilesPage } from './Files';
+import { UsagePage } from './Usage';
 import { CodeLine, JoinSteps, isManager, managerOnline, online, restartForSharingCommand, useNow } from './ui';
 import type { Snapshot } from './brain';
 
 const PAGES = [
+  { key: 'overview', label: 'Overview' },
   { key: 'board', label: 'Board' },
+  { key: 'results', label: 'Results' },
+  { key: 'files', label: 'Files' },
   { key: 'team', label: 'Team' },
   { key: 'memory', label: 'Shared memory' },
+  { key: 'usage', label: 'Usage' },
   { key: 'activity', label: 'Activity' },
   { key: 'settings', label: 'Settings' },
 ] as const;
@@ -136,7 +144,11 @@ export function App() {
         {status === 'connecting' && api && <div className="banner">Connection lost. Reconnecting…</div>}
         {unowned && !config.host && !config.present && <div className="banner">Waiting for the host to take control. This board shows what happens once they do.</div>}
         <main>
+          {page === 'overview' && <OverviewPage {...common} go={go} />}
           {page === 'board' && <BoardPage {...common} isOp={isOp} present={config.present} go={go} />}
+          {page === 'results' && <ResultsPage {...common} />}
+          {page === 'files' && <FilesPage {...common} />}
+          {page === 'usage' && <UsagePage {...common} />}
           {page === 'team' && <TeamPage {...common} team={team ?? { uri: '', db: 'sample' }} go={go} />}
           {page === 'memory' && <MemoryPage {...common} team={team ?? { uri: '', db: 'sample' }} />}
           {page === 'activity' && <ActivityPage {...common} />}

@@ -4,6 +4,7 @@ import type { Api, Snapshot } from './brain';
 import { shareable, type Team } from './config';
 import { GetStarted } from './Setup';
 import { LiveDatabase } from './Database';
+import { AgentCards } from './Agents';
 import { Avatar, Bar, CodeLine, EV_ICON, JoinSteps, WorkerStatus, agentLabel, ago, copy, isManager, money, online, restartForSharingCommand, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
@@ -114,7 +115,23 @@ export function MemoryPage(c: Common & { team: Team }) {
     <div className="page">
       <p className="muted lead">Every Claude on the team reads these notes before it starts a task. Keep them short. They are stored in the database&apos;s <code className="mono">context</code> table.</p>
       <div className="notes">{NOTES.map(n => <Note key={n.key} {...c} k={n.key} title={n.title} hint={n.hint} />)}</div>
-      <LiveDatabase snap={c.snap} team={c.team} />
+
+      <section className="shared-brain" aria-labelledby="brain-h">
+        <h2 id="brain-h">How the team shares one memory</h2>
+        <ul className="plain db-points">
+          <li><strong>The code is not stored here.</strong> It lives in git: each worker builds on its own branch and pushes it back.</li>
+          <li><strong>SpacetimeDB holds what the agents must agree on:</strong> the goals and tasks, which files are being edited, the notes above, and who is online. Everyone reads and writes the same rows.</li>
+          <li><strong>Reducers</strong> make each change in one atomic step inside the database, so two workers can never claim the same task or the same file.</li>
+          <li><strong>Subscriptions</strong> push every change to every browser and worker the moment it happens. Nothing polls.</li>
+        </ul>
+        <h2>What each agent knows and is doing</h2>
+        <AgentCards snap={c.snap} now={c.now} />
+      </section>
+
+      <details className="under-hood">
+        <summary>Under the hood: the SpacetimeDB tables</summary>
+        <LiveDatabase snap={c.snap} team={c.team} />
+      </details>
     </div>
   );
 }
