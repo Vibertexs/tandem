@@ -37,7 +37,8 @@ const HELP = `tandem: your team's Claude Codes, working as one.
     --workers N             workers on this computer (default 1, one Claude per person; 0 = none)
     --local                 only this computer can join (default: your network can)
     --team NAME             the team's name (default: this folder's name)
-    --fresh                 wipe the team's board first
+    --fresh                 start the team over: wipes its board (goals, tasks, shared memory, activity).
+                            Your project and its branches are not touched. Joined teammates run join again.
     --push                  push task and goal branches to origin (a PR per goal with the GitHub CLI)
     --review                a worker reviews each goal before it is done
     --model NAME            force one model for every task (default: auto = by task difficulty:

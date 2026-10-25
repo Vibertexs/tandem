@@ -79,7 +79,7 @@ That is the whole setup. There is nothing to install globally and no PATH to edi
   Open     http://localhost:5173/?db=your-project
   Invite   http://100.x.y.z:5173/?db=your-project
 ```
-**3. On the board, describe what you want built.** The page `tandem start` opens already knows you are the host: you control the team and the manager is approved for you, with nothing to click. Send your goal on the **Board**. (`tandem -d` opens the page again any time.) what you want built on the **Board** and send it. The manager splits it into tasks, each task runs as a Claude Code run in its own git branch, and when the goal is done the work is merged on one branch, `tandem/<goal>`, with your tests run on it.
+**3. On the board, describe what you want built.** The page `tandem start` opens already knows you are the host: you control the team and the manager is approved for you, with nothing to click. Send your goal on the **Board**. (`tandem -d` opens the page again any time.) The manager splits it into tasks, each task runs as a Claude Code run in its own git branch, and when the goal is done the work is merged on one branch, `tandem/<goal>`, with your tests run on it.
 
 The board's **Get started** page repeats these steps with your real folders already filled in, and ticks each one as it happens.
 
@@ -131,6 +131,7 @@ Run the start command in each project's folder. Each project is its own team wit
 |---|---|
 | `tandem start` | Start a team for the Git project you are in, open to your network. The board opens |
 | `tandem start --local` | Only this computer can join |
+| `tandem start --fresh` | Start the team over. It wipes the team's board in the brain: goals, tasks, shared memory, activity, and who controls it. Your project's files and branches are not touched. Use it for a clean test run, or if Tandem was updated and an old team will not start. Without it, running `tandem start` again keeps the board. Teammates who had joined should run `tandem join` again afterwards |
 | `tandem start --workers 4` | More workers here (run it again any time; what runs is kept) |
 | `tandem start --accounts all` | One worker per saved account (see below) |
 | `tandem start --model <name>` | Force one model for every task. By default it picks by task difficulty: easy haiku, normal sonnet, hard opus |
