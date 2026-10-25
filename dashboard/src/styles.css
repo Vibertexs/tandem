@@ -156,8 +156,6 @@ textarea { resize: vertical; }
 /* ---- the floating dock ---- */
 .shell { min-height: 100vh; }
 .dock { position: fixed; left: 16px; top: 50%; transform: translateY(-50%); z-index: 20; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 64px; padding: 10px 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); }
-.dock-brand { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-sm); }
-.dock-brand:hover { background: var(--fill); text-decoration: none; }
 .nav { width: 100%; height: var(--stack); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--gap); }
 .nav li { display: flex; justify-content: center; }
 .nav a { position: relative; display: grid; place-items: center; width: calc(var(--s, 36) * 1px); height: calc(var(--s, 36) * 1px); border-radius: 12px; color: var(--muted); transition: width 0.14s ease, height 0.14s ease, background 0.12s, color 0.12s; }
@@ -340,6 +338,9 @@ ul.rows.card { padding: 6px 20px; }
 .usage-head { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; }
 .worker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 14px; }
 .worker header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+/* the agent, its role and when it was seen: one row of badges with even gaps, wrapping as a unit */
+.worker-badges { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin-top: 4px; }
+.worker-seen { white-space: nowrap; }
 .worker header > div { flex: 1; min-width: 0; }
 .worker.is-offline { opacity: 0.6; }
 .connect { display: flex; flex-direction: column; gap: 8px; }
@@ -433,7 +434,6 @@ kbd { font-family: var(--mono); font-size: 0.78rem; padding: 1px 6px; border: 1p
 /* ---- phone and small tablet: the dock becomes a floating bar at the bottom ---- */
 @media (max-width: 860px) {
   .dock { left: 50%; top: auto; bottom: 10px; transform: translateX(-50%); flex-direction: row; width: min(calc(100vw - 20px), 440px); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); border-radius: 22px; gap: 0; }
-  .dock-brand { display: none; }
   .nav { height: auto; flex-direction: row; width: 100%; justify-content: space-between; gap: 0; }
   .nav li { flex: 1; }
   .nav a { width: 100% !important; height: 46px !important; border-radius: 14px; }

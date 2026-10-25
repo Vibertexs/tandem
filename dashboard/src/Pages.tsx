@@ -46,7 +46,7 @@ export function TeamPage({ snap, now, say, team, isOp, go }: Common & { team: Te
             const tokens = mine.reduce((sum, t) => sum + t.tokens, 0);
             return (
               <article key={w.id} className={`card worker ${online(w, now) ? '' : 'is-offline'}`} aria-label={w.name}>
-                <header><Avatar name={w.name} size={36} /><div><strong>{w.name}</strong><div className="small muted"><span className={`chip agent-${w.agent}`}>{agentLabel(w)}</span> <span className="chip">{onConductor(w, snap) ? "Conductor's computer" : 'Teammate'}</span> seen {ago(w.lastSeen, now)}</div></div><WorkerStatus w={w} now={now} /></header>
+                <header><Avatar name={w.name} size={36} /><div><strong>{w.name}</strong><div className="worker-badges small muted"><span className={`chip agent-${w.agent}`}>{agentLabel(w)}</span><span className="chip">{onConductor(w, snap) ? 'Conductor' : 'Teammate'}</span><span className="worker-seen">seen {ago(w.lastSeen, now)}</span></div></div><WorkerStatus w={w} now={now} /></header>
                 <p className="small">{current ? <>On <strong>{current.title}</strong>{info?.since ? ` for ${took(info.since, now)}` : ''}</> : <span className="muted">No task right now</span>}</p>
                 {/* Claude Code only reports the quota on some plans: no empty bars when it does not */}
                 {w.usage5h !== null && <Bar label="5 hours" value={w.usage5h} />}

@@ -39,7 +39,6 @@ export function Dock({ items, active, badge }: { items: readonly { key: string; 
   const stack = items.length * BASE + (items.length - 1) * GAP;
   return (
     <nav className="sidebar dock" aria-label="Sections">
-      <a className="dock-brand" href="#/board" aria-label="Tandem" title="Tandem"><span className="brand-mark" aria-hidden="true" /></a>
       <ul
         className="plain nav"
         style={{ '--stack': `${stack + ROOM * 2}px`, '--gap': `${GAP}px` } as CSSProperties}
