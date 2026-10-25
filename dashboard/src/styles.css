@@ -320,6 +320,21 @@ ol.log.card { padding: 6px 20px; }
 .danger-zone { border-color: var(--line-strong); }
 .qr { background: #fff; padding: 8px; border-radius: 8px; align-self: flex-start; }
 
+/* ---- Shared memory: the live database ---- */
+.live-db { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+.live-db .lead { margin-bottom: 0; }
+.db-points { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); max-width: 70ch; }
+.db-points strong { color: var(--ink); }
+.db-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.db-card { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; transition: border-color 0.3s, box-shadow 0.3s, background 0.6s; }
+.db-card.lit { border-color: var(--accent); background: var(--accent-soft); }
+.db-name { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.db-live { background: var(--ok); }
+.db-count strong { font-size: 1.6rem; font-weight: 600; letter-spacing: -0.02em; }
+.db-about { min-height: 2.6em; }
+.db-rows summary { cursor: pointer; color: var(--accent-strong); }
+.db-rows pre { margin-top: 6px; max-height: 220px; overflow: auto; white-space: pre; word-break: normal; font-size: 0.72rem; }
+
 .toast { position: fixed; left: 0; right: 0; margin: 0 auto; width: max-content; max-width: min(92vw, 520px); bottom: 28px; background: var(--ink); color: var(--canvas); padding: 11px 18px; border-radius: var(--radius-md); box-shadow: var(--shadow); z-index: 40; font-weight: 500; }
 
 /* ---- present view: the board only, big type ---- */

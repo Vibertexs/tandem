@@ -31,6 +31,10 @@ For real work, go to your own project's folder and run `tandem start`. `tandem s
 ## What changed today
 | Area | What |
 |---|---|
+| Verified on two computers | A real run with a teammate's computer over Tailscale: the manager split goals, both computers' Claude workers built tasks in parallel (the host did most, the teammate's did the CLI and a stylesheet), the work merged on a readable `tandem/<goal>` branch, and **Merge into my project** put it in the host's folder. |
+| Getting the code | A finished goal has **Merge into my project**: the manager merges its branch into the branch the project is on (refuses with uncommitted changes, undoes a conflicting merge). New goals then start from the merged work. |
+| Commands | `tandem --start` and every other command also work as flags. Plain `tandem` opens the page. Unknown commands say to use `tandem --help`. `tandem install` puts the Tandem folder on your user PATH (`uninstall` undoes it). `tandem doctor` checks this computer has Node, Git, npm, Claude Code, SpacetimeDB and Tailscale. |
+| Pages | Get started is now the top of the Team page (host, then connect a teammate, then send a goal); the dock has five icons, Settings is a gear. **Shared memory** also shows the live SpacetimeDB database: every table with its row count, what it is for, and its rows. |
 | Control | Whoever runs `tandem start` controls the team: the page it opens (`host=1`) takes control and approves the manager by itself. The claim-or-watch screen is gone. Teammates opening the invite only watch. |
 | Names | Workers are named after the computer (`bilal-pc`, `bilal-pc-2`, or `bilal-pc-work1` with accounts), not Alex or Sam. The Board no longer suggests goals. |
 | Task folders | Each task runs in its own git worktree (so parallel Claudes never touch the same files). `tandem start` puts them in Tandem's own folder, `.tandem/worktrees/<project>-<id>/<task words>-<id>`, not in your project, so your project gets no `.worktrees` folder and no `.git/info/exclude` entry. Run by hand without `tandem start`, they are in `.worktrees/` in the repo. |

@@ -198,15 +198,15 @@ try {
   await nav(A, 'Team');
   const steps = A.locator('.step');
   check('get started: three steps distinguish the project host from the team controller', await until(async () => await steps.count() === 3) &&
-    await seen(A, 'project host', 1000) && await seen(A, 'team controller', 1000) && (await steps.first().innerText()).includes('Start the project host') && (await steps.last().innerText()).includes('Add a teammate'));
+    await seen(A, 'project host', 1000) && await seen(A, 'team controller', 1000) && (await steps.first().innerText()).includes('Start the project host') && (await steps.nth(1).innerText()).includes('Add a teammate') && (await steps.last().innerText()).includes('Send a goal'));
   check('get started: one whole PowerShell block carries this computer\'s real folders without a PATH edit', await until(async () => {
     const s = await A.locator('.setup').innerText();
     return s.includes("Set-Location -LiteralPath 'C:\\Code\\calc-demo'") && s.includes("& 'C:\\Code\\tandem\\tandem.cmd' start") && !s.includes('$env:Path');
   }, 4000));
-  check('get started: the host and goal steps tick, while adding a teammate stays optional',
-    await steps.nth(0).evaluate(e => e.classList.contains('done')) && await steps.nth(1).evaluate(e => e.classList.contains('done')) && !(await steps.nth(2).evaluate(e => e.classList.contains('done'))));
+  check('get started: the order is host, then connect a teammate, then send a goal; the host and goal steps tick while adding a teammate stays optional',
+    await steps.nth(0).evaluate(e => e.classList.contains('done')) && !(await steps.nth(1).evaluate(e => e.classList.contains('done'))) && await steps.nth(2).evaluate(e => e.classList.contains('done')));
   check('get started: a local-only team explains that an invite needs a non-local host',
-    await steps.nth(2).innerText().then(t => t.includes('only available on this computer') && t.includes('without --local')));
+    await steps.nth(1).innerText().then(t => t.includes('only available on this computer') && t.includes('without --local')));
   await shot(A, '06a-setup');
 
   // ---- 6. team, shared memory, activity ----
@@ -246,6 +246,16 @@ try {
   await A.locator('.memory-note', { hasText: 'Project summary' }).getByRole('button', { name: /^Save/ }).click();
   check('memory: saving a note says so', await seen(A, 'Project summary saved.', 4000));
   await shot(A, '08-memory');
+  {
+    // the live database: every SpacetimeDB table, with its row count, updating as the database changes
+    const rowsIn = async (table: string) => Number(await A.getByRole('article', { name: `Table ${table}` }).locator('.db-count strong').innerText());
+    check('memory: the page lists the nine SpacetimeDB tables, and says it is the database', await A.locator('.db-card').count() === 9 && await seen(A, 'Live database', 1000) && await seen(A, 'SpacetimeDB', 1000) && await rowsIn('tasks') > 0 && await rowsIn('workers') === 2, await A.locator('.live-db').innerText().catch(() => ''));
+    const before = await rowsIn('context');
+    await manager.reducers.setContext({ sessionId: 'live', key: 'db_probe', value: 'hello from the test' });
+    check('memory: a change in the database shows up in its table the moment it happens', await until(async () => (await rowsIn('context')) === before + 1, 4000), [before, await rowsIn('context')]);
+    await A.getByRole('article', { name: 'Table context' }).locator('summary').click();
+    check('memory: "Show rows" shows the actual rows', await until(async () => (await A.getByRole('article', { name: 'Table context' }).locator('pre').innerText()).includes('db_probe'), 2000));
+  }
   await nav(A, 'Activity');
   check('activity: the log has plain-English lines', await until(async () => await A.locator('.log li').count() > 5) && await seen(A, /claimed:/, 2000), await A.locator('.log li').count());
   await A.getByRole('button', { name: /^Finished/ }).click();

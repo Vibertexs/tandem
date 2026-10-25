@@ -85,6 +85,8 @@ That is the whole setup. There is nothing to install globally. It prints somethi
 
 The board's **Team** page repeats these steps (under **Get started**) with your real folders already filled in, and ticks each one as it happens.
 
+**On a new computer, check it first:** `& "C:\path\to\tandem\tandem.cmd" doctor` (macOS / Linux: `/path/to/tandem/tandem doctor`). It lists what Tandem needs and says what to install for anything missing. To **join** a team you need Node.js 22.18+, Git, npm and Claude Code signed in. To **host** you also need the SpacetimeDB CLI. Tailscale is only needed across different networks. The first `start` or `join` then installs Tandem's own packages by itself (a few minutes, once).
+
 **Optional: type `tandem` anywhere.** Run this once, then open a new terminal:
 ```powershell
 & "C:\path\to\tandem\tandem.cmd" install      # macOS / Linux: /path/to/tandem/tandem install
