@@ -1,8 +1,8 @@
 // The manager watcher when planning fails (a fake claude that is not logged in): after two
 // tries the goal is failed with the reason; Try again (status new) makes it plan again.
 // Publishes a FRESH database (bilal-watch). Needs the local brain on 3001 and `spacetime` on PATH.
-import { execSync, spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { execFileSync, execSync, spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,7 +29,11 @@ await owner.reducers.postGoal({ sessionId: 'live', id: 'g1', text: 'Build the ca
 
 // the team's repo, with a GitHub remote (never contacted: nothing is pushed in this test)
 const repo = mkdtempSync(join(tmpdir(), 'tandem-watch-repo-'));
-execSync('git init -q && git remote add origin https://github.com/acme/shop.git', { cwd: repo, stdio: 'pipe' });
+execSync('git init -q -b main && git remote add origin https://github.com/acme/shop.git', { cwd: repo, stdio: 'pipe' });
+// a project with one commit, and a finished goal's branch that adds cli.py
+const git = (...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@x', ...a], { cwd: repo, encoding: 'utf8', stdio: 'pipe' }).trim();
+writeFileSync(join(repo, 'calc.py'), 'x = 1\n'); git('add', '-A'); git('commit', '-q', '-m', 'start');
+git('checkout', '-q', '-b', 'tandem/x'); writeFileSync(join(repo, 'cli.py'), 'import calc\n'); git('add', '-A'); git('commit', '-q', '-m', 'Add the CLI'); git('checkout', '-q', 'main');
 const here = fileURLToPath(new URL('..', import.meta.url));
 const watcher = spawn(process.execPath, ['--import', 'tsx', join(here, 'watch.ts'), '--poll', '1', '--repo', repo], {
   cwd: here,
@@ -54,6 +58,16 @@ try {
   check('it tried exactly twice, then stopped spending quota on it', runs === 2 && await sleep(3000).then(() => (out.match(/planning 1 goal/g) ?? []).length === 2), runs);
   await owner.reducers.setGoalStatus({ sessionId: 'live', id: 'g1', status: 'new' });
   check('Try again: it plans the goal again', await until(() => (out.match(/planning 1 goal/g) ?? []).length === 3, 15_000), out.slice(-300));
+
+  // "Merge into my project": the page sets apply_<goal> = requested; the manager merges and answers
+  await owner.reducers.postGoal({ sessionId: 'live', id: 'g2', text: 'Add a CLI' });
+  await owner.reducers.finishGoal({ sessionId: 'live', id: 'g2', branch: 'tandem/x', note: 'Tests pass.' });
+  const answer = () => [...owner.db.context.iter()].find(c => c.sessionId === 'live' && c.key === 'apply_g2')?.value ?? '';
+  check('before the request, the project folder does not have the goal\'s work', !existsSync(join(repo, 'cli.py')));
+  await owner.reducers.setContext({ sessionId: 'live', key: 'apply_g2', value: 'requested' });
+  check('Merge into my project: the manager merges the goal branch into the project and answers "done: Merged …"',
+    await until(() => answer().startsWith('done:'), 20_000) && /Merged tandem\/x into main: 1 file \(cli\.py\)/.test(answer()) && existsSync(join(repo, 'cli.py')), [answer(), out.slice(-300)]);
+  check('the project is left clean, on main', git('status', '--porcelain') === '' && git('branch', '--show-current') === 'main');
 } finally {
   watcher.kill();
   owner.disconnect();

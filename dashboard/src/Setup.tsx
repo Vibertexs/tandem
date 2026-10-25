@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react';
 import type { Snapshot } from './brain';
 import { shareable, type Team } from './config';
-import { CodeLine, JoinSteps, managerOnline, online, restartForSharingCommand, startCommand } from './ui';
+import { CodeLine, managerOnline, online, restartForSharingCommand, startCommand } from './ui';
 
 function Step({ done, title, children }: { done: boolean; title: string; children?: ReactNode }) {
   return (
@@ -16,11 +16,11 @@ function Step({ done, title, children }: { done: boolean; title: string; childre
   );
 }
 
-export function SetupPage({ snap, team, now, say, go, isOp }: { snap: Snapshot; team: Team; now: number; say: (m: string) => void; go: (page: string) => void; isOp: boolean }) {
+// The first-use checklist, at the top of the Team page (getting started is about the team).
+export function GetStarted({ snap, team, now, say, go, isOp }: { snap: Snapshot; team: Team; now: number; say: (m: string) => void; go: (page: string) => void; isOp: boolean }) {
   const ctx = snap.context;
   const tandemDir = ctx.tandem_dir || '<the Tandem folder>';
   const projectDir = ctx.project_dir || '<your project folder>';
-  const gitUrl = ctx.git_url ?? '';
   const share = shareable(team);
   const live = snap.workers.filter(w => online(w, now));
   const joined = live.filter(w => w.name.includes('-'));
@@ -31,7 +31,8 @@ export function SetupPage({ snap, team, now, say, go, isOp }: { snap: Snapshot; 
   const shareCommand = restartForSharingCommand(tandemDir, projectDir);
 
   return (
-    <div className="page setup">
+    <section className="page setup" aria-labelledby="get-started-h">
+      <h2 id="get-started-h">Get started</h2>
       <p className="muted lead">A <strong>project host</strong> is the computer running Tandem in the Git project. A <strong>team controller</strong> is a browser permission to send goals and approve people. They are usually the same person, but they do not have to be.</p>
 
       <section className="card setup-roles" aria-labelledby="roles-h">
@@ -63,16 +64,13 @@ export function SetupPage({ snap, team, now, say, go, isOp }: { snap: Snapshot; 
             </>
           ) : (
             <>
-              <p className="small muted">First, send this link to let them watch the board:</p>
-              <CodeLine code={share.page} say={say} />
-              <p className="small muted">Then, if you want their computer&apos;s workers to code, send them the one command block below:</p>
-              <JoinSteps link={share.page} gitUrl={gitUrl} say={say} restart={shareCommand} />
-              <p className="small muted">{tailscale ? 'This is a private Tailscale link. The teammate must be allowed to reach this computer in Tailscale.' : 'This works on the same network. For different networks or public Wi-Fi, use Tailscale and restart Tandem on the project host.'}</p>
+              <p className="small muted">Use <strong>Add a teammate&apos;s computer</strong> below. It has the invite link and the commands to copy.</p>
+              <p className="small muted">{tailscale ?'This is a private Tailscale link. The teammate must be allowed to reach this computer in Tailscale.' : 'This works on the same network. For different networks or public Wi-Fi, use Tailscale and restart Tandem on the project host.'}</p>
             </>
           )}
           {joined.length > 0 && <p className="small muted">Joined worker computers: {joined.map(w => w.name).join(', ')}.</p>}
         </Step>
       </ol>
-    </div>
+    </section>
   );
 }

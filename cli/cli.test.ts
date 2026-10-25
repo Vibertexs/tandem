@@ -2,7 +2,7 @@
 // folder so your real accounts and running workers are not touched. Needs the local brain on 3001.
 //   node cli/cli.test.ts
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,6 +45,20 @@ check('a join to a team that does not exist says so and how an invite looks (not
   (() => { const o = tandem(['join', 'http://127.0.0.1:5173/?db=no-such-team-x'], here, { TANDEM_SIMULATE: '' }); return /There is no team "no-such-team-x" on 127\.0\.0\.1/.test(o) && /\?db=/.test(o) && !/not sharing/.test(o); })());
 check('a mistyped invite (no "?", a stray ".") is read as the same team',
   /There is no team "no-such-team-x" on/.test(tandem(['join', 'http://127.0.0.1:5173/db=no-such-team-x.'], here, { TANDEM_SIMULATE: '' })));
+{
+  // tandem install / uninstall, against a file instead of the real PATH
+  const pf = join(state, 'path.txt');
+  const env = { TANDEM_TEST_PATH_FILE: pf };
+  const root = fileURLToPath(new URL('..', import.meta.url)).replace(/[\\/]+$/, '');
+  writeFileSync(pf, 'C:\\a;C:\\b');
+  const one = tandem(['install'], repo, env);
+  const after = readFileSync(pf, 'utf8');
+  check('tandem install adds the Tandem folder to the PATH, keeps what was there, and says to open a new terminal', /Added/.test(one) && /new/.test(one) && after === `C:\\a;C:\\b;${root}`, [one, after]);
+  const two = tandem(['install'], repo, env);
+  check('installing again changes nothing and says so', /Already on your PATH/.test(two) && readFileSync(pf, 'utf8') === after, two);
+  check('tandem uninstall removes only the Tandem folder', /Removed/.test(tandem(['uninstall'], repo, env)) && readFileSync(pf, 'utf8') === 'C:\\a;C:\\b');
+  check('uninstalling when it is not there says there is nothing to remove', /nothing to remove/.test(tandem(['uninstall'], repo, env)));
+}
 check('--simulate is not an option any more', /Unknown option '--simulate'/.test(tandem(['start', '--simulate'], repo)));
 check('an unknown account is refused with how to add it', /No account "nope"/.test(tandem(['start', '--accounts', 'nope', '--local', '--no-manager', '--no-browser', '--team', TEAM], repo)));
 
@@ -64,6 +78,11 @@ check('a real join to a team whose host is not sharing a project says to restart
 const status = tandem([], repo);
 check('plain "tandem" shows the team and its workers, and opens the dashboard', status.includes(TEAM) && /2 workers/.test(status) && /http:\/\/localhost:5173\/\?db=/.test(status), status);
 check('tandem -d (and dashboard, open, --dashboard) gives the dashboard address', ['-d', 'dashboard', 'open', '--dashboard'].every(c => /http:\/\/localhost:5173\/\?db=/.test(tandem([c], repo))));
+const unknown = tandem(['--nope'], repo);
+check('an unknown flag says it is not a command and points to --help, without dumping the whole help', /"--nope" is not a tandem command/.test(unknown) && /tandem --help/.test(unknown) && !/--workers N/.test(unknown), unknown);
+check('an unknown word is the same', /"banana" is not a tandem command/.test(tandem(['banana'], repo)));
+check('every command also works as a flag: --start, --join, --status',
+  /is not a git repository/.test(tandem(['--start'], tmpdir())) && /Which team/.test(tandem(['--join'], repo)) && tandem(['--status'], repo).includes(TEAM));
 const help = tandem(['--help'], repo);
 check('tandem --help lists the commands, including -d', ['tandem start', 'tandem join', 'tandem -d', 'tandem stop', 'tandem status', 'tandem logs', 'tandem account'].every(c => help.includes(c)) && /Quick:/.test(help) && tandem(['-h'], repo) === help && tandem(['help'], repo) === help, help.slice(0, 200));
 check('tandem --version prints the version', /^\d+\.\d+\.\d+\s*$/.test(tandem(['--version'], repo)));

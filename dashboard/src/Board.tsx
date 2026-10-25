@@ -188,6 +188,22 @@ function GoalLane({ lane, p, open, setOpen, flash }: { lane: Lane; p: Props; ope
               <button type="button" className="link" onClick={() => copy(`git checkout ${g.branch}`, say, `Copied: git checkout ${g.branch}`)}>copy git checkout</button>
             </span>
           )}
+          {g?.branch && g.status === 'done' && (() => {
+            // "Merge into my project": the manager merges the branch into the branch the project is on
+            const apply = snap.context[`apply_${g.id}`] ?? '';
+            if (apply.startsWith('done:')) return <span className="small goal-note ok-note">{apply.slice(5).trim()}</span>;
+            if (apply === 'requested' || apply === 'working') return <span className="small muted">Merging into your project…</span>;
+            return (
+              <>
+                {apply.startsWith('failed:') && <span className="small goal-note warn">{apply.slice(7).trim()}</span>}
+                {isOp && api && (
+                  <button type="button" className="btn small-btn" disabled={busy}
+                    title="Brings this work into the branch your project is on, so it shows in your folder. Refuses if you have uncommitted changes; never forces anything."
+                    onClick={() => act(() => api.setNote(`apply_${g.id}`, 'requested'), 'Asked the manager to merge it into your project.')}>Merge into my project</button>
+                )}
+              </>
+            );
+          })()}
           {g && isOp && api && g.status === 'failed' && <button type="button" className="btn small-btn" disabled={busy} onClick={() => act(() => api.retryGoal(g.id), 'Sent to the manager again.')}>Try again</button>}
         </div>
       )}
@@ -375,7 +391,7 @@ export function BoardPage(p: Props) {
         <div className="empty-board card">
           <p><strong>Nothing yet.</strong></p>
           <p className="muted">{p.isOp ? 'Describe what you want built above. The manager splits it into tasks, and workers pick them up.' : 'When a controller sends a goal, it shows up here with its tasks.'}</p>
-          <p className="small muted">New here? <a href="#/setup">See how to get started</a>.</p>
+          <p className="small muted">New here? <a href="#/team">See how to get started</a>.</p>
         </div>
       ) : (
         <div className="lanes">
