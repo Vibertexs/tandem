@@ -1,11 +1,13 @@
-# Status (2026-10-24, branch `bilal/git-share`)
+# Status (2026-10-24)
+
+**Supported agent: Claude Code.** Workers and the manager run Claude Code. Codex support is experimental (stand-in tested only) and is used only if you add a Codex account.
 
 ## In one line
 **You run `tandem start` in your project, and the board opens with an invite link others can join.**
 1. In your project's folder: `tandem start`. It starts the brain, the board, the manager and a Claude worker, open to your network, and prints the invite link.
 2. The board opens with you in control: the page `tandem start` opens takes control by itself and approves the manager.
 3. Type a goal. It gets its own lane on the board, and the manager splits it into tasks with exact file lists.
-4. The workers (real Claude runs, or simulated) do them without colliding. Teammates who opened the invite watch live. To add their computer's workers, they paste the Invite box's full clone-and-join block; `tandem join <invite>` copies the project host's project and starts their workers.
+4. The workers (real Claude Code runs) do them without colliding. Teammates who opened the invite watch live. To add their computer's workers, they paste the Invite box's full clone-and-join block; `tandem join <invite>` copies the project host's project and starts their workers.
 5. The goal's work is merged into one `tandem/<goal>` branch, your tests run on it, and the lane shows the result and what it cost.
 
 ## Try this first (about 2 minutes, one small Claude run for planning)
@@ -20,25 +22,29 @@ Then, while still in that project, run Tandem by its path (no PATH setup is need
 ```powershell
 & "C:\path\to\tandem\tandem.cmd" start
 ```
-It uses that project, and the workers fake the coding. On the board:
+It uses that project, and your Claude Code does the work. On the board:
 1. Type a small goal, then click **Send**.
-3. Watch the goal's lane fill up. Click a card to see why it went to that worker.
+2. Watch the goal's lane fill up. Click a card to see why it went to that worker and which model it ran.
 
 For real work, go to your own project's folder and run `tandem start`. `tandem stop` stops it. `tandem` shows what is running. `.\test.ps1` runs every test.
 
 ## What changed today
 | Area | What |
 |---|---|
+| Control | Whoever runs `tandem start` controls the team: the page it opens (`host=1`) takes control and approves the manager by itself. The claim-or-watch screen is gone. Teammates opening the invite only watch. |
+| Names | Workers are named after the computer (`bilal-pc`, `bilal-pc-2`, or `bilal-pc-work1` with accounts), not Alex or Sam. Task folders are `.worktrees/<task words>-<id>`; worker config files are in `.worktrees/.tandem/`. The Board no longer suggests goals. |
+| Models | Default is by task difficulty: easy haiku, normal sonnet, hard opus (`--model <name>` forces one). The task drawer shows the model. It used to be haiku for everything. |
+| Windows | Background workers and the manager no longer open console windows on Windows. |
 | Starting | `tandem start` in your project, not in the Tandem folder. Run its launcher by path on first use—no PATH setup needed. Open to your network by default (`--local` keeps it on this computer). One line per piece, then Open, Invite, Stop. Safe to run twice: what runs is kept. `tandem join <invite>`, `tandem stop`, `tandem status`, `tandem open`, `tandem logs`. One cross-platform TypeScript file (`cli/tandem.ts`, Node 22.18+); `start.ps1`, `start.sh`, `stop.ps1` and `stop.sh` are gone. |
 | One board | Each goal is a swimlane: what you asked for, its status and progress, cost, time, branch and note, then its tasks in Waiting, To do, In progress and Done. Finished goals move down and start folded; done cards take one line. Work added by hand gets an "Other tasks" lane. The Goals tab is gone. |
 | Invite | Top right of every page: **Invite** shows the board link plus one complete clone-and-join block for a teammate's computer, or "This computer only" says why there is none. The start page takes a pasted invite. |
-| Accounts and agents | `tandem account add <label> [--agent codex]` gives a worker its own Claude Code or Codex login (a folder inside the Tandem folder; your own login is untouched). `tandem start --accounts all` runs one worker per account. The brain knows each worker's agent and account, and the Team page shows them. Codex workers run `codex exec`. Tested with a stand-in for Codex; real Codex is untried (the CLI is not installed here). |
+| Accounts and agents | `tandem account add <label> [--agent codex]` gives a worker its own Claude Code login (a folder inside the Tandem folder; your own login is untouched). `tandem start --accounts all` runs one worker per account. The brain knows each worker's agent and account, and the Team page shows them. **Codex is experimental**: `--agent codex` workers run `codex exec`, tested only with a stand-in; real Codex is untried (the CLI is not installed here). |
 | Joining | The project host serves its project through Git's HTTP backend. `tandem join <invite>` checks the host, copies that project into Tandem's private work folder, and starts workers that push task branches back to the host. GitHub is optional (`--push` only). |
 
 Everything from the night before still holds: failure handling (giving back, conflicts as tasks, usage limits, goals that could not be planned), costs, worker ownership, `--review`, `--notify`, dependent tasks starting from their dependencies' work.
 
 ## Tested
-`.\test.ps1` on the final code: **11 suites, 362 checks, all pass** (no Claude calls).
+`.\test.ps1` on the final code: **11 suites, 363 checks, all pass** (no Claude calls).
 
 | Suite | Checks |
 |---|---|

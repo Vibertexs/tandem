@@ -10,7 +10,7 @@ Describe what you want built. A manager plans it, every teammate's coding agent 
 ![TypeScript](https://img.shields.io/badge/TypeScript-everywhere-3178C6?logo=typescript&logoColor=white)
 ![SpacetimeDB](https://img.shields.io/badge/shared%20brain-SpacetimeDB-7c3aed)
 ![MCP](https://img.shields.io/badge/tools-MCP-1f2937)
-![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex-d97757)
+![Agents](https://img.shields.io/badge/agents-Claude%20Code-d97757)
 ![Tests](https://img.shields.io/badge/tests-362%20passing-2ea44f)
 
 ![The board while workers are on it](docs/img/board.png)
@@ -31,7 +31,7 @@ When a few people each run an AI coding agent on the same repo:
 | **Work goes to whoever has room** | Workers pull tasks themselves. One that hits its usage limit hands its task back, waits for the reset and returns. A crashed one gives its files back after two minutes. |
 | **Stuck work comes back to you** | A worker that cannot finish gives the task back with a reason and a different worker tries. If two cannot, the board says **needs you** and why, with **Try again**. |
 | **One checked branch per goal** | Finished tasks merge into `tandem/<goal>` and your tests run on it. A merge conflict or failing tests become a task a worker fixes. An optional review runs before it is called done. |
-| **Claude and Codex, any accounts** | Each worker can run Claude Code or Codex under its own login. The board shows who runs what. |
+| **Claude Code, any accounts** | Each worker runs Claude Code under its own login. The board shows who runs what. (Codex workers are experimental: see Limits.) |
 | **A live board** | One lane per goal, its tasks moving Waiting → To do → In progress → Done. Who is on what, for how long, their last note, what it cost. |
 
 | Start | A task's details |
@@ -74,7 +74,7 @@ That is the whole setup. There is nothing to install globally and no PATH to edi
   ✓ page     started
   ✓ project  shared from this computer: no GitHub needed
   ✓ manager  started: it plans every goal you type
-  ✓ workers  Alex (Claude, haiku)
+  ✓ workers  your-computer (Claude, model by task difficulty)
 
   Open     http://localhost:5173/?db=your-project
   Invite   http://100.x.y.z:5173/?db=your-project
@@ -133,12 +133,12 @@ Run the start command in each project's folder. Each project is its own team wit
 | `tandem start --local` | Only this computer can join |
 | `tandem start --workers 4` | More workers here (run it again any time; what runs is kept) |
 | `tandem start --accounts all` | One worker per saved account (see below) |
-| `tandem start --model auto` | Pick the model by task difficulty instead of always haiku |
+| `tandem start --model <name>` | Force one model for every task. By default it picks by task difficulty: easy haiku, normal sonnet, hard opus |
 | `tandem start --review` | A worker reviews each goal's merged branch (read only) before it is done |
 | `tandem start --push` | Push each goal's branch to origin, and open a PR if the GitHub CLI is set up |
 | `tandem start --notify <url>` | Post "goal done" (branch, tests, cost) to Slack or Discord |
 | `tandem join <invite>` | Copy the project host's project into Tandem's private work folder and add this computer's workers |
-| `tandem account add <label> [--agent codex]` | A separate Claude Code or Codex login for a worker |
+| `tandem account add <label>` | A separate Claude Code login for a worker (`--agent codex` is experimental) |
 | `tandem` | Show what is running and open the dashboard |
 | `tandem -d` | Open the dashboard (also `tandem dashboard`, `tandem open`) |
 | `tandem status` | What is running, with each team's links |
@@ -146,13 +146,16 @@ Run the start command in each project's folder. Each project is its own team wit
 | `tandem --help` | List every command (also `tandem help`, `tandem -h`); `tandem --version` |
 | `tandem stop` | Stop what this computer started (`--all` stops the brain too) |
 
-### Several accounts, Claude and Codex
+### Several Claude accounts
+By default a worker uses your own Claude Code login. To run workers under other logins (a work and a personal account, say):
 ```
 tandem account add work1                  # opens Claude Code: /login, sign in, /exit
-tandem account add school --agent codex   # opens codex login
+tandem account add personal
 tandem start --accounts all               # one worker per account
 ```
-Each account gets its own login folder inside the Tandem folder (`CLAUDE_CONFIG_DIR` for Claude Code, `CODEX_HOME` for Codex), so your own login is not touched. The manager plans with Claude (`--manager-account <label>` picks which). Codex workers run `codex exec` in the task's worktree; Claude Code's lock-check hook has no Codex equivalent, so a Codex worker keeps to its files because the rules tell it to.
+Each account gets its own login folder inside the Tandem folder (`CLAUDE_CONFIG_DIR`), so your own login is not touched. The manager plans with Claude (`--manager-account <label>` picks which). Workers are named after the computer and the account, for example `bilal-pc-work1`.
+
+**Experimental: Codex.** `tandem account add school --agent codex` adds a Codex login, and a worker on it runs `codex exec`. Nothing uses Codex unless you add such an account. It has only been tested with a stand-in, never the real Codex CLI, and Claude Code's lock-check hook has no Codex equivalent, so a Codex worker keeps to its files because the rules tell it to.
 
 ## How SpacetimeDB is used
 [SpacetimeDB](https://spacetimedb.com) is the **brain**: a database that also runs our rules as code, and pushes every change to every connected client live. It is the one thing all the parts share.
@@ -202,7 +205,7 @@ Nothing talks to anything else directly. Every part reads and writes the brain, 
 
 ## Limits
 - Tested end to end on Windows. Not yet on a Mac or Linux, or on two physical computers.
-- Codex workers are tested with a stand-in, not the real Codex CLI.
+- Claude Code is the supported agent. Codex workers are experimental: only a stand-in has been tested, never the real Codex CLI.
 - Identities are saved tokens, not accounts. Anyone who can reach the brain can watch it and join as a worker, so keep it on your machine or a private network (such as Tailscale) until it has a real login.
 - Hosting is local or on your network. Putting the brain on SpacetimeDB's Maincloud needs `spacetime login`.
 

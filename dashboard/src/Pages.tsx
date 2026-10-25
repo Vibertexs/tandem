@@ -31,7 +31,7 @@ export function TeamPage({ snap, now, say, team }: Common & { team: Team }) {
   const sorted = [...snap.workers].sort((a, b) => Number(online(b, now)) - Number(online(a, now)) || a.name.localeCompare(b.name));
   return (
     <div className="page">
-      <p className="muted lead">Each worker is a coding agent (Claude Code or Codex) on someone's computer. They pick up tasks by themselves.</p>
+      <p className="muted lead">Each worker is a Claude Code agent on someone's computer. They pick up tasks by themselves.</p>
       {sorted.length === 0 && <div className="card empty-board"><p className="muted">No workers yet. Add a computer below.</p></div>}
       <div className="worker-grid">
         {sorted.map(w => {

@@ -37,6 +37,6 @@ One-shot, polished, easy to understand: `tandem start` in a project on one compu
 ## Useful facts
 - Start commands: run Tandem's launcher by path from the PROJECT folder, never the Tandem folder: `& "C:\Code\tandem\tandem.cmd" start` on Windows. The dashboard gives the exact command for its project and does not require PATH setup. `tandem stop [--all]`, `tandem status`, `tandem logs [part]`.
 - Bilal's Tailscale address (host laptop `yoga-laptop`): `100.113.129.14`. Invite for the demo team: `http://100.113.129.14:5173/?db=calc-demo`.
-- Tests: brain `npm test` in `brain/`, etc.; whole suite `.\test.ps1` (11 suites, 362 checks); real-Claude suites `.\test.ps1 -Real` (haiku, a few runs).
+- Tests: brain `npm test` in `brain/`, etc.; whole suite `.\test.ps1` (11 suites, 363 checks); real-Claude suites `.\test.ps1 -Real` (haiku, a few runs).
 - PowerShell quirks that bit today: `.NET` file APIs ignore PowerShell's current folder (use full paths); backticks and `${t}` inside PowerShell here-strings expand, so write files with the editor tool instead; a failed `Set-Location` leaves later commands running in the old folder.
 - Bilal's own SpacetimeDB/home folders must not be touched. Tandem keeps its state in `<Tandem>/.tandem/` (gitignored): `pids.json`, `teams.json`, `accounts.json`, `logs/`, `work/`.
