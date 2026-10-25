@@ -2,7 +2,7 @@
 // folder so your real accounts and running workers are not touched. Needs the local brain on 3001.
 //   node cli/cli.test.ts
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +34,14 @@ check('Node versions: 18, 20, 22.6 and 22.17 are too old; 22.18, 22.20, 24 and 2
 check('an old Node gets a message that says which version it has and where to get a new one',
   /needs Node\.js 22\.18/.test(oldNodeMessage('20.11.0')) && oldNodeMessage('20.11.0').includes('20.11.0') && oldNodeMessage().includes('nodejs.org'));
 check('outside a git repo, tandem start says what to do', /is not a git repository/.test(tandem(['start'], tmpdir())));
+{
+  const fresh = join(tmpdir(), `tandem-cli-new-${Date.now()}`);
+  const created = tandem(['init', fresh, '--no-browser', '--local', '--no-manager', '--workers', '0', '--team', 'fresh-cli'], repo);
+  check('init makes a new Git project, gives it a first commit, then starts Tandem there',
+    /Created a new Git project/.test(created) && git('-C', fresh, 'rev-parse', '--verify', '--quiet', 'HEAD').toString().trim().length > 0 && /Tandem is running for/.test(created), created);
+  check('init refuses a folder that already exists', /already exists/.test(tandem(['init', fresh], repo)));
+  rmSync(fresh, { recursive: true, force: true });
+}
 check('the retired --demo flag says there is no demo project', /There is no demo project/.test(tandem(['start', '--demo'], repo)));
 check('no accounts yet: account list says how to add one', /No accounts yet/.test(tandem(['account', 'list'], repo)));
 tandem(['account', 'add', 'work1', '--no-login'], repo);
@@ -91,7 +99,7 @@ check('an unknown word is the same', /"banana" is not a tandem command/.test(tan
 check('every command also works as a flag: --start, --join, --status',
   /is not a git repository/.test(tandem(['--start'], tmpdir())) && /Which team/.test(tandem(['--join'], repo)) && tandem(['--status'], repo).includes(TEAM));
 const help = tandem(['--help'], repo);
-check('tandem --help lists the commands, including -d', ['tandem start', 'tandem join', 'tandem -d', 'tandem stop', 'tandem status', 'tandem logs', 'tandem account'].every(c => help.includes(c)) && /Quick:/.test(help) && tandem(['-h'], repo) === help && tandem(['help'], repo) === help, help.slice(0, 200));
+check('tandem --help lists the commands, including init and -d', ['tandem init', 'tandem start', 'tandem join', 'tandem -d', 'tandem stop', 'tandem status', 'tandem logs', 'tandem account'].every(c => help.includes(c)) && /Quick:/.test(help) && tandem(['-h'], repo) === help && tandem(['help'], repo) === help, help.slice(0, 200));
 check('tandem --version prints the version', /^\d+\.\d+\.\d+\s*$/.test(tandem(['--version'], repo)));
 const stopped = tandem(['stop'], repo);
 check('tandem stop stops both', (stopped.match(/stopped worker/g) ?? []).length === 2, stopped);

@@ -36,7 +36,17 @@ tandem doctor
 
 The first `tandem --start` or `tandem join` installs Tandem’s own packages and can take a few minutes. To update Tandem later, run `git pull` in this folder.
 
-## Start a team
+## Start a new project
+
+For a clean test project, use one Tandem command:
+
+~~~powershell
+tandem init C:\Code\tandem-try
+~~~
+
+It creates the folder, initializes Git, makes the first empty commit, and starts Tandem. It refuses to use a folder that already exists, so it cannot accidentally add Git files to another project.
+
+## Start a team for an existing project
 
 Move to a Git project with at least one commit, then run:
 
@@ -75,15 +85,7 @@ For every command, option, account workflow, and common fix, see [Help & trouble
 
 ## Try it safely
 
-Make a temporary project and use a small Low-effort goal:
-
-~~~powershell
-mkdir tandem-try
-cd tandem-try
-git init
-git -c user.name=Tandem -c user.email=tandem@localhost commit --allow-empty -m "Start"
-tandem --start
-~~~
+Use `tandem init C:\Code\tandem-try` above, then use a small Low-effort goal:
 
 On the Board, choose **Low** and send:
 

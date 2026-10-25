@@ -7,6 +7,7 @@ import { CodeLine, LEVELS } from './ui';
 type Cmd = { code: string; what: string };
 
 const DAILY: Cmd[] = [
+  { code: 'tandem init <new-folder>', what: 'Create a brand-new Git project there and start the team. It refuses to touch a folder that already exists.' },
   { code: 'tandem --start', what: 'In your project folder: start the team. Your computer becomes the conductor and the page opens.' },
   { code: 'tandem', what: 'Open the page (or say how to start, if nothing runs).' },
   { code: 'tandem status', what: "What is running, with each team's links." },

@@ -54,12 +54,11 @@ try {
   check('start: with nothing connected, the page explains that starting makes this computer the conductor, and offers an invite',
     await seen(A, 'Start a team for a project') && await seen(A, "Open a teammate's team", 1000) && await A.getByText('tandem --start', { exact: true }).first().isVisible() && await seen(A, 'That makes this computer the conductor', 1000));
   const starter = A.locator('.project-starter').first();
-  await starter.getByLabel('Tandem folder').fill('C:\\Code\\tandem');
   await starter.getByLabel('New project folder').fill('C:\\Code\\tandem-test');
-  check('start: the project guide turns the chosen folders into one PowerShell block that creates a Git project and starts Tandem',
-    (await starter.locator('.codeline pre').innerText()).includes("New-Item -ItemType Directory -Force -Path $project") &&
-    (await starter.locator('.codeline pre').innerText()).includes("Set-Location -LiteralPath $project") &&
-    (await starter.locator('.codeline pre').innerText()).includes("& 'C:\\Code\\tandem\\tandem.cmd' --start"));
+  check('start: first-time setup is one install command, and a new project is one Tandem command instead of a custom PowerShell script',
+    ((await starter.locator('.start-help .codeline pre').textContent()) ?? '').includes('.\\tandem.cmd install') &&
+    (await starter.locator('.codeline pre').last().innerText()).includes('tandem init "C:\\Code\\tandem-test"') &&
+    !(await starter.innerText()).includes('New-Item -ItemType Directory'));
   await shot(A, '01-start');
   await A.getByLabel('Invite link').fill('not an invite');
   await A.getByRole('button', { name: 'Open team' }).click();
@@ -231,9 +230,9 @@ try {
     await A.locator('.page > section').first().evaluate(e => e.getAttribute('aria-labelledby') === 'workers-h') && await seen(A, 'Get started: add a teammate', 1000));
   check('get started: three steps, and the two roles: the conductor (you) and teammates', await until(async () => await steps.count() === 3) &&
     (await A.locator('.setup').innerText()).includes('A teammate is another computer') && (await steps.first().innerText()).includes('Start the conductor (your computer)') && (await steps.nth(1).innerText()).includes('Add a teammate') && (await steps.last().innerText()).includes('Send a goal'));
-  check('get started: one whole PowerShell block carries this computer\'s real folders without a PATH edit', await until(async () => {
+  check('get started: the conductor uses the normal Tandem command, not a script built from local folders', await until(async () => {
     const s = (await A.locator('.setup').textContent()) ?? ''; // once started, the command is folded away
-    return s.includes("Set-Location -LiteralPath 'C:\\Code\\calc-demo'") && s.includes("& 'C:\\Code\\tandem\\tandem.cmd' start") && !s.includes('$env:Path');
+    return s.includes('tandem --start') && !s.includes('Set-Location -LiteralPath') && !s.includes('tandem.cmd');
   }, 4000));
   check('get started: the order is conductor, then connect a teammate, then send a goal; the conductor and goal steps tick while adding a teammate stays optional',
     await steps.nth(0).evaluate(e => e.classList.contains('done')) && !(await steps.nth(1).evaluate(e => e.classList.contains('done'))) && await steps.nth(2).evaluate(e => e.classList.contains('done')));
@@ -241,9 +240,10 @@ try {
     await steps.nth(1).innerText().then(t => t.includes('Right now only this computer can join') && t.includes('without --local')));
   await shot(A, '06a-setup');
   const newProject = A.locator('.page > .project-starter');
-  check('team: the new-project guide uses the current project parent, not its exact project folder, and lets the conductor change it',
+  check('team: the new-project guide uses the current project parent and gives one tandem init command, without asking for Tandem\'s folder',
     await newProject.getByLabel('New project folder').inputValue() === 'C:\\Code\\tandem-test' &&
-    await newProject.getByLabel('Tandem folder').inputValue() === 'C:\\Code\\tandem');
+    (await newProject.locator('.codeline pre').last().innerText()).includes('tandem init "C:\\Code\\tandem-test"') &&
+    await newProject.getByLabel('Tandem folder').count() === 0);
 
   // ---- 6. team, shared memory, activity ----
   await nav(A, 'Team');

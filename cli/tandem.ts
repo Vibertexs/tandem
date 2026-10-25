@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // tandem: run Tandem from the project you want built. Node 22.18+ runs this TypeScript file as is.
 //
+//   tandem init <folder>      make a new project, then host a team for it
 //   tandem start              in your project's folder: host a team for it, print the invite address
 //   tandem join <address>     copy the conductor's project and add this computer's workers to the team
 //   tandem stop [--all]       stop what this computer started (--all also stops the brain)
@@ -32,9 +33,11 @@ const SIM_LIMIT = Number(process.env.TANDEM_SIM_LIMIT ?? 0);
 
 const HELP = `tandem: your team's Claude Codes, working as one.
 
-  Quick: "tandem --start" in your project, then "tandem" any time to open the dashboard.
+  Quick: "tandem init <new-folder>" starts a new project; "tandem --start" starts an existing one.
   Every command works as a word or a flag: tandem start = tandem --start, tandem stop = tandem --stop.
 
+  tandem init <folder>        Make a brand-new Git project in <folder>, give it its first commit,
+                              then start Tandem there. It refuses to touch an existing folder.
   tandem start              Start a team for the git repo you are in. You are its conductor: you send
                             the goals, and your computer plans them and merges the work. Prints the invite.
     --workers N             workers on this computer (default 1, one Claude per person; 0 = none)
@@ -317,6 +320,27 @@ async function ensurePage(): Promise<boolean> {
   background('page', '', process.execPath, [join(ROOT, 'dashboard', 'node_modules', 'vite', 'bin', 'vite.js'), '--port', String(PAGE_PORT), '--strictPort'], join(ROOT, 'dashboard'));
   if (!(await waitFor('127.0.0.1', PAGE_PORT, 20))) fail(`The page did not start. See ${join(LOGS, 'page.err')}`);
   return true;
+}
+
+// ---------- tandem init ----------
+// The friendly first-project command. It is deliberately strict: never put a Git repo or files
+// into a folder the person already has, because they may have meant to use `tandem --start` there.
+async function initProject(argv: string[]) {
+  const folder = argv[0];
+  if (!folder || folder.startsWith('-')) fail('Choose a new folder: tandem init <new-folder>\nFor a Git project you already have, open its folder and run: tandem --start');
+  const project = resolve(process.cwd(), folder);
+  if (existsSync(project)) fail(`${project} already exists. Tandem init only creates a brand-new project.\nFor an existing Git project, open its folder and run: tandem --start`);
+
+  mkdirSync(project, { recursive: true });
+  const made = git(project, 'init');
+  if (!made.ok) fail(`Could not create a Git project in ${project}:\n${made.out}`);
+  const committed = git(project, '-c', 'user.name=Tandem', '-c', 'user.email=tandem@localhost', 'commit', '--allow-empty', '-m', 'Start');
+  if (!committed.ok) fail(`Tandem made ${project}, but could not make its first Git commit:\n${committed.out}`);
+
+  say(`\n  ${green('✓')} Created a new Git project: ${project}`);
+  say(dim('  Starting Tandem there…'));
+  process.chdir(project);
+  await start(argv.slice(1));
 }
 
 // ---------- tandem start ----------
@@ -745,10 +769,11 @@ const ownCommand = () => (WIN ? `& '${join(ROOT, 'tandem.cmd')}'` : `'${join(ROO
 
 const [first, ...rest] = process.argv.slice(2);
 // Every command also works as a flag: "tandem --start" is "tandem start".
-const WORDS = ['start', 'join', 'stop', 'status', 'open', 'dashboard', 'logs', 'account', 'accounts', 'install', 'uninstall', 'doctor', 'version', 'help'];
+const WORDS = ['init', 'start', 'join', 'stop', 'status', 'open', 'dashboard', 'logs', 'account', 'accounts', 'install', 'uninstall', 'doctor', 'version', 'help'];
 const cmd = first && first.startsWith('--') && WORDS.includes(first.slice(2)) ? first.slice(2) : first;
 try {
-  if (cmd === 'start') await start(rest);
+  if (cmd === 'init') await initProject(rest);
+  else if (cmd === 'start') await start(rest);
   else if (cmd === 'join') await joinTeam(rest);
   else if (cmd === 'stop') await stop(rest);
   else if (cmd === 'status') await status();
