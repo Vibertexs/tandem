@@ -7,7 +7,7 @@ import { join } from 'node:path';
 export type TestRun = { ran: boolean; ok: boolean; command: string; output: string };
 
 const git = (cwd: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.name=Tandem', '-c', 'user.email=tandem@localhost', ...args], { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
+  execFileSync('git', ['-c', 'user.name=Tandem', '-c', 'user.email=tandem@localhost', ...args], { cwd, encoding: 'utf8', stdio: 'pipe', windowsHide: true }).trim();
 
 // What to run to test the project in `dir`, or null if there is no test we know how to run.
 export function testCommand(dir: string): { file: string; args: string[]; label: string } | null {
@@ -36,9 +36,9 @@ export function testBranch(repo: string, branch: string, timeoutMs = 300_000): T
     const cmd = testCommand(tree);
     if (!cmd) return { ran: false, ok: true, command: '', output: '' };
     if (cmd.label === 'npm test' && existsSync(join(tree, 'package.json'))) {
-      spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['install', '--silent', '--no-audit', '--no-fund'], { cwd: tree, timeout: timeoutMs, shell: process.platform === 'win32' });
+      spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['install', '--silent', '--no-audit', '--no-fund'], { cwd: tree, timeout: timeoutMs, shell: process.platform === 'win32', windowsHide: true });
     }
-    const r = spawnSync(cmd.file, cmd.args, { cwd: tree, encoding: 'utf8', timeout: timeoutMs, shell: process.platform === 'win32' && cmd.file.endsWith('.cmd') });
+    const r = spawnSync(cmd.file, cmd.args, { cwd: tree, encoding: 'utf8', timeout: timeoutMs, shell: process.platform === 'win32' && cmd.file.endsWith('.cmd'), windowsHide: true });
     const output = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
     return { ran: true, ok: r.status === 0, command: cmd.label, output: output.slice(-3000) };
   } finally {

@@ -58,7 +58,7 @@ if (!brain.isOperator()) {
 // clone. Workers elsewhere push their task branches there, and merging fetches them.
 {
   let url = '';
-  try { url = execFileSync('git', ['-C', REPO, 'remote', 'get-url', 'origin'], { encoding: 'utf8', stdio: 'pipe' }).trim(); } catch { /* no origin */ }
+  try { url = execFileSync('git', ['-C', REPO, 'remote', 'get-url', 'origin'], { encoding: 'utf8', stdio: 'pipe', windowsHide: true }).trim(); } catch { /* no origin */ }
   await brain.setContext('repo_url', url).catch(() => {});
   await brain.setContext('git_url', opt['git-url'] ?? '').catch(() => {});
   // where Tandem and the project are on this computer, so the Setup page can show real commands
@@ -74,7 +74,7 @@ const tsx = pathToFileURL(join(here, 'node_modules', 'tsx', 'dist', 'esm', 'inde
 const plan = () => new Promise<{ code: number; why: string }>(done => {
   const child = spawn(process.execPath, ['--import', tsx, join(here, 'plan.ts'),
     '--uri', URI, '--db', DB, '--session', SESSION, '--token-file', process.env.TANDEM_TOKEN_FILE!,
-    '--workdir', REPO, '--model', opt.model!, '--budget', opt.budget!], { stdio: ['ignore', 'pipe', 'inherit'] });
+    '--workdir', REPO, '--model', opt.model!, '--budget', opt.budget!], { stdio: ['ignore', 'pipe', 'inherit'], windowsHide: true });
   let why = '';
   child.stdout.on('data', d => {
     process.stdout.write(d);

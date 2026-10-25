@@ -99,7 +99,7 @@ async function simulate(t: Task) {
   return 'done' as const;
 }
 
-const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
+const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe', windowsHide: true }).trim();
 
 // A worker's own config files live in .worktrees/.tandem/, so .worktrees/ holds only task folders.
 function scratchFile(cwd: string, name: string) {
@@ -127,7 +127,7 @@ function runClaude(cwd: string, prompt: string, model: string, effort: string, e
     '--max-budget-usd', BUDGET, '--output-format', 'json'];
   if (effort && effort !== 'default') args.push('--effort', effort);
   return new Promise<{ code: number; out: string; result: string; cost: number; isError: boolean }>(done => {
-    const child = spawn('claude', args, { cwd, env: { ...process.env, TANDEM_WORKER_ID: workerId, TANDEM_SESSION: SESSION, STDB_URI: URI, STDB_DB: DB, ...extraEnv } });
+    const child = spawn('claude', args, { cwd, windowsHide: true, env: { ...process.env, TANDEM_WORKER_ID: workerId, TANDEM_SESSION: SESSION, STDB_URI: URI, STDB_DB: DB, ...extraEnv } });
     let stdout = ''; let stderr = '';
     child.stdout.on('data', d => { stdout += d; });
     child.stderr.on('data', d => { stderr += d; });
@@ -172,7 +172,7 @@ function runCodex(cwd: string, prompt: string, readOnly: boolean) {
   const cmd = fake ? process.execPath : 'codex';
   const argv = fake ? [fake, ...args] : shell ? args.map(a => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a)) : args;
   return new Promise<{ code: number; out: string; result: string; cost: number; isError: boolean }>(done => {
-    const child = spawn(cmd, argv, { cwd, shell, env: { ...process.env, TANDEM_WORKER_ID: workerId } });
+    const child = spawn(cmd, argv, { cwd, shell, windowsHide: true, env: { ...process.env, TANDEM_WORKER_ID: workerId } });
     let out = '';
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { out += d; });
