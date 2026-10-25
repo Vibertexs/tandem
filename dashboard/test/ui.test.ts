@@ -73,8 +73,8 @@ try {
   await A.goto(`${URL_}/?db=${DB}&host=1`);
   check('control: no claim-or-watch question; the host page takes control by itself and the prompt is on', await until(() => prompt(A).isEnabled()) && await A.getByText('Watch only').count() === 0);
   await shot(A, '02-owner');
-  check('control: the dock has Overview, Board, Results, Files, Team, Shared memory, Usage, Activity, Settings (goals live on the Board; getting started is on Team)',
-    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Overview|Board|Results|Files|Team|Shared memory|Usage|Activity|Settings');
+  check('control: the dock has Overview, Board, Team, Shared memory, Usage, Activity, Settings (getting started is on Team, finished goals are in Activity)',
+    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Overview|Board|Team|Shared memory|Usage|Activity|Settings');
   check('control: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
   check('control: it shows one next step: the manager is not connected yet', await seen(A, 'The manager is not connected yet', 3000));
   check('control: the sidebar says this browser controls the team', await seen(A, 'You control this team', 2000));
@@ -168,17 +168,21 @@ try {
   // what the runs cost (a real launcher and the manager report this)
   await manager.reducers.addGoalCost({ sessionId: 'live', id: goalId, usd: 0.01 });
   await manager.reducers.finishGoal({ sessionId: 'live', id: goalId, branch: `tandem/${goalId}`, note: 'Tests pass (python -m unittest).' });
-  check('goal done: its lane says Done, 2/2, and where the work is', await until(async () => {
-    const row = await calc.innerText();
-    return row.includes('2/2') && row.includes('Done') && row.includes(`tandem/${goalId}`);
-  }, 5000), await calc.innerText().catch(() => ''));
-  const doneLane = await calc.innerText();
-  check('goal done: the lane says how it went, how long it took and what it cost', doneLane.includes('Tests pass') && /done in \d/.test(doneLane) && doneLane.includes('$0.01 of Claude usage'), doneLane);
-  check('goal done: a finished goal moves below the work still going', (await A.locator('.goal-lane .goal-text').allInnerTexts()).join('|') === 'Other tasks|Build a tiny calculator with tests');
+  const fin = A.getByRole('region', { name: 'Finished goals' });
+  check('goal done: the finished goal leaves the board, and a "Finished" strip says where its work is',
+    await until(async () => await A.locator('.goal-lane', { hasText: 'Build a tiny calculator with tests' }).count() === 0 && (await fin.innerText().catch(() => '')).includes(`tandem/${goalId}`), 5000), await fin.innerText().catch(() => ''));
+  check('goal done: the board counts only the work still going, and its lanes are just that work',
+    await seen(A, '5 of 5 tasks done', 3000) && (await A.locator('.goal-lane .goal-text').allInnerTexts()).join('|') === 'Other tasks');
   await shot(A, '06-board-done', true);
+  // the full result is in Activity: how it went, how long it took, what it cost
+  await nav(A, 'Activity');
+  const finishedCard = A.getByRole('article', { name: /^Result: Build a tiny calculator/ });
+  check('goal done: Activity shows its result: how it went, how long it took, what it cost and its branch',
+    await until(() => finishedCard.isVisible(), 3000) && await (async () => { const t = await finishedCard.innerText(); return t.includes('Tests pass') && /built in \d/.test(t) && t.includes('$0.01 of Claude usage') && t.includes(`tandem/${goalId}`); })(), await finishedCard.innerText().catch(() => 'no card'));
+  await nav(A, 'Board');
 
   // "Merge into my project": the page asks, the manager answers (here the answers are played by the test)
-  const mergeBtn = calc.getByRole('button', { name: 'Merge into my project' });
+  const mergeBtn = fin.getByRole('button', { name: 'Merge into my project' });
   check('merge: a finished goal with a branch offers "Merge into my project"', await until(() => mergeBtn.isVisible(), 3000));
   await mergeBtn.click();
   const asked = await until(async () => {
@@ -264,28 +268,27 @@ try {
     check('memory: a change in the database shows up in its table the moment it happens', await until(async () => (await rowsIn('context')) === before + 1, 4000), [before, await rowsIn('context')]);
     await A.getByRole('article', { name: 'Table context' }).locator('summary').click();
     check('memory: "Show rows" shows the actual rows', await until(async () => (await A.getByRole('article', { name: 'Table context' }).locator('pre').innerText()).includes('db_probe'), 2000));
+    // the workers' heartbeats (last seen) refresh every few seconds: that must not make the table blink
+    await sleep(1500); // let the probe's own highlight fade
+    const workersCard = A.getByRole('article', { name: 'Table workers' });
+    let blinks = 0;
+    for (const end = Date.now() + 5000; Date.now() < end; await sleep(150)) if (/\blit\b/.test((await workersCard.getAttribute('class')) ?? '')) blinks++;
+    check('memory: the workers table does not light up on heartbeats, only when something real changes', blinks === 0, blinks);
   }
 
-  // ---- the other pages: Overview, Results, Files, Usage ----
+  // ---- the other pages: Overview and Usage ----
   await nav(A, 'Overview');
   check('overview: four numbers, the agents, the goals and the latest news',
     await until(async () => await A.locator('.stat-card').count() === 4, 3000) && await until(() => A.getByRole('article', { name: 'Agent Sam' }).isVisible(), 3000) && await seen(A, 'Build a tiny calculator with tests', 2000) && await seen(A, 'Latest', 1000), await A.locator('.page').innerText().catch(() => ''));
   await shot(A, '08a-overview');
-  await nav(A, 'Results');
-  const result = A.getByRole('article', { name: /^Result: Build a tiny calculator/ });
-  check('results: a finished goal shows its branch, what it cost, who built it, its files and what the merge said',
-    await until(() => result.isVisible(), 3000) && (await result.innerText()).includes(`tandem/${goalId}`) && (await result.innerText()).includes('$0.01') && /Built by/.test(await result.innerText()) && /Files/.test(await result.innerText()) && (await result.innerText()).includes('Merged tandem/x into main'), await result.innerText().catch(() => 'no result card'));
-  await shot(A, '08b-results');
-  await nav(A, 'Files');
-  check('files: every file any task works on, with its stage and who has it', await until(async () => await A.locator('.file-list .row').count() > 3, 3000) && await seen(A, 'All files', 1000) && /calc\.py/.test(await A.locator('.file-list').innerText()), await A.locator('.file-list').innerText().catch(() => ''));
-  await A.getByRole('button', { name: 'Done', exact: true }).click();
-  check('files: the Done filter keeps only files of finished tasks', await until(async () => (await A.locator('.file-list .stage-tag').allInnerTexts()).every(t => /Done/.test(t)) && await A.locator('.file-list .row').count() > 0, 3000));
-  await shot(A, '08c-files');
   await nav(A, 'Usage');
   check('usage: the total, each computer and each goal, with what it spent',
     await seen(A, 'Spent in total', 2000) && await A.getByRole('article', { name: 'Usage Alex' }).isVisible() && (await A.locator('.page').innerText()).includes('$0.01'), await A.locator('.page').innerText().catch(() => ''));
   await shot(A, '08d-usage');
   await nav(A, 'Activity');
+  check('activity: it also holds the finished goals: branch, who built it, its files, and what the merge said',
+    await until(() => finishedCard.isVisible(), 3000) && await (async () => { const t = await finishedCard.innerText(); return /Built by/.test(t) && /Files/.test(t) && t.includes('Merged tandem/x into main'); })(), await finishedCard.innerText().catch(() => ''));
+  await shot(A, '08b-activity');
   check('activity: the log has plain-English lines', await until(async () => await A.locator('.log li').count() > 5) && await seen(A, /claimed:/, 2000), await A.locator('.log li').count());
   await A.getByRole('button', { name: /^Finished/ }).click();
   check('activity: "Finished" shows only what got done', await until(async () => (await A.locator('.log li').allInnerTexts()).every(t => /Done:|Goal done|Job progress|Merge task/.test(t))), await A.locator('.log li').allInnerTexts());
@@ -381,7 +384,7 @@ try {
   await P.goto(`${URL_}/?db=${DB}`);
   await until(() => prompt(P).isVisible(), 10_000);
   const bar = await P.locator('.sidebar').boundingBox();
-  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 820 && await P.locator('.nav a').count() === 9, bar);
+  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 820 && await P.locator('.nav a').count() === 7, bar);
   const small = await P.locator('.nav a, .btn').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent && (e as HTMLElement).offsetHeight < 44).length);
   check('phone: tap targets are at least 44px tall', small === 0, small);
   check('phone: no sideways scrolling', await P.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
