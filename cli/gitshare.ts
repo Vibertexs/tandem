@@ -32,6 +32,7 @@ export function serveRepo(repo: string, backend: string): Server {
     req.on('end', () => {
       const body = Buffer.concat(chunks);
       const child = spawn(backend, [], {
+        windowsHide: true,
         env: {
           PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', HOME: process.env.HOME ?? process.env.USERPROFILE ?? '',
           GIT_PROJECT_ROOT: dirname(repo), GIT_HTTP_EXPORT_ALL: '1',

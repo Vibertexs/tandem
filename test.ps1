@@ -2,7 +2,8 @@
 #   .\test.ps1            all automated suites (no Claude calls; about 6 minutes)
 #   .\test.ps1 -Real      also the suites that make real headless Claude runs (haiku, uses quota)
 #   .\test.ps1 -Restart   also the brain-restart test (stops and restarts the local brain)
-# Needs the local brain on 127.0.0.1:3001 (started here if it is not running) and Chrome for the
+# Needs the brain on port 3001 (started here, open to the network like `tandem start` does, if it is
+# not running; the host-sharing test needs that) and Chrome for the
 # page tests. Test databases are all named bilal-* and are wiped freely.
 param([switch]$Real, [switch]$Restart)
 $root = $PSScriptRoot
@@ -15,7 +16,7 @@ function Up($port) { [bool](Get-NetTCPConnection -LocalPort $port -State Listen 
 if (-not (Up 3001)) {
   Write-Host 'starting the local brain...'
   $psi = New-Object System.Diagnostics.ProcessStartInfo
-  $psi.FileName = $env:ComSpec; $psi.Arguments = '/d /c spacetime start --listen-addr 127.0.0.1:3001'
+  $psi.FileName = $env:ComSpec; $psi.Arguments = '/d /c spacetime start --listen-addr 0.0.0.0:3001'
   $psi.UseShellExecute = $true; $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
   [void][System.Diagnostics.Process]::Start($psi)
   for ($i = 0; $i -lt 40 -and -not (Up 3001); $i++) { Start-Sleep -Milliseconds 500 }

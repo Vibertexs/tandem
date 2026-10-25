@@ -98,7 +98,7 @@ function which(cmd: string): string | null {
 function run(cmd: string, args: string[], cwd = ROOT) {
   const shell = WIN && /\.(cmd|bat)$/i.test(cmd);
   const quoted = shell ? args.map(a => (/[\s"&|<>^]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a)) : args;
-  const r = spawnSync(shell ? `"${cmd}"` : cmd, quoted, { cwd, encoding: 'utf8', shell });
+  const r = spawnSync(shell ? `"${cmd}"` : cmd, quoted, { cwd, encoding: 'utf8', shell, windowsHide: true });
   return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() };
 }
 const git = (cwd: string, ...args: string[]) => run('git', args, cwd);
@@ -161,6 +161,8 @@ const running = (name: string, team: string) => loadProcs().some(p => p.name ===
 
 // Starts a background process that logs to .tandem/logs and does not hold this terminal: its own
 // process group, no console window, output to files (not pipes, which would keep a caller waiting).
+// On Windows a detached process has no console, so EVERY program it starts (git, claude, node) must
+// itself be started with windowsHide: true, or each one opens its own visible window.
 function background(name: string, team: string, cmd: string, args: string[], cwd: string, env: Record<string, string | undefined> = {}) {
   mkdirSync(LOGS, { recursive: true });
   const base = join(LOGS, `${team ? `${team}-` : ''}${name.replace(/\s+/g, '-')}`);

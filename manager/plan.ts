@@ -51,7 +51,7 @@ const [cmd, ...pre] = process.env.TANDEM_CLAUDE ? [process.execPath, process.env
 const code = await new Promise<number>(done => {
   const child = spawn(cmd, [...pre, '-p', '--model', opt.model!, '--mcp-config', config, '--strict-mcp-config',
     '--allowedTools', 'mcp__tandem', 'Read', 'Glob', 'Grep', '--max-budget-usd', opt.budget!, '--output-format', 'json'],
-    { cwd: resolve(opt.workdir!) });
+    { cwd: resolve(opt.workdir!), windowsHide: true });
   let stdout = ''; let stderr = '';
   child.stdout.on('data', d => { stdout += d; });
   child.stderr.on('data', d => { stderr += d; process.stderr.write(d); });
