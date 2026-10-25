@@ -345,6 +345,10 @@ async function start(argv: string[]) {
   const pub = run(spacetime, ['publish', team, '--server', `http://127.0.0.1:${BRAIN_PORT}`, '--no-config', '--module-path', join(ROOT, 'brain', 'spacetimedb'), '--yes', ...(o.fresh ? ['--delete-data=always'] : [])]);
   if (!pub.ok) fail(`${pub.out}\nCould not set up the team "${team}". If Tandem was updated and this team is old, tandem start --fresh starts it over (this wipes its board).`);
   done('team', o.fresh ? `"${team}", fresh` : `"${team}"`);
+  if (!o.fresh) {
+    const goals = await countRows('127.0.0.1', team, 'goals');
+    if (goals > 0) say(dim(`            kept the board from last time (${goals} goal${goals === 1 ? '' : 's'}). To start over: tandem start --fresh`));
+  }
 
   if (!(await reachable('127.0.0.1', PAGE_PORT))) {
     background('page', '', process.execPath, [join(ROOT, 'dashboard', 'node_modules', 'vite', 'bin', 'vite.js'), '--port', String(PAGE_PORT), '--strictPort'], join(ROOT, 'dashboard'));
@@ -422,10 +426,28 @@ function parseAddress(address: string, team?: string): { host: string; team: str
   const a = address.trim();
   try {
     const u = new URL(/^[a-z]+:\/\//i.test(a) ? a : `http://${a}`);
-    const t = team ?? u.searchParams.get('db') ?? u.pathname.replace(/^\/+|\/+$/g, '');
+    // also accepts a link typed without the "?" (…:5173/db=shop), and ignores a stray "." or quote
+    const t = team ?? u.searchParams.get('db') ?? /(?:^|\/)db=([^&/#]+)/.exec(u.pathname)?.[1] ?? u.pathname.replace(/^\/+|\/+$/g, '');
     if (u.hostname && t) return { host: u.hostname, team: slug(t) };
   } catch { /* not a URL */ }
   return fail(`Could not read the address "${address}". Use the invite the host's page shows, like http://192.168.1.20:5173/?db=shop`);
+}
+
+// Does the host's brain have a team with this name? false only when it says there is none;
+// null when it could not tell (the join then carries on and fails with a more specific message).
+async function teamExists(host: string, team: string): Promise<boolean | null> {
+  try {
+    const r = await fetch(`http://${host}:${BRAIN_PORT}/v1/database/${team}/sql`, { method: 'POST', body: 'SELECT key FROM context', signal: AbortSignal.timeout(3000) });
+    return r.ok ? true : r.status === 404 ? false : null;
+  } catch { return null; }
+}
+
+// How many rows a table of the team's board has (0 if it cannot tell).
+async function countRows(host: string, team: string, table: string): Promise<number> {
+  try {
+    const r = await fetch(`http://${host}:${BRAIN_PORT}/v1/database/${team}/sql`, { method: 'POST', body: `SELECT * FROM ${table}`, signal: AbortSignal.timeout(3000) });
+    return ((await r.json()) as { rows: unknown[][] }[])[0]?.rows.length ?? 0;
+  } catch { return 0; }
 }
 
 // One value the host published about the team (git_url, repo_url, ...). Read-only SQL over HTTP.
@@ -472,6 +494,9 @@ async function joinTeam(argv: string[]) {
     fail(`Cannot reach ${host}:${BRAIN_PORT}. Check the invite on the host's page, that both computers are on the same network, and that the host did not use --local.`);
   }
   done('host', 'reachable');
+  if ((await teamExists(host, team)) === false) {
+    fail(`There is no team "${team}" on ${host}. Check the invite link. It looks like http://${host}:${PAGE_PORT}/?db=your-team (note the "?db=").`);
+  }
 
   const workers = accts.length || Number(o.workers);
   let repo: string | null = null;

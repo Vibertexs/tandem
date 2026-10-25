@@ -40,8 +40,11 @@ tandem(['account', 'add', 'work1', '--no-login'], repo);
 tandem(['account', 'add', 'school', '--agent', 'codex', '--no-login'], repo);
 const list = tandem(['account', 'list'], repo);
 check('two accounts are listed, with their agent, not signed in yet', /work1\s+claude\s+not signed in/.test(list) && /school\s+codex\s+not signed in/.test(list), list);
-check('a real join to a host that is not sharing a project says to restart the host',
-  /not sharing the project/.test(tandem(['join', 'http://127.0.0.1:5173/?db=x'], fileURLToPath(new URL('..', import.meta.url)), { TANDEM_SIMULATE: '' })));
+const here = fileURLToPath(new URL('..', import.meta.url));
+check('a join to a team that does not exist says so and how an invite looks (not "host is not sharing")',
+  (() => { const o = tandem(['join', 'http://127.0.0.1:5173/?db=no-such-team-x'], here, { TANDEM_SIMULATE: '' }); return /There is no team "no-such-team-x" on 127\.0\.0\.1/.test(o) && /\?db=/.test(o) && !/not sharing/.test(o); })());
+check('a mistyped invite (no "?", a stray ".") is read as the same team',
+  /There is no team "no-such-team-x" on/.test(tandem(['join', 'http://127.0.0.1:5173/db=no-such-team-x.'], here, { TANDEM_SIMULATE: '' })));
 check('--simulate is not an option any more', /Unknown option '--simulate'/.test(tandem(['start', '--simulate'], repo)));
 check('an unknown account is refused with how to add it', /No account "nope"/.test(tandem(['start', '--accounts', 'nope', '--local', '--no-manager', '--no-browser', '--team', TEAM], repo)));
 
@@ -56,6 +59,25 @@ const expected = [`${computer}-school codex school`, `${computer}-work1 claude w
 for (let i = 0; i < 40 && describe() !== expected; i++) { await new Promise(r => setTimeout(r, 500)); rows = await sql("SELECT name, agent, account FROM workers WHERE session_id = 'live'"); }
 const seen = describe();
 check('the brain knows which agent and account each worker runs', seen === expected, seen);
+check('a real join to a team whose host is not sharing a project says to restart the host',
+  /not sharing the project/.test(tandem(['join', `http://127.0.0.1:5173/?db=${TEAM}`], here, { TANDEM_SIMULATE: '' })));
+// starting again keeps the board, and says so
+{
+  const { DbConnection, tables } = await import('../brain/bindings/index.js');
+  const owner = await new Promise<InstanceType<typeof DbConnection>>((res, rej) => {
+    DbConnection.builder().withUri('ws://127.0.0.1:3001').withDatabaseName(TEAM)
+      .onConnect(c => { c.subscriptionBuilder().onApplied(() => res(c)).subscribe([tables.goals, tables.operators]); }).onConnectError((_c, e) => rej(e)).build();
+  });
+  await owner.reducers.claimOperator({});
+  await owner.reducers.postGoal({ sessionId: 'live', id: 'g-keep', text: 'A goal that should survive a restart' });
+  await new Promise(r => setTimeout(r, 500));
+  const again = tandem(['start', '--local', '--no-manager', '--no-browser', '--workers', '0', '--team', TEAM], repo);
+  check('starting again keeps the board and says how to start over', /kept the board from last time \(1 goal\)/.test(again) && /tandem start --fresh/.test(again), again.slice(-400));
+  const fresh = tandem(['start', '--local', '--no-manager', '--no-browser', '--workers', '0', '--team', TEAM, '--fresh'], repo);
+  check('start --fresh wipes the board (the goal is gone, nothing is "kept")', !/kept the board/.test(fresh) && /fresh/.test(fresh), fresh.slice(-400));
+  owner.disconnect();
+  await new Promise(r => setTimeout(r, 300));
+}
 const status = tandem([], repo);
 check('plain "tandem" shows the team and its workers, and opens the dashboard', status.includes(TEAM) && /2 workers/.test(status) && /http:\/\/localhost:5173\/\?db=/.test(status), status);
 check('tandem -d (and dashboard, open, --dashboard) gives the dashboard address', ['-d', 'dashboard', 'open', '--dashboard'].every(c => /http:\/\/localhost:5173\/\?db=/.test(tandem([c], repo))));
