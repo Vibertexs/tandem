@@ -46,12 +46,12 @@ System font stack (`Inter` first if installed, then Segoe UI Variable on Windows
 
 ## Components
 - **Dock (navigation).** A white rounded panel floating on the left, vertically centred. Icons only; the name appears as a dark label to the right on hover or keyboard focus. The active page has the accent tint and accent-coloured icon. A badge (accent dot with a count) shows pending requests.
-  - **Pages (six, in this order).** Board (work still going), Team (its Get started steps are at the top), Shared memory, Usage (tokens or estimated dollars, and quota), Activity (finished goals with their merge button, then the log) and Settings (a gear). On a phone all six fit in the bottom bar. One page per job: nothing is shown on two pages in full. (There was an Overview; it repeated the Board and Usage, so it is gone.)
+  - **Pages (seven, in this order).** Board (work still going), Team (the workers, then one "Get started: add a teammate" card, since getting started is adding a teammate), Shared memory (developer info: the notes in every prompt, the agents, files locked now, every other shared value, the raw tables folded away), Usage (tokens or estimated dollars, and quota), Activity (finished goals with their merge button, then the log), Help (every command with a copy button, the start options, which model each effort uses, the words) and Settings (a gear). On a phone all seven fit in the bottom bar. One page per job: nothing is shown on two pages in full. Explaining why it is built this way belongs in the README, not on the page.
   - **Behaviour.** The dock keeps a fixed width (64px). Icons are 36px. When the mouse comes within about 80px of one it grows smoothly to at most 48px, which is as wide as the dock allows, and its neighbours grow less and push the rest away (like a dock). Clicking opens the page. The growth is computed in `Dock.tsx` (`dockSizes`) from the pointer position.
   - **Phone.** The dock becomes a floating bar at the bottom with fixed 46px targets and no growth. It is skipped for touch.
   - **Reduced motion.** With the operating system's reduced-motion setting on, transitions and the working bar's animation are off.
 - **Words.** Two roles only. The **conductor** is you and your computer (it ran `tandem --start`); **teammates** are other computers. The page never says "host", "manager" or "controller". The planning Claude shows as the Conductor card.
-- **Top bar.** Page title on the left. On the right: a team pill (team name, workers online, conductor online or offline), a chip ("You are the conductor" or "Teammate · watching"), and the Invite button.
+- **Top bar.** Page title on the left. On the right, everything has one shape, the team pill's: a white pill (full round, 1px border, soft shadow, 38px tall). The team pill (team name, workers online, conductor online or offline), the role pill with a coloured dot ("You are the conductor" blue, "Teammate · watching" grey, waiting amber), and Invite (or "This computer only"). Request control is the same pill, filled ink.
 - **Prompt.** One rounded card with a borderless input and a black Send button inside it. A soft coral ring shows when it has focus. Below it, a small segmented choice, **Effort: Low · Medium · High** (Medium first), with one muted line saying what the choice means. It keeps the last choice for the next goal.
 - **Segmented choice** (effort, Dollars/Tokens). Round chips in a row; the chosen one is solid ink, the others white with a border.
 - **Usage numbers.** Dollars always start with "~" (estimated at API prices; a tooltip says so). Tokens read "12.4k tokens". One switch, remembered per browser, changes every page.
@@ -61,7 +61,8 @@ System font stack (`Inter` first if installed, then Segoe UI Variable on Windows
 - **Buttons.** Primary is solid ink. Secondary is white with a border. Destructive is secondary with red text. 38px tall (44px on a phone).
 - **Chips.** Round, small, tinted by meaning: green done or free, blue working, amber waiting, red failed.
 
+- **Theme.** Settings → This browser → Theme: System (default), Light or Dark. Saved in this browser; `index.html` applies it before the page draws, so there is no flash. Dark redefines the same tokens.
+
 ## Ideas not built yet
 - A keyboard shortcut per page (1 to 6) and a command palette on Ctrl+K.
 - A strip at the top of the Board showing each worker and what they are on right now.
-- A light and dark switch in Settings (today it follows the operating system).

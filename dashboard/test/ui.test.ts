@@ -73,8 +73,14 @@ try {
   await A.goto(`${URL_}/?db=${DB}&host=1`);
   check('control: no claim-or-watch question; the conductor page takes control by itself and the prompt is on', await until(() => prompt(A).isEnabled()) && await A.getByText('Watch only').count() === 0);
   await shot(A, '02-owner');
-  check('control: the dock has Board, Team, Shared memory, Usage, Activity, Settings (no Overview: the Board and Usage cover it)',
-    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Board|Team|Shared memory|Usage|Activity|Settings');
+  check('control: the dock has Board, Team, Shared memory, Usage, Activity, Help, Settings (no Overview: the Board and Usage cover it)',
+    (await A.locator('.nav-label').allInnerTexts()).join('|') === 'Board|Team|Shared memory|Usage|Activity|Help|Settings');
+  {
+    // the top bar: every item on its right has the same shape and height (the team pill's)
+    const shapes = await A.locator('.topbar .top-item').evaluateAll(els => els.map(e => { const c = getComputedStyle(e); return `${c.borderTopLeftRadius}|${Math.round(e.getBoundingClientRect().height)}|${c.borderTopWidth}`; }));
+    check('top bar: the team pill, "You are the conductor" and "This computer only" are one shape: same radius, height and border',
+      shapes.length >= 3 && new Set(shapes).size === 1, shapes);
+  }
   await A.goto(`${URL_}/?db=${DB}&host=1#/overview`);
   check('control: an old #/overview link opens the Board', await until(async () => (await A.locator('.topbar h1').innerText()) === 'Board', 4000));
   check('control: a team only this computer can reach says so at the top, instead of an invite', await seen(A, 'This computer only', 2000));
@@ -214,16 +220,18 @@ try {
   await manager.reducers.setContext({ sessionId: 'live', key: 'project_dir', value: 'C:\\Code\\calc-demo' });
   await nav(A, 'Team');
   const steps = A.locator('.step');
+  check('team: the workers come first, then getting started, which is adding a teammate', await until(async () => await steps.count() === 3) &&
+    await A.locator('.page > section').first().evaluate(e => e.getAttribute('aria-labelledby') === 'workers-h') && await seen(A, 'Get started: add a teammate', 1000));
   check('get started: three steps, and the two roles: the conductor (you) and teammates', await until(async () => await steps.count() === 3) &&
-    await seen(A, 'There are two roles', 1000) && await seen(A, 'You are the conductor.', 1000) && (await steps.first().innerText()).includes('Start the conductor (your computer)') && (await steps.nth(1).innerText()).includes('Add a teammate') && (await steps.last().innerText()).includes('Send a goal'));
+    (await A.locator('.setup').innerText()).includes('A teammate is another computer') && (await steps.first().innerText()).includes('Start the conductor (your computer)') && (await steps.nth(1).innerText()).includes('Add a teammate') && (await steps.last().innerText()).includes('Send a goal'));
   check('get started: one whole PowerShell block carries this computer\'s real folders without a PATH edit', await until(async () => {
-    const s = await A.locator('.setup').innerText();
+    const s = (await A.locator('.setup').textContent()) ?? ''; // once started, the command is folded away
     return s.includes("Set-Location -LiteralPath 'C:\\Code\\calc-demo'") && s.includes("& 'C:\\Code\\tandem\\tandem.cmd' start") && !s.includes('$env:Path');
   }, 4000));
   check('get started: the order is conductor, then connect a teammate, then send a goal; the conductor and goal steps tick while adding a teammate stays optional',
     await steps.nth(0).evaluate(e => e.classList.contains('done')) && !(await steps.nth(1).evaluate(e => e.classList.contains('done'))) && await steps.nth(2).evaluate(e => e.classList.contains('done')));
   check('get started: a local-only team explains that an invite needs a conductor started without --local',
-    await steps.nth(1).innerText().then(t => t.includes('only available on this computer') && t.includes('without --local')));
+    await steps.nth(1).innerText().then(t => t.includes('Right now only this computer can join') && t.includes('without --local')));
   await shot(A, '06a-setup');
 
   // ---- 6. team, shared memory, activity ----
@@ -267,16 +275,19 @@ try {
     await until(async () => { const t = await summaryNote.innerText(); return t.includes('Written by Conductor') && t.includes('No worker has read it yet'); }, 4000), await summaryNote.innerText().catch(() => ''));
   await shot(A, '08-memory');
   {
-    // how the team shares one memory: the agents, and what each is doing, holding and read
+    // developer info: the agents, what each is doing, holding and read; locks; every other shared value
     await manager.reducers.setContext({ sessionId: 'live', key: 'host_computer', value: 'Alex' });
-    check('memory: it explains that the code is in git and SpacetimeDB holds what the agents agree on', await seen(A, 'The code is not stored here.', 2000) && await seen(A, 'SpacetimeDB holds what the agents must agree on', 1000));
+    check('memory: no explaining the database; it shows the files locked now and every other shared value',
+      await A.getByText('The code is not stored here.').count() === 0 && await seen(A, 'Files locked now', 2000) &&
+      await until(async () => { const t = await A.locator('section[aria-labelledby="values-h"]').innerText(); return t.includes('host_computer') && t.includes('project_dir') && t.includes('C:\\Code\\calc-demo'); }, 3000),
+      await A.locator('section[aria-labelledby="values-h"]').innerText().catch(() => ''));
     const alex = A.getByRole('article', { name: 'Agent Alex' });
     check('memory: each agent has a card: what it is working on, the files it holds, and the notes it read',
       await alex.isVisible() && /Working on/.test(await alex.innerText()) && /Holding/.test(await alex.innerText()) && /No notes read yet/.test(await alex.innerText()), await alex.innerText().catch(() => ''));
     check("memory: a worker on the conductor's computer says so; the others are teammates",
       await until(async () => (await alex.innerText()).includes("Conductor's computer"), 3000) && (await A.getByRole('article', { name: 'Agent Sam' }).innerText()).includes('Teammate'));
     check('memory: the conductor has a card too', await A.getByRole('article', { name: 'Conductor' }).isVisible());
-    await A.locator('.under-hood > summary').click(); // the raw tables are under "Under the hood"
+    await A.locator('.under-hood > summary').click(); // the raw tables are folded away
   }
   {
     // the live database: every SpacetimeDB table, with its row count, updating as the database changes
@@ -311,6 +322,30 @@ try {
   await A.getByRole('group', { name: 'Show usage as' }).getByRole('button', { name: 'Dollars' }).click();
   check('settings: the same switch is in Settings, and switches back to dollars', await A.getByRole('group', { name: 'Show usage as' }).getByRole('button', { name: 'Dollars' }).getAttribute('aria-pressed') === 'true');
   check('settings: it links the projector view', (await A.getByRole('link', { name: 'the big-type board' }).getAttribute('href'))?.includes('view=present') === true);
+  {
+    // Light / Dark / System, remembered in this browser
+    const theme = A.getByRole('group', { name: 'Theme' });
+    const bg = () => A.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    check('theme: it follows the system by default', await theme.getByRole('button', { name: 'System' }).getAttribute('aria-pressed') === 'true');
+    const light = await bg();
+    await theme.getByRole('button', { name: 'Dark' }).click();
+    check('theme: Dark turns the page dark', await A.evaluate(() => document.documentElement.dataset.theme) === 'dark' && await bg() !== light, [light, await bg()]);
+    await A.reload();
+    check('theme: the choice survives a reload, with no flash (set before the page draws)', await A.evaluate(() => document.documentElement.dataset.theme) === 'dark');
+    await shot(A, '08e-dark');
+    await A.getByRole('group', { name: 'Theme' }).getByRole('button', { name: 'System' }).click();
+    check('theme: System goes back to the operating system\'s', await A.evaluate(() => document.documentElement.dataset.theme === undefined) && await bg() === light);
+  }
+  // ---- Help: the commands, with copy buttons ----
+  await nav(A, 'Help');
+  {
+    const help = await A.locator('.help').innerText();
+    check('help: the commands to run (start, join, stop, status, logs, install, doctor), the options and the words',
+      ['tandem --start', 'tandem join "<invite link>"', 'tandem stop --all', 'tandem status', 'tandem logs conductor', 'tandem.cmd install', 'tandem doctor', '--fresh', '--conductor-model', 'Conductor', 'Teammate'].every(x => help.includes(x)), help.slice(0, 600));
+    check('help: which model does what, read from routing.json', (await A.locator('.help-table').innerText()).includes('opus, xhigh') && (await A.locator('.help-table tbody tr').count()) === 6);
+    check('help: each command has a copy button', await A.locator('.help .copy-btn').count() >= 11);
+    await shot(A, '08f-help', true);
+  }
   await nav(A, 'Activity');
   check('activity: it also holds the finished goals: branch, who built it, its files, and what the merge said',
     await until(() => finishedCard.isVisible(), 3000) && await (async () => { const t = await finishedCard.innerText(); return /Built by/.test(t) && /Files/.test(t) && t.includes('Merged tandem/x into main'); })(), await finishedCard.innerText().catch(() => ''));
@@ -434,7 +469,7 @@ try {
   await P.goto(`${URL_}/?db=${DB}`);
   await until(() => prompt(P).isVisible(), 10_000);
   const bar = await P.locator('.sidebar').boundingBox();
-  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 820 && await P.locator('.nav a').count() === 6, bar);
+  check('phone: the sections become a tab bar at the bottom', !!bar && bar.y + bar.height >= 820 && await P.locator('.nav a').count() === 7, bar);
   const small = await P.locator('.nav a, .btn').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent && (e as HTMLElement).offsetHeight < 44).length);
   check('phone: tap targets are at least 44px tall', small === 0, small);
   check('phone: no sideways scrolling', await P.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));

@@ -2,11 +2,11 @@
 import { useState } from 'react';
 import type { Api, Snapshot } from './brain';
 import { shareable, type Team } from './config';
-import { GetStarted } from './Setup';
+import { TeamSetup } from './Setup';
 import { LiveDatabase } from './Database';
-import { AgentCards } from './Agents';
+import { AgentCards, NOTE_KEYS } from './Agents';
 import { FinishedGoals } from './Finished';
-import { Avatar, Bar, CodeLine, EV_ICON, JoinSteps, Spend, UnitSwitch, WorkerStatus, agentLabel, ago, copy, isManager, onConductor, online, restartForSharingCommand, took, liveInfo } from './ui';
+import { Avatar, Bar, CodeLine, EV_ICON, Spend, ThemeSwitch, UnitSwitch, WorkerStatus, agentLabel, ago, copy, isManager, onConductor, online, restartForSharingCommand, took, liveInfo } from './ui';
 
 type Common = { snap: Snapshot; api: Api | null; isOp: boolean; me: string | null; now: number; say: (m: string) => void };
 
@@ -25,72 +25,47 @@ function useAct(say: (m: string) => void) {
 const list = (text: string) => text.split(/[,\n]/).map(x => x.trim()).filter(Boolean);
 
 // ---------- Team ----------
+// The workers first (who is here and what they are doing), then how to add more.
 export function TeamPage({ snap, now, say, team, isOp, go }: Common & { team: Team; go: (page: string) => void }) {
-  const share = shareable(team);
-  const uri = share?.uri ?? team.uri;
-  // The conductor says which repo the team works on (its origin). Real workers elsewhere need a clone.
-  const gitUrl = snap.context.git_url ?? ''; // set once the conductor serves the project (tandem --start)
-  const restart = restartForSharingCommand(snap.context.tandem_dir ?? '', snap.context.project_dir ?? '');
-  const mcp = `claude mcp add tandem -e STDB_URI=${uri} -e STDB_DB=${team.db} -e TANDEM_SESSION=live -- node --import tsx <tandem-folder>/mcp/src/server.ts`;
   const sorted = [...snap.workers].sort((a, b) => Number(online(b, now)) - Number(online(a, now)) || a.name.localeCompare(b.name));
+  const live = sorted.filter(w => online(w, now)).length;
   return (
     <div className="page">
-      <GetStarted snap={snap} team={team} now={now} say={say} go={go} isOp={isOp} />
-      <h2>Workers</h2>
-      <p className="muted lead">Each worker is a Claude Code agent on someone's computer. They pick up tasks by themselves.</p>
-      {sorted.length === 0 && <div className="card empty-board"><p className="muted">No workers yet. Add a computer below.</p></div>}
-      <div className="worker-grid">
-        {sorted.map(w => {
-          const current = snap.tasks.find(t => t.status === 'claimed' && t.assignee === w.id);
-          const info = current ? liveInfo(current, snap.events) : null;
-          const held = snap.locks.filter(l => l.workerId === w.id);
-          const theirs = snap.tasks.filter(t => t.assignee === w.id && t.status === 'done');
-          const mine = snap.tasks.filter(t => t.assignee === w.id);
-          const spent = mine.reduce((sum, t) => sum + t.costUsd, 0);
-          const tokens = mine.reduce((sum, t) => sum + t.tokens, 0);
-          return (
-            <article key={w.id} className={`card worker ${online(w, now) ? '' : 'is-offline'}`} aria-label={w.name}>
-              <header><Avatar name={w.name} size={36} /><div><strong>{w.name}</strong><div className="small muted"><span className={`chip agent-${w.agent}`}>{agentLabel(w)}</span> <span className="chip">{onConductor(w, snap) ? "Conductor's computer" : 'Teammate'}</span> seen {ago(w.lastSeen, now)}</div></div><WorkerStatus w={w} now={now} /></header>
-              <p className="small">{current ? <>On <strong>{current.title}</strong>{info?.since ? ` for ${took(info.since, now)}` : ''}</> : <span className="muted">No task right now</span>}</p>
-              {/* Claude Code only reports the quota on some plans: no empty bars when it does not */}
-              {w.usage5h !== null && <Bar label="5 hours" value={w.usage5h} />}
-              {w.usageWeek !== null && <Bar label="Week" value={w.usageWeek} />}
-              {held.length > 0 && <p className="small mono muted">Holding {held.map(l => l.path).join(', ')}</p>}
-              <p className="small muted">{theirs.length} task{theirs.length === 1 ? '' : 's'} done{spent > 0 || tokens > 0 ? <> · <Spend usd={spent} tokens={tokens} /> used</> : ''}</p>
-            </article>
-          );
-        })}
-      </div>
-      <section className="card connect" aria-labelledby="connect-h">
-        <h2 id="connect-h">Add a teammate&apos;s computer</h2>
-        {share ? (
-          <>
-            <p className="muted small">Send them the invite to watch the board: <a href={share.page}>{share.page}</a>. To let their computer&apos;s workers code, send them this one command block:</p>
-            <JoinSteps link={share.page} gitUrl={gitUrl} say={say} restart={restart} />
-          </>
-        ) : (
-          <>
-            <p className="small warn">Right now only this computer can join.</p>
-            <p className="muted small">On the conductor&apos;s computer, restart without <code className="mono">--local</code> to invite others:</p>
-            <CodeLine code={restart} say={say} />
-            <p className="muted small">Or add more workers on this computer:</p>
-            <CodeLine code="tandem --start --workers 4" say={say} />
-          </>
-        )}
-        <details>
-          <summary className="small">Or use your own Claude Code session as a worker</summary>
-          <ol className="steps small">
-            <li>Connect it: <CodeLine code={mcp} say={say} /></li>
-            <li>Give it the team rules: copy <code className="mono">mcp/skill/SKILL.md</code> to <code className="mono">.claude/skills/tandem-worker/SKILL.md</code> in your project.</li>
-            <li>Tell it: <em>Register with the tandem tools using my name, then claim a task, do it, and complete it. Repeat until no tasks are left.</em></li>
-          </ol>
-        </details>
+      <section aria-labelledby="workers-h">
+        <h2 id="workers-h">Workers <span className="muted small">{live} online{sorted.length > live ? ` · ${sorted.length - live} offline` : ''}</span></h2>
+        <p className="muted small">Each worker is a Claude Code agent on someone&apos;s computer. They pick up tasks by themselves.</p>
+        {sorted.length === 0 && <div className="card empty-board"><p className="muted">No workers yet. Add a computer below.</p></div>}
+        <div className="worker-grid">
+          {sorted.map(w => {
+            const current = snap.tasks.find(t => t.status === 'claimed' && t.assignee === w.id);
+            const info = current ? liveInfo(current, snap.events) : null;
+            const held = snap.locks.filter(l => l.workerId === w.id);
+            const mine = snap.tasks.filter(t => t.assignee === w.id);
+            const done = mine.filter(t => t.status === 'done').length;
+            const spent = mine.reduce((sum, t) => sum + t.costUsd, 0);
+            const tokens = mine.reduce((sum, t) => sum + t.tokens, 0);
+            return (
+              <article key={w.id} className={`card worker ${online(w, now) ? '' : 'is-offline'}`} aria-label={w.name}>
+                <header><Avatar name={w.name} size={36} /><div><strong>{w.name}</strong><div className="small muted"><span className={`chip agent-${w.agent}`}>{agentLabel(w)}</span> <span className="chip">{onConductor(w, snap) ? "Conductor's computer" : 'Teammate'}</span> seen {ago(w.lastSeen, now)}</div></div><WorkerStatus w={w} now={now} /></header>
+                <p className="small">{current ? <>On <strong>{current.title}</strong>{info?.since ? ` for ${took(info.since, now)}` : ''}</> : <span className="muted">No task right now</span>}</p>
+                {/* Claude Code only reports the quota on some plans: no empty bars when it does not */}
+                {w.usage5h !== null && <Bar label="5 hours" value={w.usage5h} />}
+                {w.usageWeek !== null && <Bar label="Week" value={w.usageWeek} />}
+                {held.length > 0 && <p className="small mono muted">Holding {held.map(l => l.path).join(', ')}</p>}
+                <p className="small muted">{done} task{done === 1 ? '' : 's'} done{spent > 0 || tokens > 0 ? <> · <Spend usd={spent} tokens={tokens} /> used</> : ''}</p>
+              </article>
+            );
+          })}
+        </div>
       </section>
+      <TeamSetup snap={snap} team={team} now={now} say={say} go={go} isOp={isOp} />
     </div>
   );
 }
 
 // ---------- Shared memory ----------
+// For developers: what each Claude is given before a task, what each agent is doing and holding,
+// and the raw shared state behind it. (Why it is built this way belongs in the README.)
 const NOTES: { key: string; title: string; hint: string }[] = [
   { key: 'project_summary', title: 'Project summary', hint: 'What this project is, in two or three sentences.' },
   { key: 'interfaces', title: 'Interfaces', hint: 'Names and shapes that parallel tasks must agree on. The conductor writes here too.' },
@@ -111,7 +86,7 @@ function Note({ k, title, hint, snap, api, isOp, say, now }: Common & { k: strin
   const readers = readersOf(snap, title);
   return (
     <form className="card memory-note" onSubmit={e => { e.preventDefault(); void act(() => api!.setNote(k, value), `${title} saved.`).then(ok => { if (ok) setDraft(null); }); }}>
-      <h2>{title}</h2>
+      <h2>{title} <code className="mono small muted">{k}</code></h2>
       <p className="small muted">{hint}</p>
       <label className="sr-only" htmlFor={`note-${k}`}>{title}</label>
       <textarea id={`note-${k}`} value={value} onChange={e => setDraft(e.target.value)} disabled={!isOp} rows={4} placeholder={isOp ? 'Empty' : 'Nothing yet'} />
@@ -129,26 +104,60 @@ function Note({ k, title, hint, snap, api, isOp, say, now }: Common & { k: strin
   );
 }
 export function MemoryPage(c: Common & { team: Team }) {
+  const { snap, now } = c;
+  const nameOf = (id: string) => snap.workers.find(w => w.id === id)?.name ?? id;
+  const titleOf = (id: string) => snap.tasks.find(t => t.id === id)?.title ?? id;
+  // everything else in the shared context: where the project is, the conductor's computer, merge answers...
+  const others = Object.keys(snap.context).filter(k => !(NOTE_KEYS as readonly string[]).includes(k)).sort();
   return (
     <div className="page">
-      <p className="muted lead">Every worker&apos;s Claude reads these notes before it starts a task, and each note says who wrote it and who read it. Keep them short. They are stored in the database&apos;s <code className="mono">context</code> table.</p>
-      <div className="notes">{NOTES.map(n => <Note key={n.key} {...c} k={n.key} title={n.title} hint={n.hint} />)}</div>
+      <p className="muted lead">What every worker&apos;s Claude is given before a task, what each agent is doing and holding right now, and the shared state behind it.</p>
 
-      <section className="shared-brain" aria-labelledby="brain-h">
-        <h2 id="brain-h">How the team shares one memory</h2>
-        <ul className="plain db-points">
-          <li><strong>The code is not stored here.</strong> It lives in git: each worker builds on its own branch and pushes it back.</li>
-          <li><strong>SpacetimeDB holds what the agents must agree on:</strong> the goals and tasks, which files are being edited, the notes above, and who is online. Everyone reads and writes the same rows.</li>
-          <li><strong>Reducers</strong> make each change in one atomic step inside the database, so two workers can never claim the same task or the same file.</li>
-          <li><strong>Subscriptions</strong> push every change to every browser and worker the moment it happens. Nothing polls.</li>
+      <section aria-labelledby="notes-h">
+        <h2 id="notes-h">Notes in every task&apos;s prompt</h2>
+        <div className="notes">{NOTES.map(n => <Note key={n.key} {...c} k={n.key} title={n.title} hint={n.hint} />)}</div>
+      </section>
+
+      <section aria-labelledby="agents-h">
+        <h2 id="agents-h">Agents</h2>
+        <AgentCards snap={snap} now={now} />
+      </section>
+
+      <section aria-labelledby="locks-h">
+        <h2 id="locks-h">Files locked now <span className="muted small">{snap.locks.length}</span></h2>
+        <ul className="plain rows card dev-rows">
+          {snap.locks.map(l => (
+            <li className="row" key={l.path}>
+              <code className="mono grow">{l.path}</code>
+              <span className="small">{titleOf(l.taskId)}</span>
+              <span className="small who"><Avatar name={nameOf(l.workerId)} size={18} /> {nameOf(l.workerId)}</span>
+              <span className="small muted nowrap">{ago(l.createdAt, now)}</span>
+            </li>
+          ))}
+          {snap.locks.length === 0 && <li className="row muted small">No files locked. A worker locks its task&apos;s files when it claims it.</li>}
         </ul>
-        <h2>What each agent knows and is doing</h2>
-        <AgentCards snap={c.snap} now={c.now} />
+      </section>
+
+      <section aria-labelledby="values-h">
+        <h2 id="values-h">Other shared values <span className="muted small">{others.length}</span></h2>
+        <ul className="plain rows card dev-rows">
+          {others.map(k => {
+            const m = snap.contextMeta[k];
+            return (
+              <li className="row" key={k}>
+                <code className="mono dev-key">{k}</code>
+                <code className="mono grow dev-value" title={snap.context[k]}>{snap.context[k] || '""'}</code>
+                <span className="small muted nowrap">{m?.by ? `${m.by}${m.at ? ` · ${ago(m.at, now)}` : ''}` : ''}</span>
+              </li>
+            );
+          })}
+          {others.length === 0 && <li className="row muted small">Nothing else yet.</li>}
+        </ul>
       </section>
 
       <details className="under-hood">
-        <summary>Under the hood: the SpacetimeDB tables</summary>
-        <LiveDatabase snap={c.snap} team={c.team} />
+        <summary>Raw tables</summary>
+        <LiveDatabase snap={snap} team={c.team} />
       </details>
     </div>
   );
@@ -281,9 +290,12 @@ export function SettingsPage(c: Common & { team: Team; onLeave: () => void }) {
       </section>
 
       <section className="card" aria-labelledby="unit-h">
-        <h2 id="unit-h">Show usage as</h2>
-        <p className="small muted">Dollars are estimated at Claude API prices (~). On a Pro or Max plan nothing is billed per run, so tokens may say more. This browser remembers the choice.</p>
-        <UnitSwitch />
+        <h2 id="unit-h">This browser</h2>
+        <dl className="facts prefs">
+          <dt>Theme</dt><dd><ThemeSwitch /></dd>
+          <dt>Show usage as</dt><dd><UnitSwitch /><span className="small muted">Dollars are estimated at Claude API prices (~). On a Pro or Max plan nothing is billed per run.</span></dd>
+        </dl>
+        <p className="small muted">Remembered in this browser only.</p>
       </section>
 
       {isOp && (

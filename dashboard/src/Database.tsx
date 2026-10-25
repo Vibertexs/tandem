@@ -47,7 +47,7 @@ export function LiveDatabase({ snap, team }: { snap: Snapshot; team: Team }) {
       <h2 id="live-db-h">Live database</h2>
       <p className="muted lead">
         {live
-          ? <>This is <strong>SpacetimeDB</strong>: the database <code className="mono">{team.db}</code> at <code className="mono">{team.uri}</code>. Everything on the Board, the Team page and the notes above is rows in these tables. Changes are pushed to every connected computer the moment they happen; nothing polls.</>
+          ? <>SpacetimeDB database <code className="mono">{team.db}</code> at <code className="mono">{team.uri}</code>, session <code className="mono">live</code>. This page is subscribed, so the counts change as rows do.</>
           : <>Sample data, not a live database. With a real team, this shows its SpacetimeDB tables and updates the moment anything changes.</>}
       </p>
       <div className="db-grid">

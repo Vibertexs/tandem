@@ -6,6 +6,7 @@ import { BoardPage } from './Board';
 import { ActivityPage, MemoryPage, SettingsPage, TeamPage } from './Pages';
 import { Dock } from './Dock';
 import { UsagePage } from './Usage';
+import { HelpPage } from './Help';
 import { CodeLine, JoinSteps, isManager, managerOnline, online, restartForSharingCommand, useNow } from './ui';
 import type { Snapshot } from './brain';
 
@@ -15,6 +16,7 @@ const PAGES = [
   { key: 'memory', label: 'Shared memory' },
   { key: 'usage', label: 'Usage' },
   { key: 'activity', label: 'Activity' },
+  { key: 'help', label: 'Help' },
   { key: 'settings', label: 'Settings' },
 ] as const;
 type PageKey = typeof PAGES[number]['key'];
@@ -127,7 +129,7 @@ export function App() {
           <h1>{config.present ? `${team?.db ?? 'Tandem'}` : title}</h1>
           <span className="spacer" />
           {!config.present && (
-            <div className="team-pill" title={team?.uri}>
+            <div className="top-item team-pill" title={team?.uri}>
               <span className={`dot ${status === 'connected' ? 'on' : 'off'}`} aria-hidden="true" />
               <span className="team-name">{config.mock ? 'Sample data' : team!.db}</span>
               <span className="small muted">{status === 'connected' ? `${workersOnline} worker${workersOnline === 1 ? '' : 's'} online` : 'Reconnecting…'}</span>
@@ -136,11 +138,15 @@ export function App() {
               )}
             </div>
           )}
-          {!config.present && (config.mock ? <span className="chip">Read only</span> : isOp ? <span className="chip st-busy">You are the conductor</span> : <span className="chip">Teammate · watching</span>)}
+          {!config.present && (config.mock
+            ? <span className="top-item"><span className="dot" aria-hidden="true" />Read only</span>
+            : isOp
+              ? <span className="top-item role-pill"><span className="dot you" aria-hidden="true" />You are the conductor</span>
+              : <span className="top-item role-pill"><span className="dot" aria-hidden="true" />Teammate · watching</span>)}
           {!config.mock && !config.present && team && <Invite team={team} snap={snap} say={say} />}
           {!config.mock && !isOp && !unowned && !config.present && status === 'connected' && (
             asked
-              ? <span className="chip goal-new">Waiting for the conductor to approve you</span>
+              ? <span className="top-item"><span className="dot wait" aria-hidden="true" />Waiting for the conductor to approve you</span>
               : <AskToManage onAsk={name => api!.askToManage(name).then(() => say('Request sent. The conductor sees it on the Board.'), e => say('Could not ask: ' + (e as Error).message))} />
           )}
         </header>
@@ -153,6 +159,7 @@ export function App() {
           {page === 'team' && <TeamPage {...common} team={team ?? { uri: '', db: 'sample' }} go={go} />}
           {page === 'memory' && <MemoryPage {...common} team={team ?? { uri: '', db: 'sample' }} />}
           {page === 'activity' && <ActivityPage {...common} />}
+          {page === 'help' && <HelpPage snap={snap} team={team ?? { uri: '', db: 'sample' }} say={say} />}
           {page === 'settings' && <SettingsPage {...common} team={team ?? { uri: '', db: 'sample' }} onLeave={leave} />}
         </main>
       </div>
@@ -178,11 +185,11 @@ function Invite({ team, snap, say }: { team: Team; snap: Snapshot; say: (m: stri
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('mousedown', onDown); };
   }, [open]);
   if (!share) {
-    return <span className="chip invite-local" title="To invite others: tandem stop --all, then tandem --start, in the project's folder">This computer only</span>;
+    return <span className="top-item invite-local" title="To invite others: tandem stop --all, then tandem --start, in the project's folder">This computer only</span>;
   }
   return (
     <div className="invite" ref={box}>
-      <button type="button" className="btn" aria-expanded={open} onClick={() => setOpen(!open)}>Invite</button>
+      <button type="button" className="top-item" aria-expanded={open} onClick={() => setOpen(!open)}>Invite</button>
       {open && (
         <div className="invite-pop card" role="dialog" aria-label="Invite">
           <p className="small"><strong>Send this link to watch the board.</strong></p>
@@ -198,7 +205,7 @@ function Invite({ team, snap, say }: { team: Team; snap: Snapshot; say: (m: stri
 function AskToManage({ onAsk }: { onAsk: (name: string) => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
-  if (!open) return <button type="button" className="btn primary" onClick={() => setOpen(true)}>Request control</button>;
+  if (!open) return <button type="button" className="top-item primary" onClick={() => setOpen(true)}>Request control</button>;
   return (
     <form className="inline-form" onSubmit={e => { e.preventDefault(); if (name.trim()) void onAsk(name.trim()).then(() => setOpen(false)); }}>
       <label className="sr-only" htmlFor="ask-name">Your name</label>
