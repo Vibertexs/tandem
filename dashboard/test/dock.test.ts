@@ -8,15 +8,16 @@ const check = (name: string, ok: boolean, detail: unknown = '') => {
 };
 
 const none = dockSizes(null, 6);
-check('with no pointer every icon is 40px', none.length === 6 && none.every(s => s === 40), none);
+check('with no pointer every icon is 36px', none.length === 6 && none.every(s => s === 36), none);
 
-// the third icon's centre: ROOM 24 + 2 * (40 + 6) + 20 = 136
-const on = dockSizes(136, 6);
-check('the icon under the pointer is the biggest, at most 60px', on[2] === 60 && on.every((s, i) => i === 2 || s < on[2]) && Math.max(...on) <= 60, on);
-check('its neighbours grow less, and equally on both sides', on[1] === on[3] && on[1] > 40 && on[1] < 60, on);
-check('icons far away stay 40px', on[5] === 40 && on[0] <= on[1], on);
-check('moving the pointer down moves the peak down', dockSizes(240, 6).indexOf(Math.max(...dockSizes(240, 6))) === 4, dockSizes(240, 6));
-check('the total growth stays within the room kept above and below (48px)', on.reduce((a, s) => a + s - 40, 0) <= 48, on);
+// the third icon's centre: ROOM 20 + 2 * (36 + 6) + 18 = 122
+const on = dockSizes(122, 6);
+check('the icon under the pointer is the biggest, and never more than the dock is wide (48px)', on[2] === 48 && on.every((s, i) => i === 2 || s < on[2]) && Math.max(...on) <= 48, on);
+check('its neighbours grow less, and equally on both sides', on[1] === on[3] && on[1] > 36 && on[1] < 48, on);
+check('icons far away stay 36px', on[5] === 36 && on[0] <= on[1], on);
+check('moving the pointer down moves the peak down', dockSizes(220, 6).indexOf(Math.max(...dockSizes(220, 6))) === 4, dockSizes(220, 6));
+check('the total growth stays within the room kept above and below (40px)', on.reduce((a, s) => a + s - 36, 0) <= 40, on);
+check('every size is a whole number of pixels between 36 and 48 wherever the pointer is', Array.from({ length: 300 }, (_, p) => dockSizes(p, 6)).flat().every(s => Number.isInteger(s) && s >= 36 && s <= 48));
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

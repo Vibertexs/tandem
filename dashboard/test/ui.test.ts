@@ -84,9 +84,12 @@ try {
     const before = (await link(2).boundingBox())!;
     const nextBefore = (await link(3).boundingBox())!;
     await A.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
-    const grew = await until(async () => { const b = await link(2).boundingBox(); return !!b && b.width > before.width + 8; }, 3000);
+    const dockBefore = (await A.locator('.dock').boundingBox())!;
+    const grew = await until(async () => { const b = await link(2).boundingBox(); return !!b && b.width > before.width + 6; }, 3000);
     const nextAfter = (await link(3).boundingBox())!;
-    check('dock: the icon under the pointer grows, and pushes the next icon away', grew && nextAfter.y > nextBefore.y + 4, [before, nextBefore, nextAfter]);
+    const dockAfter = (await A.locator('.dock').boundingBox())!;
+    check('dock: the icon under the pointer grows, and pushes the next icon away', grew && nextAfter.y > nextBefore.y + 2, [before, nextBefore, nextAfter]);
+    check('dock: the dock itself keeps its width and its icons never get wider than it', dockAfter.width === dockBefore.width && (await link(2).boundingBox())!.width <= dockAfter.width, [dockBefore, dockAfter]);
     await shot(A, '02b-dock-hover');
     await A.mouse.move(700, 500);
     check('dock: it shrinks back when the pointer leaves', await until(async () => (await link(2).boundingBox())!.width === before.width, 3000));

@@ -198,7 +198,8 @@ function GoalLane({ lane, p, open, setOpen, flash }: { lane: Lane; p: Props; ope
             {STAGES.map(s => {
               const items = lane.tasks.filter(t => stageOf(t) === s.key);
               return (
-                <div className="column" key={s.key} aria-label={s.title}>
+                <div className={`column ${items.length === 0 ? 'is-empty' : ''}`} key={s.key} aria-label={s.title}>
+                  <div className="column-head"><span className={`stage-tag stage-${s.key}`} title={s.hint}><i className="tag-dot" />{s.title}<span className="tag-count">{items.length}</span></span></div>
                   {items.map(t => <Card key={t.id} t={t} snap={snap} now={now} selected={open === t.id} flash={flash.has(t.id)} onOpen={() => setOpen(t.id)} />)}
                 </div>
               );
@@ -378,7 +379,6 @@ export function BoardPage(p: Props) {
         </div>
       ) : (
         <div className="lanes">
-          <div className="lane-cols" aria-hidden="true">{STAGES.map(s => <span key={s.key} className={`stage-tag stage-${s.key}`} title={s.hint}><i className="tag-dot" />{s.title}</span>)}</div>
           {lanes.map(l => <GoalLane key={l.key} lane={l} p={p} open={open} setOpen={setOpen} flash={flash} />)}
         </div>
       )}
