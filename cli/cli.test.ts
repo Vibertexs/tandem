@@ -42,6 +42,24 @@ check('outside a git repo, tandem start says what to do', /is not a git reposito
   check('init refuses a folder that already exists', /already exists/.test(tandem(['init', fresh], repo)));
   rmSync(fresh, { recursive: true, force: true });
 }
+{
+  const flags = ['--no-browser', '--local', '--no-manager', '--workers', '0'];
+  const empty = mkdtempSync(join(tmpdir(), 'tandem-cli-empty-'));
+  const viaInit = tandem(['init', empty, ...flags, '--team', 'empty-init'], repo);
+  check('init accepts a folder that exists but is empty', /Created a new Git project/.test(viaInit) && /Tandem is running for/.test(viaInit), viaInit);
+  rmSync(empty, { recursive: true, force: true });
+
+  const bare = mkdtempSync(join(tmpdir(), 'tandem-cli-empty-'));
+  const viaStart = tandem(['start', ...flags, '--team', 'empty-start'], bare);
+  check('start in an empty folder makes it a Git project, then starts', /was empty/.test(viaStart) && /Tandem is running for/.test(viaStart), viaStart);
+  rmSync(bare, { recursive: true, force: true });
+
+  const full = mkdtempSync(join(tmpdir(), 'tandem-cli-full-'));
+  writeFileSync(join(full, 'notes.txt'), 'mine\n');
+  check('start leaves a folder with files alone and explains', /is not a git repository/.test(tandem(['start'], full)) && /git init/.test(tandem(['start'], full)));
+  check('init refuses a folder with files', /has files in it/.test(tandem(['init', full], repo)));
+  rmSync(full, { recursive: true, force: true });
+}
 check('the retired --demo flag says there is no demo project', /There is no demo project/.test(tandem(['start', '--demo'], repo)));
 check('no accounts yet: account list says how to add one', /No accounts yet/.test(tandem(['account', 'list'], repo)));
 tandem(['account', 'add', 'work1', '--no-login'], repo);

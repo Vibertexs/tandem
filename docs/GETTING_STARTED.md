@@ -44,11 +44,13 @@ For a clean test project, use one Tandem command:
 tandem init C:\Code\tandem-try
 ~~~
 
-It creates the folder, initializes Git, makes the first empty commit, and starts Tandem. It refuses to use a folder that already exists, so it cannot accidentally add Git files to another project.
+It creates the folder, initializes Git, makes the first empty commit, and starts Tandem. It also works in a folder you already made, as long as that folder is empty. It refuses a folder with files in it, so it cannot accidentally add Git files to another project.
+
+Already made an empty folder? Open it and run `tandem --start`. Tandem sees that it is empty and makes it a Git project for you.
 
 ## Start a team for an existing project
 
-Move to a Git project with at least one commit, then run:
+Tandem needs a Git project. Move to one with at least one commit, then run:
 
 ~~~powershell
 cd C:\path\to\your-project
